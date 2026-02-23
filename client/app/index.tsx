@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {router} from "expo-router"
 
 function withAlpha(hex: string, alpha: number) {
   const value = hex.replace("#", "");
@@ -29,6 +30,14 @@ function withAlpha(hex: string, alpha: number) {
   const b = Number.parseInt(normalized.slice(4, 6), 16);
 
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const onLogin = (): void => {
+  router.push("/(tabs)");
+}
+
+const onForgot = (): void => {
+  router.push("/forgotpass")
 }
 
 export default function App() {
@@ -99,7 +108,7 @@ export default function App() {
                     >
                       Password
                     </Text>
-                    <Pressable hitSlop={8}>
+                    <Pressable hitSlop={8} onPress={onForgot}>
                       <Text
                         className="text-xs font-semibold"
                         style={{ color: palette.primary }}
@@ -135,6 +144,7 @@ export default function App() {
                 label="Sign In"
                 className="mt-8"
                 textClassName="font-bold"
+                onPress={onLogin}
                 rightIcon={
                   <Feather name="arrow-right" size={18} color={palette.bgBase} />
                 }
