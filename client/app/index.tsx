@@ -40,6 +40,9 @@ const onForgot = (): void => {
   router.push("/forgotpass")
 }
 
+const onRegister = (): void => {
+  router.push("/register")
+}
 export default function App() {
   const palette = Colors.dark;
   const [showPassword, setShowPassword] = useState(false);
@@ -185,7 +188,7 @@ export default function App() {
                 <Text className="text-sm" style={{ color: palette.textTertiary }}>
                   Don&apos;t have an account?{" "}
                 </Text>
-                <Pressable hitSlop={8}>
+                <Pressable hitSlop={8} onPress={onRegister}>
                   <Text
                     className="text-sm font-bold"
                     style={{ color: palette.primary }}
