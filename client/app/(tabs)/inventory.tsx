@@ -1,10 +1,10 @@
 import { Colors } from "@/constants/theme";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
-import { FilterChip } from "@/components/inventory/filter-chip";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
+import { FilterGroup } from "@/components/ui/filter-group";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
@@ -191,35 +191,21 @@ export default function InventoryTabScreen() {
             </Pressable>
           </View>
 
-          <Text className="mt-4 text-xs uppercase tracking-[1px] text-text-tertiary">Status</Text>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {statusFilters.map((filter) => {
-              const isActive = activeStatus === filter;
-              return (
-                <FilterChip
-                  key={filter}
-                  label={filter}
-                  isActive={isActive}
-                  onPress={() => setActiveStatus(filter)}
-                />
-              );
-            })}
-          </View>
+          <FilterGroup
+            label="Status"
+            options={statusFilters}
+            activeValue={activeStatus}
+            onSelect={setActiveStatus}
+            className="mt-4"
+          />
 
-          <Text className="mt-4 text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {roomFilters.map((room) => {
-              const isActive = activeRoom === room;
-              return (
-                <FilterChip
-                  key={room}
-                  label={room}
-                  isActive={isActive}
-                  onPress={() => setActiveRoom(room)}
-                />
-              );
-            })}
-          </View>
+          <FilterGroup
+            label="Room"
+            options={roomFilters}
+            activeValue={activeRoom}
+            onSelect={setActiveRoom}
+            className="mt-4"
+          />
         </View>
       ) : null}
 
