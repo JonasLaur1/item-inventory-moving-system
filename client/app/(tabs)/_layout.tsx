@@ -61,7 +61,7 @@ export default function TabLayout() {
                 alignItems: "center",
                 justifyContent: "center",
                 marginTop: -26,
-                backgroundColor: focused ? Colors.dark.primary : "rgba(46, 111, 242, 0.82)",
+                backgroundColor: focused ? Colors.dark.primary : `${Colors.dark.primary}D1`,
                 borderWidth: 2,
                 borderColor: Colors.dark.bgElevated,
                 shadowColor: "#000",
