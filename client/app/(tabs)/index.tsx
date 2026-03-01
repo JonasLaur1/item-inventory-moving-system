@@ -1,5 +1,11 @@
 import { Colors } from "@/constants/theme";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  PriorityRoomCard,
+  type PriorityRoomCardProps,
+} from "@/components/home/priority-room-card";
+import { QuickActionCard } from "@/components/home/quick-action-card";
+import { SectionHeader } from "@/components/home/section-header";
+import { Feather } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,7 +16,7 @@ type Room = {
   name: string;
   packed: number;
   total: number;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon: PriorityRoomCardProps["icon"];
 };
 
 type Activity = {
@@ -112,70 +118,45 @@ export default function HomeTabScreen() {
           </View>
 
           <View className="mt-8 flex-row gap-3">
-            <Pressable className="flex-1 rounded-card bg-primary px-4 py-5 shadow-soft">
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-white/15">
-                <Feather name="camera" size={20} color={Colors.dark.textPrimary} />
-              </View>
-              <Text className="mt-4 text-lg font-bold text-text-primary">Scan QR</Text>
-              <Text className="mt-1 text-sm text-text-secondary/80">Scan QR Code</Text>
-            </Pressable>
-
-            <Pressable className="flex-1 rounded-card border border-border-default bg-bg-elevated/70 px-4 py-5">
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-primary/20">
-                <Feather name="plus" size={20} color={Colors.dark.primary} />
-              </View>
-              <Text className="mt-4 text-lg font-bold text-text-primary">Add Box</Text>
-              <Text className="mt-1 text-sm text-text-tertiary">Add New Box</Text>
-            </Pressable>
+            <QuickActionCard
+              title="Scan QR"
+              subtitle="Scan QR Code"
+              icon="camera"
+              variant="primary"
+            />
+            <QuickActionCard
+              title="Add Box"
+              subtitle="Add New Box"
+              icon="plus"
+              variant="secondary"
+            />
           </View>
 
           <View className="mt-10">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-text-primary">Priority Rooms</Text>
-              {roomData.length > 2 ? (
-                <Pressable onPress={() => setShowAllRooms((prev) => !prev)}>
-                  <Text className="text-sm font-semibold text-text-link">
-                    {showAllRooms ? "Show Less" : "Show All"}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
+            <SectionHeader
+              title="Priority Rooms"
+              actionLabel={roomData.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
+              onPressAction={
+                roomData.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
+              }
+            />
 
             <View className="mt-4 flex-row flex-wrap justify-between">
-              {visibleRooms.map((room) => {
-                const roomProgress = Math.round((room.packed / room.total) * 100);
-
-                return (
-                  <Pressable
-                    key={room.id}
-                    className="mb-3 rounded-card border border-border-default bg-bg-elevated/75 p-4"
-                    style={{ width: "48.5%" }}
-                  >
-                    <View className="h-14 w-14 items-center justify-center rounded-xl bg-primary/15">
-                      <MaterialCommunityIcons
-                        name={room.icon}
-                        size={24}
-                        color={Colors.dark.primary}
-                      />
-                    </View>
-                    <Text className="mt-3 text-base font-bold text-text-primary">{room.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">
-                      {room.packed}/{room.total} boxes
-                    </Text>
-                    <View className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border-default">
-                      <View
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${roomProgress}%` }}
-                      />
-                    </View>
-                  </Pressable>
-                );
-              })}
+              {visibleRooms.map((room) => (
+                <PriorityRoomCard
+                  key={room.id}
+                  name={room.name}
+                  packed={room.packed}
+                  total={room.total}
+                  icon={room.icon}
+                  style={{ width: "48.5%" }}
+                />
+              ))}
             </View>
           </View>
 
           <View className="mt-4">
-            <Text className="text-xl font-bold text-text-primary">Recent Activity</Text>
+            <SectionHeader title="Recent Activity" />
             <View className="mt-4 gap-3">
               {recentActivity.slice(0, 4).map((activity) => (
                 <View
