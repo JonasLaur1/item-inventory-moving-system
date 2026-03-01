@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { Feather } from "@expo/vector-icons";
+import { MetaPill } from "@/components/ui/meta-pill";
 import { Pressable, Text, View } from "react-native";
 
 export type InventoryBoxStatus = "Packed" | "Unpacked";
@@ -62,20 +61,6 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressMove }: BoxC
           <Text className="text-xs font-semibold text-text-secondary">Move</Text>
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-type MetaPillProps = {
-  icon: keyof typeof Feather.glyphMap;
-  text: string;
-};
-
-function MetaPill({ icon, text }: MetaPillProps) {
-  return (
-    <View className="flex-row items-center rounded-full border border-border-default bg-bg-input/60 px-3 py-1.5">
-      <Feather name={icon} size={12} color={Colors.dark.textTertiary} />
-      <Text className="ml-1.5 text-xs text-text-tertiary">{text}</Text>
     </View>
   );
 }
