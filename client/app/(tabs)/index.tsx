@@ -6,6 +6,7 @@ import {
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -75,7 +76,10 @@ export default function HomeTabScreen() {
               </View>
               <Text className="text-2xl font-bold text-text-primary">BoxIt</Text>
             </View>
-            <Pressable className="h-11 w-11 items-center justify-center rounded-card border border-border-default bg-bg-elevated/70">
+            <Pressable
+              onPress={() => router.push("/profile")}
+              className="h-11 w-11 items-center justify-center rounded-card border border-border-default bg-bg-elevated/70"
+            >
               <Feather name="settings" size={18} color={Colors.dark.textPrimary} />
             </Pressable>
           </View>
@@ -180,3 +184,4 @@ export default function HomeTabScreen() {
     </SafeAreaView>
   );
 }
+
