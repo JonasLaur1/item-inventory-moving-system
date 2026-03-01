@@ -10,10 +10,14 @@ export function SectionHeader({ title, actionLabel, onPressAction }: SectionHead
   return (
     <View className="flex-row items-center justify-between">
       <Text className="text-xl font-bold text-text-primary">{title}</Text>
-      {actionLabel && onPressAction ? (
-        <Pressable onPress={onPressAction}>
-          <Text className="text-sm font-semibold text-text-link">{actionLabel}</Text>
-        </Pressable>
+      {actionLabel ? (
+        onPressAction ? (
+          <Pressable onPress={onPressAction}>
+            <Text className="text-sm font-semibold text-text-link">{actionLabel}</Text>
+          </Pressable>
+        ) : (
+          <Text className="text-sm font-semibold text-text-tertiary">{actionLabel}</Text>
+        )
       ) : null}
     </View>
   );

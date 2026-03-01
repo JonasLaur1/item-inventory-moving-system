@@ -5,10 +5,10 @@ import {
 } from "@/components/home/priority-room-card";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
+import { AppHeader } from "@/components/app-header";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
@@ -69,20 +69,7 @@ export default function HomeTabScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="pt-2">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 items-center justify-center rounded-card bg-primary/20">
-                <Feather name="package" size={20} color={Colors.dark.primary} />
-              </View>
-              <Text className="text-2xl font-bold text-text-primary">BoxIt</Text>
-            </View>
-            <Pressable
-              onPress={() => router.push("/profile")}
-              className="h-11 w-11 items-center justify-center rounded-card border border-border-default bg-bg-elevated/70"
-            >
-              <Feather name="settings" size={18} color={Colors.dark.textPrimary} />
-            </Pressable>
-          </View>
+          <AppHeader />
 
           <View className="mt-8 items-center">
             <View className="relative h-[220px] w-[220px] items-center justify-center">
