@@ -15,26 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function withAlpha(hex: string, alpha: number) {
-  const value = hex.replace("#", "");
-  const normalized =
-    value.length === 3
-      ? value
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : value;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
-  const palette = Colors.dark;
   const strengthSegments = [1, 2, 3, 0];
 
   const onRegister = (): void => {
@@ -46,9 +28,9 @@ export default function Register() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bgBase }}>
+    <SafeAreaView className="flex-1 bg-bg-base">
       <StatusBar style="light" />
-      <View className="flex-1" style={{ backgroundColor: palette.bgBase }}>
+      <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1"
@@ -59,35 +41,15 @@ export default function Register() {
             contentContainerStyle={{ flexGrow: 1 }}
           >
             <View className="flex-1 px-6 pt-8 pb-6">
-              <View
-                className="items-center mt-6"
-              >
-                <View
-                  className="items-center justify-center rounded-2xl"
-                  style={{
-                    width: 60,
-                    height: 60,
-                    backgroundColor: palette.primary,
-                    shadowColor: palette.primary,
-                    shadowOpacity: 0.35,
-                    shadowRadius: 18,
-                    shadowOffset: { width: 0, height: 10 },
-                    elevation: 10,
-                  }}
-                >
-                  <Feather name="package" size={28} color={palette.textPrimary} />
+              <View className="items-center mt-6">
+                <View className="h-[60px] w-[60px] items-center justify-center rounded-card bg-primary shadow-card">
+                  <Feather name="package" size={28} color={Colors.dark.textPrimary} />
                 </View>
 
-                <Text
-                  className="mt-5 text-4xl font-bold"
-                  style={{ color: palette.textPrimary }}
-                >
+                <Text className="mt-5 text-4xl font-bold text-text-primary">
                   Create Account
                 </Text>
-                <Text
-                  className="mt-2 text-sm text-center"
-                  style={{ color: palette.textTertiary }}
-                >
+                <Text className="mt-2 text-center text-sm text-text-tertiary">
                   Start your smart move today with AI-powered packing.
                 </Text>
               </View>
@@ -128,7 +90,7 @@ export default function Register() {
                       <Feather
                         name={showPassword ? "eye" : "eye-off"}
                         size={18}
-                        color={palette.textTertiary}
+                        color={Colors.dark.textTertiary}
                       />
                     </Pressable>
                   }
@@ -136,30 +98,15 @@ export default function Register() {
 
                 <View className="mt-4">
                   <View className="flex-row items-center justify-between">
-                    <Text
-                      className="text-xs"
-                      style={{ color: withAlpha(palette.textTertiary, 0.95) }}
-                    >
-                      Password Strength
-                    </Text>
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{ color: palette.primary }}
-                    >
-                      Strong
-                    </Text>
+                    <Text className="text-xs text-text-tertiary">Password Strength</Text>
+                    <Text className="text-xs font-semibold text-text-link">Strong</Text>
                   </View>
 
                   <View className="mt-2 flex-row gap-2">
                     {strengthSegments.map((active, index) => (
                       <View
                         key={index}
-                        className="h-1 flex-1 rounded-full"
-                        style={{
-                          backgroundColor: active
-                            ? palette.primary
-                            : withAlpha(palette.textTertiary, 0.3),
-                        }}
+                        className={`h-1 flex-1 rounded-full ${active ? "bg-primary" : "bg-text-tertiary/30"}`}
                       />
                     ))}
                   </View>
@@ -171,24 +118,18 @@ export default function Register() {
                   textClassName="font-bold"
                   onPress={onRegister}
                   rightIcon={
-                    <Feather name="arrow-right" size={18} color={palette.bgBase} />
+                    <Feather name="arrow-right" size={18} color={Colors.dark.bgBase} />
                   }
                 />
 
-                <View
-                  className="mt-6 h-px"
-                  style={{ backgroundColor: withAlpha(palette.textTertiary, 0.15) }}
-                />
+                <View className="mt-6 h-px bg-text-tertiary/15" />
 
                 <View className="mt-4 flex-row items-center justify-center">
-                  <Text
-                    className="text-sm"
-                    style={{ color: withAlpha(palette.textTertiary, 0.95) }}
-                  >
+                  <Text className="text-sm text-text-tertiary">
                     Already have an account?{" "}
                   </Text>
                   <Pressable hitSlop={8} onPress={onLogin}>
-                    <Text className="text-sm font-bold" style={{ color: palette.primary }}>
+                    <Text className="text-sm font-bold text-text-link">
                       Log In
                     </Text>
                   </Pressable>

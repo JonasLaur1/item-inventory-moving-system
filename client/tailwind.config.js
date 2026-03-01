@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+const designTokens = require("./constants/design-tokens.json");
+
+const { brand, dark } = designTokens.colors;
+
 module.exports = {
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
@@ -8,24 +12,39 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary Brand & Status Colors
-        primary: "#2E6FF2",
-        crimson: "#EF4444",
-        emerald: "#10B981",
-        
-        // Background & Surface
-        "bg-base": "#121826",
-        "bg-elevated": "#1C2433",
-        "bg-input": "#2D3748",
-        
-        // Typography & Icons
-        "text-primary": "#FFFFFF",
-        "text-secondary": "#E2E8F0",
-        "text-tertiary": "#94A3B8",
-        "text-disabled": "#4A5568",
+        primary: brand.primary,
+        crimson: brand.crimson,
+        emerald: brand.emerald,
+        "bg-base": dark.bgBase,
+        "bg-elevated": dark.bgElevated,
+        "bg-input": dark.bgInput,
+        "bg-disabled": dark.bgDisabled,
+        "border-default": dark.borderDefault,
+        "border-subtle": dark.borderSubtle,
+        "border-strong": dark.borderStrong,
+        "text-primary": dark.textPrimary,
+        "text-secondary": dark.textSecondary,
+        "text-tertiary": dark.textTertiary,
+        "text-disabled": dark.textDisabled,
+        "text-link": dark.textLink,
+      },
+      borderRadius: {
+        control: designTokens.radius.control,
+        card: designTokens.radius.card,
+        modal: designTokens.radius.modal,
+      },
+      spacing: {
+        18: designTokens.spacing["18"],
+        22: designTokens.spacing["22"],
+        26: designTokens.spacing["26"],
+        30: designTokens.spacing["30"],
+      },
+      boxShadow: {
+        card: designTokens.shadow.card,
+        modal: designTokens.shadow.modal,
+        soft: designTokens.shadow.soft,
       },
     },
   },
   plugins: [],
-}
-
+};

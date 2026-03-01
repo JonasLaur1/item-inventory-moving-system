@@ -3,23 +3,6 @@ import { Feather } from "@expo/vector-icons";
 import { type ReactNode } from "react";
 import { Text, TextInput, TextInputProps, View } from "react-native";
 
-function withAlpha(hex: string, alpha: number) {
-  const value = hex.replace("#", "");
-  const normalized =
-    value.length === 3
-      ? value
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : value;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 type FormInputProps = TextInputProps & {
   containerClassName?: string;
   inputClassName?: string;
@@ -48,24 +31,11 @@ export function FormInput({
   return (
     <View className={`gap-2 ${containerClassName}`}>
       {label ? (
-        <Text
-          className="text-sm font-medium"
-          style={{ color: palette.textSecondary }}
-        >
-          {label}
-        </Text>
+        <Text className="text-sm font-medium text-text-secondary">{label}</Text>
       ) : null}
 
       {leftIcon || rightElement ? (
-        <View
-          className="flex-row items-center rounded-2xl px-4"
-          style={{
-            backgroundColor: withAlpha(palette.bgElevated, 0.75),
-            borderWidth: 1,
-            borderColor: withAlpha(palette.textTertiary, 0.22),
-            minHeight: 52,
-          }}
-        >
+        <View className="min-h-[52px] flex-row items-center rounded-control border border-border-default bg-bg-elevated/75 px-4">
           {leftIcon ? (
             <Feather
               name={leftIcon}
@@ -76,8 +46,8 @@ export function FormInput({
           ) : null}
 
           <TextInput
-            className={`flex-1 text-base ${inputClassName}`}
-            style={[{ color: palette.textPrimary, paddingVertical: 12 }, props.style]}
+            className={`flex-1 py-3 text-base text-text-primary ${inputClassName}`}
+            style={props.style}
             {...sharedInputProps}
           />
 
@@ -85,8 +55,8 @@ export function FormInput({
         </View>
       ) : (
         <TextInput
-          className={`w-full rounded-2xl px-4 py-3 text-base ${showDefaultBorder ? "border border-gray-300" : ""} ${inputClassName}`}
-          style={[{ color: palette.textPrimary }, props.style]}
+          className={`w-full rounded-control bg-bg-elevated px-4 py-3 text-base text-text-primary ${showDefaultBorder ? "border border-border-default" : ""} ${inputClassName}`}
+          style={props.style}
           {...sharedInputProps}
         />
       )}

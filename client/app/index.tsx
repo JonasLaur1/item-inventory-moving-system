@@ -13,44 +13,26 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {router} from "expo-router"
-
-function withAlpha(hex: string, alpha: number) {
-  const value = hex.replace("#", "");
-  const normalized =
-    value.length === 3
-      ? value
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : value;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+import { router } from "expo-router";
 
 const onLogin = (): void => {
   router.push("/(tabs)");
-}
+};
 
 const onForgot = (): void => {
-  router.push("/forgotpass")
-}
+  router.push("/forgotpass");
+};
 
 const onRegister = (): void => {
-  router.push("/register")
-}
+  router.push("/register");
+};
 export default function App() {
-  const palette = Colors.dark;
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bgBase }}>
+    <SafeAreaView className="flex-1 bg-bg-base">
       <StatusBar style="light" />
-      <View className="flex-1" style={{ backgroundColor: palette.bgBase }}>
+      <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1"
@@ -62,32 +44,12 @@ export default function App() {
           >
             <View className="flex-1 px-6 pt-8 pb-6">
               <View className="items-center mt-6">
-                <View
-                  className="items-center justify-center rounded-2xl"
-                  style={{
-                    width: 60,
-                    height: 60,
-                    backgroundColor: palette.primary,
-                    shadowColor: palette.primary,
-                    shadowOpacity: 0.35,
-                    shadowRadius: 18,
-                    shadowOffset: { width: 0, height: 10 },
-                    elevation: 10,
-                  }}
-                >
-                  <Feather name="package" size={28} color={palette.textPrimary} />
+                <View className="h-[60px] w-[60px] items-center justify-center rounded-card bg-primary shadow-card">
+                  <Feather name="package" size={28} color={Colors.dark.textPrimary} />
                 </View>
 
-                <Text
-                  className="mt-5 text-4xl font-bold"
-                  style={{ color: palette.textPrimary }}
-                >
-                  BoxIt
-                </Text>
-                <Text
-                  className="mt-2 text-sm"
-                  style={{ color: palette.textTertiary }}
-                >
+                <Text className="mt-5 text-4xl font-bold text-text-primary">BoxIt</Text>
+                <Text className="mt-2 text-sm text-text-tertiary">
                   Smart moving & inventory assistant
                 </Text>
               </View>
@@ -105,19 +67,9 @@ export default function App() {
 
                 <View className="gap-2">
                   <View className="flex-row items-center justify-between">
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: palette.textSecondary }}
-                    >
-                      Password
-                    </Text>
+                    <Text className="text-sm font-medium text-text-secondary">Password</Text>
                     <Pressable hitSlop={8} onPress={onForgot}>
-                      <Text
-                        className="text-xs font-semibold"
-                        style={{ color: palette.primary }}
-                      >
-                        Forgot Password?
-                      </Text>
+                      <Text className="text-xs font-semibold text-text-link">Forgot Password?</Text>
                     </Pressable>
                   </View>
                   <FormInput
@@ -135,7 +87,7 @@ export default function App() {
                         <Feather
                           name={showPassword ? "eye" : "eye-off"}
                           size={18}
-                          color={palette.textTertiary}
+                          color={Colors.dark.textTertiary}
                         />
                       </Pressable>
                     }
@@ -149,25 +101,14 @@ export default function App() {
                 textClassName="font-bold"
                 onPress={onLogin}
                 rightIcon={
-                  <Feather name="arrow-right" size={18} color={palette.bgBase} />
+                  <Feather name="arrow-right" size={18} color={Colors.dark.bgBase} />
                 }
               />
 
               <View className="mt-8 flex-row items-center">
-                <View
-                  className="flex-1 h-px"
-                  style={{ backgroundColor: withAlpha(palette.textTertiary, 0.2) }}
-                />
-                <Text
-                  className="mx-4 text-sm"
-                  style={{ color: palette.textTertiary }}
-                >
-                  Or continue with
-                </Text>
-                <View
-                  className="flex-1 h-px"
-                  style={{ backgroundColor: withAlpha(palette.textTertiary, 0.2) }}
-                />
+                <View className="h-px flex-1 bg-text-tertiary/20" />
+                <Text className="mx-4 text-sm text-text-tertiary">Or continue with</Text>
+                <View className="h-px flex-1 bg-text-tertiary/20" />
               </View>
 
               <View className="mt-8">
@@ -178,23 +119,18 @@ export default function App() {
                     <AntDesign
                       name="google"
                       size={16}
-                      color={palette.textPrimary}
+                      color={Colors.dark.textPrimary}
                     />
                   }
                 />
               </View>
 
               <View className="mt-auto pt-10 flex-row items-center justify-center">
-                <Text className="text-sm" style={{ color: palette.textTertiary }}>
+                <Text className="text-sm text-text-tertiary">
                   Don&apos;t have an account?{" "}
                 </Text>
                 <Pressable hitSlop={8} onPress={onRegister}>
-                  <Text
-                    className="text-sm font-bold"
-                    style={{ color: palette.primary }}
-                  >
-                    Sign Up
-                  </Text>
+                  <Text className="text-sm font-bold text-text-link">Sign Up</Text>
                 </Pressable>
               </View>
             </View>
