@@ -13,14 +13,43 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { authService } from "@/lib/auth.service";
+import { useState } from "react";
+import * as Linking from "expo-linking";
 
 export default function ForgotPass() {
+  const [email, setEmail] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const onBack = (): void => {
     router.push("/");
   };
 
-  const onSendResetLink = (): void => {
-    // Placeholder action until API flow is wired.
+  const onSendResetLink = async (): Promise<void> => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setErrorMessage("Please provide your email address");
+      return;
+    }
+
+    const redirectTo = Linking.createURL("/reset-password");
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await authService.remindPassword(trimmedEmail, redirectTo);
+      setSuccessMessage("Reset link sent. Check your email inbox.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to send reset link";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +80,11 @@ export default function ForgotPass() {
 
               <View className="items-center mt-10">
                 <View className="h-[60px] w-[60px] items-center justify-center rounded-card bg-primary shadow-card">
-                  <Feather name="lock" size={28} color={Colors.dark.textPrimary} />
+                  <Feather
+                    name="lock"
+                    size={28}
+                    color={Colors.dark.textPrimary}
+                  />
                 </View>
 
                 <Text className="mt-12 text-center text-3xl font-bold text-text-primary">
@@ -68,6 +101,8 @@ export default function ForgotPass() {
                   label="Email Address"
                   placeholder="name@example.com"
                   leftIcon="mail"
+                  value={email}
+                  onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -75,10 +110,11 @@ export default function ForgotPass() {
                 />
 
                 <Button
-                  label="Send Reset Link"
+                  label={isSubmitting ? "Sending..." : "Send Reset Link"}
                   className="mt-6 shadow-card"
                   textClassName="font-bold"
                   onPress={onSendResetLink}
+                  disabled={isSubmitting}
                   rightIcon={
                     <Feather
                       name="chevron-right"
@@ -87,6 +123,16 @@ export default function ForgotPass() {
                     />
                   }
                 />
+
+                {errorMessage ? (
+                  <Text className="mt-4 text-sm text-red-400">{errorMessage}</Text>
+                ) : null}
+
+                {successMessage ? (
+                  <Text className="mt-4 text-sm text-emerald-400">
+                    {successMessage}
+                  </Text>
+                ) : null}
               </View>
 
               <View className="mt-auto pt-12 items-center">

@@ -5,6 +5,26 @@ import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const onLogout = async (): Promise<void> => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    setErrorMessage(null);
+
+    try {
+      await authService.signOut();
+      router.replace("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to sign out";
+      setErrorMessage(message);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
       <View className="flex-1 px-6 pt-4 pb-6">
