@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
+import { authService } from "@/lib/auth.service";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,10 +16,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-const onLogin = (): void => {
-  router.push("/(tabs)");
-};
-
 const onForgot = (): void => {
   router.push("/forgotpass");
 };
@@ -26,8 +23,36 @@ const onForgot = (): void => {
 const onRegister = (): void => {
   router.push("/register");
 };
+
 export default function App() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onLogin = async (): Promise<void> => {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
+      setErrorMessage("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await authService.signIn(trimmedEmail, trimmedPassword);
+      router.replace("/(tabs)");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to sign in";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
@@ -59,6 +84,8 @@ export default function App() {
                   label="Email Address"
                   placeholder="hello@example.com"
                   leftIcon="mail"
+                  value={email}
+                  onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -75,6 +102,8 @@ export default function App() {
                   <FormInput
                     placeholder="........"
                     leftIcon="lock"
+                    value={password}
+                    onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -95,11 +124,16 @@ export default function App() {
                 </View>
               </View>
 
+              {errorMessage ? (
+                <Text className="mt-3 text-sm text-red-400">{errorMessage}</Text>
+              ) : null}
+
               <Button
-                label="Sign In"
+                label={isSubmitting ? "Signing In..." : "Sign In"}
                 className="mt-8"
                 textClassName="font-bold"
                 onPress={onLogin}
+                disabled={isSubmitting}
                 rightIcon={
                   <Feather name="arrow-right" size={18} color={Colors.dark.bgBase} />
                 }

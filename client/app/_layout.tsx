@@ -1,10 +1,12 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-import "../global.css"
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+import "react-native-reanimated";
+import "../global.css";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
 const AUTH_REQUIRED_ROUTES = new Set(["(tabs)"]);

@@ -1,6 +1,9 @@
 import { Colors } from "@/constants/theme";
+import { Button } from "@/components/button";
+import { authService } from "@/lib/auth.service";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -54,6 +57,20 @@ export default function ProfileScreen() {
           <Text className="text-base font-semibold text-text-primary">Preferences</Text>
           <Text className="mt-1 text-sm text-text-tertiary">Manage theme and app behavior.</Text>
         </View>
+
+        {errorMessage ? (
+          <Text className="mt-4 text-sm text-red-400">{errorMessage}</Text>
+        ) : null}
+
+        <Button
+          label={isLoggingOut ? "Signing out..." : "Log Out"}
+          className="mt-auto"
+          onPress={onLogout}
+          disabled={isLoggingOut}
+          rightIcon={
+            <Feather name="log-out" size={16} color={Colors.dark.bgBase} />
+          }
+        />
       </View>
     </SafeAreaView>
   );

@@ -1,11 +1,13 @@
 import { Colors } from "@/constants/theme";
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
+import { authService } from "@/lib/auth.service";
 import { Feather } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,14 +19,39 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const strengthSegments = [1, 2, 3, 0];
 
-  const onRegister = (): void => {
-    router.push("/(tabs)");
+  const onRegister = async (): Promise<void> => {
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedUsername || !trimmedEmail || !password.trim()) {
+      setErrorMessage("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await authService.signUp(trimmedUsername, trimmedEmail, password);
+      router.replace("/(tabs)");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to create account";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onLogin = (): void => {
-    router.push("/");
+    router.replace("/");
   };
 
   return (
@@ -56,9 +83,11 @@ export default function Register() {
 
               <View className="mt-12 gap-4">
                 <FormInput
-                  label="Full Name"
+                  label="Username"
                   placeholder="John Doe"
                   leftIcon="user"
+                  value={username}
+                  onChangeText={setUsername}
                   autoCapitalize="words"
                   autoCorrect={false}
                   showDefaultBorder={false}
@@ -68,6 +97,8 @@ export default function Register() {
                   label="Email Address"
                   placeholder="hello@example.com"
                   leftIcon="mail"
+                  value={email}
+                  onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -78,6 +109,8 @@ export default function Register() {
                   label="Password"
                   placeholder="........"
                   leftIcon="lock"
+                  value={password}
+                  onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -112,13 +145,29 @@ export default function Register() {
                   </View>
                 </View>
 
+                {errorMessage ? (
+                  <Text className="text-sm text-red-400">{errorMessage}</Text>
+                ) : null}
+
                 <Button
-                  label="Get Started"
+                  label={isSubmitting ? "Creating account..." : "Get Started"}
                   className="mt-8"
                   textClassName="font-bold"
                   onPress={onRegister}
+                  disabled={isSubmitting}
                   rightIcon={
-                    <Feather name="arrow-right" size={18} color={Colors.dark.bgBase} />
+                    isSubmitting ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.dark.bgBase}
+                      />
+                    ) : (
+                      <Feather
+                        name="arrow-right"
+                        size={18}
+                        color={Colors.dark.bgBase}
+                      />
+                    )
                   }
                 />
 
