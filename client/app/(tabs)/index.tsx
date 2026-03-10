@@ -1,9 +1,6 @@
 import { Button } from "@/components/button";
 import { Colors } from "@/constants/theme";
-import {
-  RoomCard,
-  type RoomCardProps,
-} from "@/components/home/room-card";
+import { RoomCard } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
@@ -11,20 +8,11 @@ import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { useLocations } from "@/hooks/use-locations";
-import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-
-type Room = {
-  id: string;
-  name: string;
-  packed: number;
-  total: number;
-  icon: RoomCardProps["icon"];
-};
 
 type Activity = {
   id: string;
@@ -46,7 +34,7 @@ export default function HomeTabScreen() {
   const isCompact = width < 400;
   const [showAllRooms, setShowAllRooms] = useState(false);
   const {
-    locations,
+    rooms,
     isLoading,
     isRefreshing,
     errorMessage,
@@ -65,25 +53,13 @@ export default function HomeTabScreen() {
     }, [refreshLocations]),
   );
 
-  const roomData: Room[] = useMemo(
-    () =>
-      locations.map((location) => ({
-        id: location.id,
-        name: location.name,
-        packed: location.packedBoxes,
-        total: location.boxes,
-        icon: getLocationIcon(location.name),
-      })),
-    [locations],
-  );
-
   const totalBoxes = useMemo(
-    () => roomData.reduce((total, room) => total + room.total, 0),
-    [roomData],
+    () => rooms.reduce((total, room) => total + room.boxes, 0),
+    [rooms],
   );
   const packedBoxes = useMemo(
-    () => roomData.reduce((total, room) => total + room.packed, 0),
-    [roomData],
+    () => rooms.reduce((total, room) => total + room.packedBoxes, 0),
+    [rooms],
   );
   const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
   const boxesLeft = totalBoxes - packedBoxes;
@@ -97,7 +73,7 @@ export default function HomeTabScreen() {
     return { radius, strokeWidth, circumference, offset };
   }, [percentage]);
 
-  const visibleRooms = showAllRooms ? roomData : roomData.slice(0, 2);
+  const visibleRooms = showAllRooms ? rooms : rooms.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () =>
       recentActivity.slice(0, 4).map((activity) => ({
@@ -181,9 +157,9 @@ export default function HomeTabScreen() {
 
         <SectionHeader
           title="Priority Rooms"
-          actionLabel={roomData.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
+          actionLabel={rooms.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
           onPressAction={
-            roomData.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
+            rooms.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
           }
         />
 
@@ -195,14 +171,14 @@ export default function HomeTabScreen() {
           renderItem={(room) => (
             <RoomCard
               name={room.name}
-              packed={room.packed}
-              total={room.total}
+              packed={room.packedBoxes}
+              total={room.boxes}
               icon={room.icon}
             />
           )}
         />
 
-        {isLoading && roomData.length === 0 ? (
+        {isLoading && rooms.length === 0 ? (
           <EmptyStateCard
             title="Loading rooms..."
             description="Fetching your locations and box progress."
@@ -210,7 +186,7 @@ export default function HomeTabScreen() {
           />
         ) : null}
 
-        {!isLoading && !errorMessage && roomData.length === 0 ? (
+        {!isLoading && !errorMessage && rooms.length === 0 ? (
           <EmptyStateCard
             title="No rooms yet"
             description="Create a room from the Rooms tab to see progress here."

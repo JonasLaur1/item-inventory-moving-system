@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { locationService, type LocationSummary } from "@/lib/location.service";
+import { getLocationIcon, type LocationIcon } from "@/utils/location-icon";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -10,8 +19,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+export type LocationRoom = {
+  id: string;
+  name: string;
+  icon: LocationIcon;
+  boxes: number;
+  packedBoxes: number;
+  items: number;
+};
+
 type UseLocationsResult = {
   locations: LocationSummary[];
+  rooms: LocationRoom[];
   isLoading: boolean;
   isRefreshing: boolean;
   isCreating: boolean;
@@ -21,7 +40,13 @@ type UseLocationsResult = {
   clearError: () => void;
 };
 
-export function useLocations(): UseLocationsResult {
+type LocationsProviderProps = {
+  children: ReactNode;
+};
+
+const LocationsContext = createContext<UseLocationsResult | null>(null);
+
+function useLocationsState(): UseLocationsResult {
   const [locations, setLocations] = useState<LocationSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -81,14 +106,56 @@ export function useLocations(): UseLocationsResult {
     setErrorMessage(null);
   }, []);
 
-  return {
-    locations,
-    isLoading,
-    isRefreshing,
-    isCreating,
-    errorMessage,
-    refreshLocations,
-    createLocation,
-    clearError,
-  };
+  const rooms = useMemo<LocationRoom[]>(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        icon: getLocationIcon(location.name),
+        boxes: location.boxes,
+        packedBoxes: location.packedBoxes,
+        items: location.items,
+      })),
+    [locations],
+  );
+
+  return useMemo(
+    () => ({
+      locations,
+      rooms,
+      isLoading,
+      isRefreshing,
+      isCreating,
+      errorMessage,
+      refreshLocations,
+      createLocation,
+      clearError,
+    }),
+    [
+      locations,
+      rooms,
+      isLoading,
+      isRefreshing,
+      isCreating,
+      errorMessage,
+      refreshLocations,
+      createLocation,
+      clearError,
+    ],
+  );
+}
+
+export function LocationsProvider({ children }: LocationsProviderProps) {
+  const value = useLocationsState();
+  return <LocationsContext.Provider value={value}>{children}</LocationsContext.Provider>;
+}
+
+export function useLocations(): UseLocationsResult {
+  const context = useContext(LocationsContext);
+
+  if (!context) {
+    throw new Error("useLocations must be used within LocationsProvider.");
+  }
+
+  return context;
 }
