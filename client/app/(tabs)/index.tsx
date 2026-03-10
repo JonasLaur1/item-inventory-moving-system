@@ -1,3 +1,4 @@
+import { Button } from "@/components/button";
 import { Colors } from "@/constants/theme";
 import {
   RoomCard,
@@ -7,9 +8,13 @@ import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
+import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { useLocations } from "@/hooks/use-locations";
+import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
@@ -29,13 +34,6 @@ type Activity = {
   icon: keyof typeof Feather.glyphMap;
 };
 
-const roomData: Room[] = [
-  { id: "kitchen", name: "Kitchen", packed: 12, total: 15, icon: "silverware-fork-knife" },
-  { id: "living-room", name: "Living Room", packed: 8, total: 13, icon: "sofa" },
-  { id: "master-bedroom", name: "Master Bedroom", packed: 6, total: 10, icon: "bed-king-outline" },
-  { id: "garage", name: "Garage", packed: 4, total: 12, icon: "garage-variant" },
-];
-
 const recentActivity: Activity[] = [
   { id: "1", item: "Toaster", detail: "Added to Kitchen Box #3", time: "2m ago", icon: "archive" },
   { id: "2", item: "Winter Jacket", detail: "Moved to Master Bedroom Box #5", time: "15m ago", icon: "package" },
@@ -47,10 +45,47 @@ export default function HomeTabScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const [showAllRooms, setShowAllRooms] = useState(false);
+  const {
+    locations,
+    isLoading,
+    isRefreshing,
+    errorMessage,
+    refreshLocations,
+  } = useLocations();
+  const hasFocusedOnceRef = useRef(false);
 
-  const totalBoxes = 40;
-  const packedBoxes = 26;
-  const percentage = Math.round((packedBoxes / totalBoxes) * 100);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+
+      void refreshLocations();
+    }, [refreshLocations]),
+  );
+
+  const roomData: Room[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        packed: location.packedBoxes,
+        total: location.boxes,
+        icon: getLocationIcon(location.name),
+      })),
+    [locations],
+  );
+
+  const totalBoxes = useMemo(
+    () => roomData.reduce((total, room) => total + room.total, 0),
+    [roomData],
+  );
+  const packedBoxes = useMemo(
+    () => roomData.reduce((total, room) => total + room.packed, 0),
+    [roomData],
+  );
+  const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
   const boxesLeft = totalBoxes - packedBoxes;
 
   const progress = useMemo(() => {
@@ -130,6 +165,20 @@ export default function HomeTabScreen() {
       </View>
 
       <View className="mt-10">
+        {errorMessage ? (
+          <View className="rounded-card border border-border-default bg-bg-elevated/80 p-4">
+            <Text className="text-sm font-semibold text-text-primary">{errorMessage}</Text>
+            <Button
+              label={isRefreshing ? "Refreshing..." : "Retry"}
+              variant="secondary"
+              onPress={() => void refreshLocations()}
+              disabled={isRefreshing}
+              className="mt-3"
+              textClassName="text-sm"
+            />
+          </View>
+        ) : null}
+
         <SectionHeader
           title="Priority Rooms"
           actionLabel={roomData.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
@@ -152,6 +201,22 @@ export default function HomeTabScreen() {
             />
           )}
         />
+
+        {isLoading && roomData.length === 0 ? (
+          <EmptyStateCard
+            title="Loading rooms..."
+            description="Fetching your locations and box progress."
+            containerClassName="mt-4"
+          />
+        ) : null}
+
+        {!isLoading && !errorMessage && roomData.length === 0 ? (
+          <EmptyStateCard
+            title="No rooms yet"
+            description="Create a room from the Rooms tab to see progress here."
+            containerClassName="mt-4"
+          />
+        ) : null}
       </View>
 
       <View className="mt-4">
