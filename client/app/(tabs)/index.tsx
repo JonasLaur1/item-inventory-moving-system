@@ -1,6 +1,6 @@
 import { Button } from "@/components/button";
 import { Colors } from "@/constants/theme";
-import { RoomCard } from "@/components/home/room-card";
+import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
@@ -8,11 +8,20 @@ import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { useLocations } from "@/hooks/use-locations";
+import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
+
+type Room = {
+  id: string;
+  name: string;
+  packed: number;
+  total: number;
+  icon: RoomCardProps["icon"];
+};
 
 type Activity = {
   id: string;
@@ -34,7 +43,7 @@ export default function HomeTabScreen() {
   const isCompact = width < 400;
   const [showAllRooms, setShowAllRooms] = useState(false);
   const {
-    rooms,
+    locations,
     isLoading,
     isRefreshing,
     errorMessage,
@@ -53,12 +62,24 @@ export default function HomeTabScreen() {
     }, [refreshLocations]),
   );
 
+  const rooms: Room[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        packed: location.packedBoxes,
+        total: location.boxes,
+        icon: getLocationIcon(location.name),
+      })),
+    [locations],
+  );
+
   const totalBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.boxes, 0),
+    () => rooms.reduce((total, room) => total + room.total, 0),
     [rooms],
   );
   const packedBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.packedBoxes, 0),
+    () => rooms.reduce((total, room) => total + room.packed, 0),
     [rooms],
   );
   const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
@@ -171,8 +192,8 @@ export default function HomeTabScreen() {
           renderItem={(room) => (
             <RoomCard
               name={room.name}
-              packed={room.packedBoxes}
-              total={room.boxes}
+              packed={room.packed}
+              total={room.total}
               icon={room.icon}
             />
           )}

@@ -1,6 +1,6 @@
 import { Button } from "@/components/button";
 import { DashboardCard } from "@/components/home/dashboard-card";
-import { RoomCard } from "@/components/home/room-card";
+import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
@@ -10,7 +10,8 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { FormInput } from "@/components/form-input";
 import { Colors } from "@/constants/theme";
-import { useLocations, type LocationRoom } from "@/hooks/use-locations";
+import { useLocations } from "@/hooks/use-locations";
+import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useRef, useState, useMemo } from "react";
@@ -18,11 +19,19 @@ import { ActivityIndicator, Text, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
 type RoomStatus = "Done" | "Packing" | "Started" | "Empty";
+type Room = {
+  id: string;
+  name: string;
+  icon: RoomCardProps["icon"];
+  boxes: number;
+  packedBoxes: number;
+  items: number;
+};
 
 const PREVIEW_ROOMS_COUNT = 5;
 const ROOM_GRID_CARD_MIN_HEIGHT = 170;
 
-function getRoomStatus(room: Pick<LocationRoom, "boxes" | "packedBoxes">): RoomStatus {
+function getRoomStatus(room: Pick<Room, "boxes" | "packedBoxes">): RoomStatus {
   const totalBoxes = Math.max(room.boxes, 0);
   const packedBoxes = Math.max(room.packedBoxes, 0);
 
@@ -73,7 +82,7 @@ export default function RoomsTabScreen() {
   const isCompact = width < 400;
 
   const {
-    rooms,
+    locations,
     isLoading,
     isRefreshing,
     isCreating,
@@ -99,6 +108,19 @@ export default function RoomsTabScreen() {
 
       void refreshLocations();
     }, [refreshLocations]),
+  );
+
+  const rooms: Room[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        icon: getLocationIcon(location.name),
+        boxes: location.boxes,
+        packedBoxes: location.packedBoxes,
+        items: location.items,
+      })),
+    [locations],
   );
 
   const filteredRooms = useMemo(() => {
