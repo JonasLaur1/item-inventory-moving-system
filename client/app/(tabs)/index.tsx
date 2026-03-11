@@ -11,6 +11,7 @@ import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
@@ -39,6 +40,7 @@ const recentActivity: Activity[] = [
 ];
 
 export default function HomeTabScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const [showAllRooms, setShowAllRooms] = useState(false);
@@ -195,6 +197,7 @@ export default function HomeTabScreen() {
               packed={room.packed}
               total={room.total}
               icon={room.icon}
+              onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
             />
           )}
         />

@@ -15,6 +15,14 @@ type BoxRow = {
   item_count: Array<{ count: number | null }> | null;
 };
 
+type RoomDetailsBoxRow = {
+  id: string;
+  name: string;
+  status: string | null;
+  updated_at: string | null;
+  item_count: Array<{ count: number | null }> | null;
+};
+
 export type LocationSummary = {
   id: string;
   name: string;
@@ -25,6 +33,18 @@ export type LocationSummary = {
   boxes: number;
   packedBoxes: number;
   items: number;
+};
+
+export type LocationDetailsBox = {
+  id: string;
+  name: string;
+  status: string | null;
+  updatedAt: string | null;
+  itemsCount: number;
+};
+
+export type LocationDetails = LocationSummary & {
+  boxList: LocationDetailsBox[];
 };
 
 async function getCurrentUserId(): Promise<string> {
@@ -124,7 +144,57 @@ async function createLocation(name: string): Promise<void> {
   if (error) throw error;
 }
 
+async function getLocationDetails(locationId: string): Promise<LocationDetails> {
+  const normalizedLocationId = locationId.trim();
+
+  if (!normalizedLocationId) {
+    throw new Error("Location id is required.");
+  }
+
+  const [{ data: location, error: locationError }, { data: boxes, error: boxesError }] =
+    await Promise.all([
+      supabase
+        .from("locations")
+        .select("id,name,cover_image_url,sort_order,created_at,updated_at")
+        .eq("id", normalizedLocationId)
+        .maybeSingle(),
+      supabase
+        .from("boxes")
+        .select("id,name,status,updated_at,item_count:items(count)")
+        .eq("location_id", normalizedLocationId)
+        .order("created_at", { ascending: true }),
+    ]);
+
+  if (locationError) throw locationError;
+  if (boxesError) throw boxesError;
+  if (!location) {
+    throw new Error("Room not found.");
+  }
+
+  const mappedBoxes: LocationDetailsBox[] = (boxes ?? []).map((box: RoomDetailsBoxRow) => ({
+    id: box.id,
+    name: box.name,
+    status: box.status,
+    updatedAt: box.updated_at,
+    itemsCount: getNestedCount(box.item_count),
+  }));
+
+  const summary = mapLocationSummaries([location], [
+    ...(boxes ?? []).map((box: RoomDetailsBoxRow) => ({
+      location_id: location.id,
+      status: box.status,
+      item_count: box.item_count,
+    })),
+  ])[0];
+
+  return {
+    ...summary,
+    boxList: mappedBoxes,
+  };
+}
+
 export const locationService = {
   listLocationSummaries,
   createLocation,
+  getLocationDetails,
 };

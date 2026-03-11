@@ -14,6 +14,7 @@ import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { useCallback, useRef, useState, useMemo } from "react";
 import { ActivityIndicator, Text, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
@@ -78,6 +79,7 @@ function AddRoomCard({
 }
 
 export default function RoomsTabScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
 
@@ -314,6 +316,7 @@ export default function RoomsTabScreen() {
                 total={room.boxes}
                 icon={room.icon}
                 style={contentStyle}
+                onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
               />
             )}
             footer={(contentStyle) => (
