@@ -9,7 +9,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
-const AUTH_REQUIRED_ROUTES = new Set(["(tabs)"]);
+const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "room"]);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

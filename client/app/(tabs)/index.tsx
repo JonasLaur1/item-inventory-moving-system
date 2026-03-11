@@ -1,4 +1,3 @@
-import { Button } from "@/components/button";
 import { Colors } from "@/constants/theme";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
@@ -6,6 +5,7 @@ import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
+import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
@@ -165,17 +165,12 @@ export default function HomeTabScreen() {
 
       <View className="mt-10">
         {errorMessage ? (
-          <View className="rounded-card border border-border-default bg-bg-elevated/80 p-4">
-            <Text className="text-sm font-semibold text-text-primary">{errorMessage}</Text>
-            <Button
-              label={isRefreshing ? "Refreshing..." : "Retry"}
-              variant="secondary"
-              onPress={() => void refreshLocations()}
-              disabled={isRefreshing}
-              className="mt-3"
-              textClassName="text-sm"
-            />
-          </View>
+          <RetryErrorCard
+            message={errorMessage}
+            isRetrying={isRefreshing}
+            retryingLabel="Refreshing..."
+            onRetry={() => void refreshLocations()}
+          />
         ) : null}
 
         <SectionHeader

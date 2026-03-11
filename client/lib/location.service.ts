@@ -64,8 +64,10 @@ function getNestedCount(value: BoxRow["item_count"]): number {
     return 0;
   }
 
-  const count = value[0]?.count;
-  return typeof count === "number" ? count : 0;
+  return value.reduce((total, entry) => {
+    const count = entry?.count;
+    return total + (typeof count === "number" ? count : 0);
+  }, 0);
 }
 
 function mapLocationSummaries(locations: LocationRow[], boxes: BoxRow[]): LocationSummary[] {
@@ -112,17 +114,27 @@ function mapLocationSummaries(locations: LocationRow[], boxes: BoxRow[]): Locati
 }
 
 async function listLocationSummaries(): Promise<LocationSummary[]> {
-  const [{ data: locations, error: locationsError }, { data: boxes, error: boxesError }] =
-    await Promise.all([
-      supabase
-        .from("locations")
-        .select("id,name,cover_image_url,sort_order,created_at,updated_at")
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true }),
-      supabase.from("boxes").select("location_id,status,item_count:items(count)"),
-    ]);
+  const userId = await getCurrentUserId();
+
+  const { data: locations, error: locationsError } = await supabase
+    .from("locations")
+    .select("id,name,cover_image_url,sort_order,created_at,updated_at")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (locationsError) throw locationsError;
+  if (!locations || locations.length === 0) {
+    return [];
+  }
+
+  const locationIds = locations.map((location) => location.id);
+
+  const { data: boxes, error: boxesError } = await supabase
+    .from("boxes")
+    .select("location_id,status,item_count:items(count)")
+    .in("location_id", locationIds);
+
   if (boxesError) throw boxesError;
 
   return mapLocationSummaries(locations ?? [], boxes ?? []);
@@ -216,19 +228,20 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
     throw new Error("Location id is required.");
   }
 
-  const [{ data: location, error: locationError }, { data: boxes, error: boxesError }] =
-    await Promise.all([
-      supabase
-        .from("locations")
-        .select("id,name,cover_image_url,sort_order,created_at,updated_at")
-        .eq("id", normalizedLocationId)
-        .maybeSingle(),
-      supabase
-        .from("boxes")
-        .select("id,name,status,updated_at,item_count:items(count)")
-        .eq("location_id", normalizedLocationId)
-        .order("created_at", { ascending: true }),
-    ]);
+  const userId = await getCurrentUserId();
+
+  const { data: location, error: locationError } = await supabase
+    .from("locations")
+    .select("id,name,cover_image_url,sort_order,created_at,updated_at")
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const { data: boxes, error: boxesError } = await supabase
+    .from("boxes")
+    .select("id,name,status,updated_at,item_count:items(count)")
+    .eq("location_id", normalizedLocationId)
+    .order("created_at", { ascending: true });
 
   if (locationError) throw locationError;
   if (boxesError) throw boxesError;

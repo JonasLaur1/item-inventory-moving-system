@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
+import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { FormInput } from "@/components/form-input";
@@ -219,17 +220,13 @@ export default function RoomsTabScreen() {
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
       {errorMessage ? (
-        <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/80 p-4">
-          <Text className="text-sm font-semibold text-text-primary">{errorMessage}</Text>
-          <Button
-            label={isRefreshing ? "Refreshing..." : "Retry"}
-            variant="secondary"
-            onPress={() => void refreshLocations()}
-            disabled={isRefreshing}
-            className="mt-3"
-            textClassName="text-sm"
-          />
-        </View>
+        <RetryErrorCard
+          message={errorMessage}
+          isRetrying={isRefreshing}
+          retryingLabel="Refreshing..."
+          onRetry={() => void refreshLocations()}
+          className="mt-6"
+        />
       ) : null}
 
       <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>

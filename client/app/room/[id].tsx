@@ -5,6 +5,7 @@ import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/component
 import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
+import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
 import { locationService, type LocationDetails } from "@/lib/location.service";
 import { getLocationIcon } from "@/utils/location-icon";
@@ -14,8 +15,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
-  ScrollView,
   Text,
   View,
   useWindowDimensions,
@@ -268,150 +269,151 @@ export default function RoomDetailsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
-      <ScrollView
+      <FlatList
         className="flex-1"
+        data={room ? boxes : []}
+        keyExtractor={(box) => box.id}
+        renderItem={({ item }) => <BoxCard box={item} compact={isCompact} />}
+        ItemSeparatorComponent={() => <View className="h-3" />}
+        ListHeaderComponent={
+          <View className="mt-2">
+            <View className="flex-row items-center justify-between">
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={8}
+                className="h-10 w-10 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
+              >
+                <Feather name="arrow-left" size={18} color={Colors.dark.textPrimary} />
+              </Pressable>
+              <Text className="text-base font-semibold text-text-primary">Room Details</Text>
+              <View className="h-10 w-10" />
+            </View>
+
+            {errorMessage ? (
+              <RetryErrorCard
+                message={errorMessage}
+                isRetrying={isRefreshing}
+                retryingLabel="Refreshing..."
+                onRetry={() => void loadRoom(true)}
+                className="mt-6"
+              />
+            ) : null}
+
+            {room ? (
+              <>
+                <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/70 p-4">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+                      <MaterialCommunityIcons
+                        name={getLocationIcon(room.name)}
+                        size={22}
+                        color={Colors.dark.primary}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      {isEditingName ? (
+                        <>
+                          <FormInput
+                            value={editedRoomName}
+                            onChangeText={setEditedRoomName}
+                            placeholder="Room name"
+                            autoCapitalize="words"
+                            autoCorrect={false}
+                            maxLength={60}
+                            editable={!isSavingName}
+                            showDefaultBorder={false}
+                          />
+
+                          {editNameError ? (
+                            <Text className="mt-2 text-xs text-text-tertiary">{editNameError}</Text>
+                          ) : null}
+
+                          <View className="mt-3 flex-row gap-2">
+                            <Button
+                              label={isSavingName ? "Saving..." : "Save"}
+                              onPress={() => void saveRoomName()}
+                              disabled={isSavingName}
+                              className="flex-1"
+                              textClassName="text-base"
+                            />
+                            <Button
+                              label="Cancel"
+                              variant="secondary"
+                              onPress={cancelNameEditor}
+                              disabled={isSavingName}
+                              className="flex-1"
+                              textClassName="text-base"
+                            />
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <View className="flex-row items-center gap-2">
+                            <View className="flex-1">
+                              <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
+                              <Text className="mt-1 text-xs text-text-tertiary">
+                                {room.boxes} boxes • {room.items} items
+                              </Text>
+                            </View>
+                            <Pressable
+                              onPress={openNameEditor}
+                              hitSlop={8}
+                              className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                              disabled={isDeletingRoom}
+                            >
+                              <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                            </Pressable>
+                            <Pressable
+                              onPress={openDeleteModal}
+                              hitSlop={8}
+                              className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
+                              disabled={isDeletingRoom}
+                            >
+                              <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
+                            </Pressable>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
+                  <MetricCard
+                    label="Boxes"
+                    value={String(room.boxes)}
+                    style={{ width: isNarrow ? "100%" : "48.5%" }}
+                  />
+                  <MetricCard
+                    label="Packed"
+                    value={String(room.packedBoxes)}
+                    style={{ width: isNarrow ? "100%" : "48.5%" }}
+                  />
+                  <MetricCard
+                    label="Items"
+                    value={String(room.items)}
+                    style={{ width: "100%" }}
+                  />
+                </View>
+
+                <View className="mb-4 mt-8">
+                  <SectionHeader title="Boxes" actionLabel={`${boxes.length} total`} />
+                </View>
+              </>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          room ? (
+            <EmptyStateCard
+              title="No boxes yet"
+              description="Add your first box to this room from the inventory flow."
+            />
+          ) : null
+        }
         contentContainerStyle={{ paddingHorizontal: isCompact ? 16 : 20, paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
-      >
-        <View className="mt-2 flex-row items-center justify-between">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            className="h-10 w-10 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
-          >
-            <Feather name="arrow-left" size={18} color={Colors.dark.textPrimary} />
-          </Pressable>
-          <Text className="text-base font-semibold text-text-primary">Room Details</Text>
-          <View className="h-10 w-10" />
-        </View>
-
-        {errorMessage ? (
-          <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/80 p-4">
-            <Text className="text-sm font-semibold text-text-primary">{errorMessage}</Text>
-            <Button
-              label={isRefreshing ? "Refreshing..." : "Retry"}
-              variant="secondary"
-              onPress={() => void loadRoom(true)}
-              disabled={isRefreshing}
-              className="mt-3"
-              textClassName="text-sm"
-            />
-          </View>
-        ) : null}
-
-        {room ? (
-          <>
-            <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/70 p-4">
-              <View className="flex-row items-center gap-3">
-                <View className="h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
-                  <MaterialCommunityIcons
-                    name={getLocationIcon(room.name)}
-                    size={22}
-                    color={Colors.dark.primary}
-                  />
-                </View>
-                <View className="flex-1">
-                  {isEditingName ? (
-                    <>
-                      <FormInput
-                        value={editedRoomName}
-                        onChangeText={setEditedRoomName}
-                        placeholder="Room name"
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                        maxLength={60}
-                        editable={!isSavingName}
-                        showDefaultBorder={false}
-                      />
-
-                      {editNameError ? (
-                        <Text className="mt-2 text-xs text-text-tertiary">{editNameError}</Text>
-                      ) : null}
-
-                      <View className="mt-3 flex-row gap-2">
-                        <Button
-                          label={isSavingName ? "Saving..." : "Save"}
-                          onPress={() => void saveRoomName()}
-                          disabled={isSavingName}
-                          className="flex-1"
-                          textClassName="text-base"
-                        />
-                        <Button
-                          label="Cancel"
-                          variant="secondary"
-                          onPress={cancelNameEditor}
-                          disabled={isSavingName}
-                          className="flex-1"
-                          textClassName="text-base"
-                        />
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <View className="flex-row items-center gap-2">
-                        <View className="flex-1">
-                          <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
-                          <Text className="mt-1 text-xs text-text-tertiary">
-                            {room.boxes} boxes • {room.items} items
-                          </Text>
-                        </View>
-                        <Pressable
-                          onPress={openNameEditor}
-                          hitSlop={8}
-                          className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
-                          disabled={isDeletingRoom}
-                        >
-                          <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
-                        </Pressable>
-                        <Pressable
-                          onPress={openDeleteModal}
-                          hitSlop={8}
-                          className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
-                          disabled={isDeletingRoom}
-                        >
-                          <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
-                        </Pressable>
-                      </View>
-                    </>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
-              <MetricCard
-                label="Boxes"
-                value={String(room.boxes)}
-                style={{ width: isNarrow ? "100%" : "48.5%" }}
-              />
-              <MetricCard
-                label="Packed"
-                value={String(room.packedBoxes)}
-                style={{ width: isNarrow ? "100%" : "48.5%" }}
-              />
-              <MetricCard
-                label="Items"
-                value={String(room.items)}
-                style={{ width: "100%" }}
-              />
-            </View>
-
-            <View className="mt-8">
-              <SectionHeader title="Boxes" actionLabel={`${boxes.length} total`} />
-              <View className="mt-4 gap-3">
-                {boxes.length > 0 ? (
-                  boxes.map((box) => <BoxCard key={box.id} box={box} compact={isCompact} />)
-                ) : (
-                  <EmptyStateCard
-                    title="No boxes yet"
-                    description="Add your first box to this room from the inventory flow."
-                  />
-                )}
-              </View>
-            </View>
-          </>
-        ) : null}
-      </ScrollView>
+      />
 
       <AppModal
         visible={isDeleteModalOpen}
