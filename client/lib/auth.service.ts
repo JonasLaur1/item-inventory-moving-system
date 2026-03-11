@@ -39,6 +39,9 @@ export const authService = {
     if (error) throw error;
   },
 
+  /*------------------------------------------------ 
+  KOL KAS NEVEIKIA SUTAISYTI VELIAU */
+
   async remindPassword(email: string, redirectTo: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
@@ -58,6 +61,8 @@ export const authService = {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
   },
+
+  /*------------------------------------------------*/
 
   onAuthStateChange(callback: AuthStateChangeCallback) {
     return supabase.auth.onAuthStateChange((event, session) =>

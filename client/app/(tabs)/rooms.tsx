@@ -1,3 +1,4 @@
+import { Button } from "@/components/button";
 import { DashboardCard } from "@/components/home/dashboard-card";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
@@ -5,16 +6,21 @@ import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
+import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { FormInput } from "@/components/form-input";
 import { Colors } from "@/constants/theme";
+import { useLocations } from "@/hooks/use-locations";
+import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
-import { type ViewStyle } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { useCallback, useRef, useState, useMemo } from "react";
+import { ActivityIndicator, Text, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
 type RoomStatus = "Done" | "Packing" | "Started" | "Empty";
-
 type Room = {
   id: string;
   name: string;
@@ -22,82 +28,7 @@ type Room = {
   boxes: number;
   packedBoxes: number;
   items: number;
-  secondaryLabel: string;
-  updatedAt: string;
 };
-
-const rooms: Room[] = [
-  {
-    id: "kitchen",
-    name: "Kitchen",
-    icon: "silverware-fork-knife",
-    boxes: 12,
-    packedBoxes: 12,
-    items: 46,
-    secondaryLabel: "Furniture",
-    updatedAt: "5m ago",
-  },
-  {
-    id: "living-room",
-    name: "Living Room",
-    icon: "sofa-outline",
-    boxes: 8,
-    packedBoxes: 6,
-    items: 33,
-    secondaryLabel: "TVs",
-    updatedAt: "12m ago",
-  },
-  {
-    id: "master-bedroom",
-    name: "Master Bed",
-    icon: "bed-king-outline",
-    boxes: 10,
-    packedBoxes: 2,
-    items: 40,
-    secondaryLabel: "Closet",
-    updatedAt: "20m ago",
-  },
-  {
-    id: "garage",
-    name: "Garage",
-    icon: "garage-variant",
-    boxes: 24,
-    packedBoxes: 17,
-    items: 75,
-    secondaryLabel: "Tools",
-    updatedAt: "30m ago",
-  },
-  {
-    id: "office",
-    name: "Office",
-    icon: "laptop",
-    boxes: 6,
-    packedBoxes: 0,
-    items: 18,
-    secondaryLabel: "Desks",
-    updatedAt: "1h ago",
-  },
-  {
-    id: "bathroom",
-    name: "Bathroom",
-    icon: "shower",
-    boxes: 5,
-    packedBoxes: 4,
-    items: 21,
-    secondaryLabel: "Essentials",
-    updatedAt: "1h ago",
-  },
-  {
-    id: "guest-room",
-    name: "Guest Room",
-    icon: "bed-outline",
-    boxes: 4,
-    packedBoxes: 1,
-    items: 12,
-    secondaryLabel: "Linen",
-    updatedAt: "2h ago",
-  },
-];
 
 const PREVIEW_ROOMS_COUNT = 5;
 const ROOM_GRID_CARD_MIN_HEIGHT = 170;
@@ -123,7 +54,15 @@ function getRoomStatus(room: Pick<Room, "boxes" | "packedBoxes">): RoomStatus {
   return "Packing";
 }
 
-function AddRoomCard({ style }: { style: ViewStyle }) {
+function AddRoomCard({
+  style,
+  disabled,
+  onPress,
+}: {
+  style: ViewStyle;
+  disabled: boolean;
+  onPress: () => void;
+}) {
   return (
     <DashboardCard
       icon={<Feather name="plus" size={20} color={Colors.dark.primary} />}
@@ -133,17 +72,59 @@ function AddRoomCard({ style }: { style: ViewStyle }) {
       iconContainerClassName="h-14 w-14 rounded-xl bg-primary/20"
       titleClassName="text-base text-text-primary"
       subtitleClassName="text-xs text-text-tertiary"
+      onPress={onPress}
+      disabled={disabled}
       style={style}
     />
   );
 }
 
 export default function RoomsTabScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
 
+  const {
+    locations,
+    isLoading,
+    isRefreshing,
+    isCreating,
+    errorMessage,
+    refreshLocations,
+    createLocation,
+    clearError,
+  } = useLocations();
+
   const [search, setSearch] = useState("");
   const [showAllRooms, setShowAllRooms] = useState(false);
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [createRoomError, setCreateRoomError] = useState<string | null>(null);
+  const hasFocusedOnceRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+
+      void refreshLocations();
+    }, [refreshLocations]),
+  );
+
+  const rooms: Room[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        icon: getLocationIcon(location.name),
+        boxes: location.boxes,
+        packedBoxes: location.packedBoxes,
+        items: location.items,
+      })),
+    [locations],
+  );
 
   const filteredRooms = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -156,11 +137,10 @@ export default function RoomsTabScreen() {
       const derivedStatus = getRoomStatus(room).toLowerCase();
       return (
         room.name.toLowerCase().includes(normalizedSearch) ||
-        room.secondaryLabel.toLowerCase().includes(normalizedSearch) ||
         derivedStatus.includes(normalizedSearch)
       );
     });
-  }, [search]);
+  }, [rooms, search]);
 
   const totalItems = useMemo(
     () => filteredRooms.reduce((total, room) => total + room.items, 0),
@@ -202,8 +182,53 @@ export default function RoomsTabScreen() {
   const canExpand = filteredRooms.length > PREVIEW_ROOMS_COUNT;
   const visibleRooms = showAllRooms ? filteredRooms : filteredRooms.slice(0, PREVIEW_ROOMS_COUNT);
 
+  const openCreateRoomForm = () => {
+    clearError();
+    setCreateRoomError(null);
+    setIsCreateRoomOpen(true);
+  };
+
+  const closeCreateRoomForm = () => {
+    setIsCreateRoomOpen(false);
+    setCreateRoomError(null);
+    setNewRoomName("");
+  };
+
+  const handleCreateRoom = async () => {
+    const normalizedName = newRoomName.trim();
+
+    if (!normalizedName) {
+      setCreateRoomError("Room name is required.");
+      return;
+    }
+
+    setCreateRoomError(null);
+
+    try {
+      await createLocation(normalizedName);
+      closeCreateRoomForm();
+    } catch (error) {
+      if (error instanceof Error) {
+        setCreateRoomError(error.message);
+        return;
+      }
+
+      setCreateRoomError("Failed to create room.");
+    }
+  };
+
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
+      {errorMessage ? (
+        <RetryErrorCard
+          message={errorMessage}
+          isRetrying={isRefreshing}
+          retryingLabel="Refreshing..."
+          onRetry={() => void refreshLocations()}
+          className="mt-6"
+        />
+      ) : null}
+
       <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>
         <MetricCard
           label="Total Items"
@@ -226,7 +251,7 @@ export default function RoomsTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search rooms, boxes, or tags"
+          placeholder="Search rooms or status"
         />
       </View>
 
@@ -237,23 +262,81 @@ export default function RoomsTabScreen() {
           onPressAction={canExpand ? () => setShowAllRooms((prev) => !prev) : undefined}
         />
 
-        <CardGrid
-          items={visibleRooms}
-          compact={isCompact}
-          itemMinHeight={ROOM_GRID_CARD_MIN_HEIGHT}
-          className="mt-4"
-          keyExtractor={(room) => room.id}
-          renderItem={(room, contentStyle) => (
-            <RoomCard
-              name={room.name}
-              packed={room.packedBoxes}
-              total={room.boxes}
-              icon={room.icon}
-              style={contentStyle}
+        {isCreateRoomOpen ? (
+          <View className="mt-4 rounded-card border border-border-default bg-bg-elevated/75 p-4">
+            <FormInput
+              value={newRoomName}
+              onChangeText={setNewRoomName}
+              placeholder="Room name (e.g. Kitchen)"
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={60}
             />
-          )}
-          footer={(contentStyle) => <AddRoomCard style={contentStyle} />}
-        />
+
+            {createRoomError ? (
+              <Text className="mt-2 text-xs text-text-tertiary">{createRoomError}</Text>
+            ) : null}
+
+            <View className="mt-4 flex-row gap-3">
+              <Button
+                label={isCreating ? "Creating..." : "Create Room"}
+                onPress={() => void handleCreateRoom()}
+                disabled={isCreating}
+                className="flex-1"
+              />
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={closeCreateRoomForm}
+                disabled={isCreating}
+                className="flex-1"
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {isLoading && rooms.length === 0 ? (
+          <View className="mt-6 items-center">
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <CardGrid
+            items={visibleRooms}
+            compact={isCompact}
+            itemMinHeight={ROOM_GRID_CARD_MIN_HEIGHT}
+            className="mt-4"
+            keyExtractor={(room) => room.id}
+            renderItem={(room, contentStyle) => (
+              <RoomCard
+                name={room.name}
+                packed={room.packedBoxes}
+                total={room.boxes}
+                icon={room.icon}
+                style={contentStyle}
+                onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
+              />
+            )}
+            footer={(contentStyle) => (
+              <AddRoomCard
+                style={contentStyle}
+                onPress={openCreateRoomForm}
+                disabled={isCreating}
+              />
+            )}
+          />
+        )}
+
+        {!isLoading && !errorMessage && filteredRooms.length === 0 ? (
+          <EmptyStateCard
+            title={search.trim().length > 0 ? "No rooms match your search" : "No rooms yet"}
+            description={
+              search.trim().length > 0
+                ? "Try a different search query."
+                : "Create your first room to start organizing your inventory."
+            }
+            containerClassName="mt-4"
+          />
+        ) : null}
       </View>
 
       <View className="mt-8">

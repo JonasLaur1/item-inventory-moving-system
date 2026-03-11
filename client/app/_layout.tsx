@@ -9,7 +9,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
-const AUTH_REQUIRED_ROUTES = new Set(["(tabs)"]);
+const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "room"]);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -82,6 +82,7 @@ export default function RootLayout() {
         <Stack.Screen name="forgotpass" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+        <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />

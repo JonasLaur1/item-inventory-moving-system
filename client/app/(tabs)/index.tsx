@@ -1,15 +1,18 @@
 import { Colors } from "@/constants/theme";
-import {
-  RoomCard,
-  type RoomCardProps,
-} from "@/components/home/room-card";
+import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
+import { EmptyStateCard } from "@/components/ui/empty-state-card";
+import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { useLocations } from "@/hooks/use-locations";
+import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
@@ -29,13 +32,6 @@ type Activity = {
   icon: keyof typeof Feather.glyphMap;
 };
 
-const roomData: Room[] = [
-  { id: "kitchen", name: "Kitchen", packed: 12, total: 15, icon: "silverware-fork-knife" },
-  { id: "living-room", name: "Living Room", packed: 8, total: 13, icon: "sofa" },
-  { id: "master-bedroom", name: "Master Bedroom", packed: 6, total: 10, icon: "bed-king-outline" },
-  { id: "garage", name: "Garage", packed: 4, total: 12, icon: "garage-variant" },
-];
-
 const recentActivity: Activity[] = [
   { id: "1", item: "Toaster", detail: "Added to Kitchen Box #3", time: "2m ago", icon: "archive" },
   { id: "2", item: "Winter Jacket", detail: "Moved to Master Bedroom Box #5", time: "15m ago", icon: "package" },
@@ -44,13 +40,51 @@ const recentActivity: Activity[] = [
 ];
 
 export default function HomeTabScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const [showAllRooms, setShowAllRooms] = useState(false);
+  const {
+    locations,
+    isLoading,
+    isRefreshing,
+    errorMessage,
+    refreshLocations,
+  } = useLocations();
+  const hasFocusedOnceRef = useRef(false);
 
-  const totalBoxes = 40;
-  const packedBoxes = 26;
-  const percentage = Math.round((packedBoxes / totalBoxes) * 100);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+
+      void refreshLocations();
+    }, [refreshLocations]),
+  );
+
+  const rooms: Room[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        packed: location.packedBoxes,
+        total: location.boxes,
+        icon: getLocationIcon(location.name),
+      })),
+    [locations],
+  );
+
+  const totalBoxes = useMemo(
+    () => rooms.reduce((total, room) => total + room.total, 0),
+    [rooms],
+  );
+  const packedBoxes = useMemo(
+    () => rooms.reduce((total, room) => total + room.packed, 0),
+    [rooms],
+  );
+  const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
   const boxesLeft = totalBoxes - packedBoxes;
 
   const progress = useMemo(() => {
@@ -62,7 +96,7 @@ export default function HomeTabScreen() {
     return { radius, strokeWidth, circumference, offset };
   }, [percentage]);
 
-  const visibleRooms = showAllRooms ? roomData : roomData.slice(0, 2);
+  const visibleRooms = showAllRooms ? rooms : rooms.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () =>
       recentActivity.slice(0, 4).map((activity) => ({
@@ -130,11 +164,20 @@ export default function HomeTabScreen() {
       </View>
 
       <View className="mt-10">
+        {errorMessage ? (
+          <RetryErrorCard
+            message={errorMessage}
+            isRetrying={isRefreshing}
+            retryingLabel="Refreshing..."
+            onRetry={() => void refreshLocations()}
+          />
+        ) : null}
+
         <SectionHeader
           title="Priority Rooms"
-          actionLabel={roomData.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
+          actionLabel={rooms.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
           onPressAction={
-            roomData.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
+            rooms.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
           }
         />
 
@@ -149,9 +192,26 @@ export default function HomeTabScreen() {
               packed={room.packed}
               total={room.total}
               icon={room.icon}
+              onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
             />
           )}
         />
+
+        {isLoading && rooms.length === 0 ? (
+          <EmptyStateCard
+            title="Loading rooms..."
+            description="Fetching your locations and box progress."
+            containerClassName="mt-4"
+          />
+        ) : null}
+
+        {!isLoading && !errorMessage && rooms.length === 0 ? (
+          <EmptyStateCard
+            title="No rooms yet"
+            description="Create a room from the Rooms tab to see progress here."
+            containerClassName="mt-4"
+          />
+        ) : null}
       </View>
 
       <View className="mt-4">
