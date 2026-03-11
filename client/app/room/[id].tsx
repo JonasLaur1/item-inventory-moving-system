@@ -1,4 +1,5 @@
 import { Button } from "@/components/button";
+import { FormInput } from "@/components/form-input";
 import { SectionHeader } from "@/components/home/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
@@ -75,6 +76,10 @@ export default function RoomDetailsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedRoomName, setEditedRoomName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [editNameError, setEditNameError] = useState<string | null>(null);
 
   const loadRoom = useCallback(
     async (refresh: boolean) => {
@@ -125,6 +130,14 @@ export default function RoomDetailsScreen() {
     }, [loadRoom]),
   );
 
+  useEffect(() => {
+    if (!room || isEditingName) {
+      return;
+    }
+
+    setEditedRoomName(room.name);
+  }, [room, isEditingName]);
+
   const boxes: InventoryBox[] = useMemo(() => {
     if (!room) {
       return [];
@@ -140,6 +153,55 @@ export default function RoomDetailsScreen() {
       updatedAt: formatUpdatedAt(box.updatedAt),
     }));
   }, [room]);
+
+  const openNameEditor = useCallback(() => {
+    if (!room) {
+      return;
+    }
+
+    setEditedRoomName(room.name);
+    setEditNameError(null);
+    setIsEditingName(true);
+  }, [room]);
+
+  const cancelNameEditor = useCallback(() => {
+    setEditedRoomName(room?.name ?? "");
+    setEditNameError(null);
+    setIsEditingName(false);
+  }, [room?.name]);
+
+  const saveRoomName = useCallback(async () => {
+    if (!room) {
+      return;
+    }
+
+    const normalizedName = editedRoomName.trim();
+    if (!normalizedName) {
+      setEditNameError("Room name is required.");
+      return;
+    }
+
+    if (normalizedName === room.name) {
+      setEditNameError(null);
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    setEditNameError(null);
+
+    try {
+      await locationService.updateLocationName(room.id, normalizedName);
+      setRoom((previousRoom) => (previousRoom ? { ...previousRoom, name: normalizedName } : previousRoom));
+      setIsEditingName(false);
+      await loadRoom(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update room name.";
+      setEditNameError(message);
+    } finally {
+      setIsSavingName(false);
+    }
+  }, [editedRoomName, loadRoom, room]);
 
   if (isLoading && !room) {
     return (
@@ -196,10 +258,60 @@ export default function RoomDetailsScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-lg font-bold text-text-primary">{room.name}</Text>
-                  <Text className="mt-1 text-xs text-text-tertiary">
-                    {room.boxes} boxes • {room.items} items
-                  </Text>
+                  {isEditingName ? (
+                    <>
+                      <FormInput
+                        value={editedRoomName}
+                        onChangeText={setEditedRoomName}
+                        placeholder="Room name"
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        maxLength={60}
+                        editable={!isSavingName}
+                        showDefaultBorder={false}
+                      />
+
+                      {editNameError ? (
+                        <Text className="mt-2 text-xs text-text-tertiary">{editNameError}</Text>
+                      ) : null}
+
+                      <View className="mt-3 flex-row gap-2">
+                        <Button
+                          label={isSavingName ? "Saving..." : "Save"}
+                          onPress={() => void saveRoomName()}
+                          disabled={isSavingName}
+                          className="flex-1"
+                          textClassName="text-base"
+                        />
+                        <Button
+                          label="Cancel"
+                          variant="secondary"
+                          onPress={cancelNameEditor}
+                          disabled={isSavingName}
+                          className="flex-1"
+                          textClassName="text-base"
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View className="flex-row items-center gap-2">
+                        <View className="flex-1">
+                          <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
+                          <Text className="mt-1 text-xs text-text-tertiary">
+                            {room.boxes} boxes • {room.items} items
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={openNameEditor}
+                          hitSlop={8}
+                          className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                        >
+                          <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                        </Pressable>
+                      </View>
+                    </>
+                  )}
                 </View>
               </View>
             </View>

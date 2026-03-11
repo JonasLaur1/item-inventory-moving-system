@@ -144,6 +144,33 @@ async function createLocation(name: string): Promise<void> {
   if (error) throw error;
 }
 
+async function updateLocationName(locationId: string, name: string): Promise<void> {
+  const normalizedLocationId = locationId.trim();
+  if (!normalizedLocationId) {
+    throw new Error("Location id is required.");
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error("Location name is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("locations")
+    .update({ name: trimmedName })
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Room not found.");
+  }
+}
+
 async function getLocationDetails(locationId: string): Promise<LocationDetails> {
   const normalizedLocationId = locationId.trim();
 
@@ -196,5 +223,6 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 export const locationService = {
   listLocationSummaries,
   createLocation,
+  updateLocationName,
   getLocationDetails,
 };
