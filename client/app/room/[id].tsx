@@ -2,6 +2,7 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { SectionHeader } from "@/components/home/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
+import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Colors } from "@/constants/theme";
@@ -11,7 +12,14 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 function getMinutesAgo(occurredAt: string, nowMs: number) {
@@ -80,6 +88,9 @@ export default function RoomDetailsScreen() {
   const [editedRoomName, setEditedRoomName] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [editNameError, setEditNameError] = useState<string | null>(null);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
+  const [deleteRoomError, setDeleteRoomError] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const loadRoom = useCallback(
     async (refresh: boolean) => {
@@ -203,6 +214,48 @@ export default function RoomDetailsScreen() {
     }
   }, [editedRoomName, loadRoom, room]);
 
+  const deleteRoom = useCallback(async () => {
+    if (!room) {
+      return;
+    }
+
+    setIsDeletingRoom(true);
+    setDeleteRoomError(null);
+
+    try {
+      await locationService.deleteLocation(room.id);
+
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/rooms");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete room.";
+      setDeleteRoomError(message);
+    } finally {
+      setIsDeletingRoom(false);
+    }
+  }, [room, router]);
+
+  const openDeleteModal = useCallback(() => {
+    if (!room) {
+      return;
+    }
+
+    setDeleteRoomError(null);
+    setIsDeleteModalOpen(true);
+  }, [room]);
+
+  const closeDeleteModal = useCallback(() => {
+    if (isDeletingRoom) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
+    setDeleteRoomError(null);
+  }, [isDeletingRoom]);
+
   if (isLoading && !room) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -306,8 +359,17 @@ export default function RoomDetailsScreen() {
                           onPress={openNameEditor}
                           hitSlop={8}
                           className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                          disabled={isDeletingRoom}
                         >
                           <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                        </Pressable>
+                        <Pressable
+                          onPress={openDeleteModal}
+                          hitSlop={8}
+                          className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
+                          disabled={isDeletingRoom}
+                        >
+                          <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
                         </Pressable>
                       </View>
                     </>
@@ -350,6 +412,40 @@ export default function RoomDetailsScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <AppModal
+        visible={isDeleteModalOpen}
+        title="Delete room?"
+        description={
+          room
+            ? `Delete "${room.name}" permanently. If this room still has boxes, deletion will be blocked.`
+            : "Delete this room permanently."
+        }
+        onRequestClose={closeDeleteModal}
+        maxWidth={420}
+      >
+        {deleteRoomError ? (
+          <Text className="text-xs text-crimson">{deleteRoomError}</Text>
+        ) : null}
+
+        <View className={`${deleteRoomError ? "mt-4" : ""} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeDeleteModal}
+            disabled={isDeletingRoom}
+            className="flex-1"
+          />
+          <Button
+            label={isDeletingRoom ? "Deleting..." : "Delete"}
+            variant="secondary"
+            onPress={() => void deleteRoom()}
+            disabled={isDeletingRoom}
+            className="flex-1 border-crimson/60 bg-crimson/10"
+            textClassName="text-crimson"
+          />
+        </View>
+      </AppModal>
     </SafeAreaView>
   );
 }

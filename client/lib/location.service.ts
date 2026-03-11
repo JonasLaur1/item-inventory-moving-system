@@ -171,6 +171,44 @@ async function updateLocationName(locationId: string, name: string): Promise<voi
   }
 }
 
+function isForeignKeyViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const possibleCode = (error as { code?: unknown }).code;
+  return possibleCode === "23503";
+}
+
+async function deleteLocation(locationId: string): Promise<void> {
+  const normalizedLocationId = locationId.trim();
+  if (!normalizedLocationId) {
+    throw new Error("Location id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("locations")
+    .delete()
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (isForeignKeyViolation(error)) {
+      throw new Error("Room has boxes. Remove or move its boxes before deleting it.");
+    }
+
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Room not found.");
+  }
+}
+
 async function getLocationDetails(locationId: string): Promise<LocationDetails> {
   const normalizedLocationId = locationId.trim();
 
@@ -224,5 +262,6 @@ export const locationService = {
   listLocationSummaries,
   createLocation,
   updateLocationName,
+  deleteLocation,
   getLocationDetails,
 };
