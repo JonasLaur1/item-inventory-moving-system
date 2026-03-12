@@ -33,7 +33,7 @@ export function TabScreenLayout({
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-base">
+    <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-bg-base">
       {scrollable ? (
         <ScrollView
           className="flex-1"

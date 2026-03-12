@@ -15,8 +15,8 @@ import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useRouter } from "expo-router";
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Text, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
@@ -81,6 +81,7 @@ function AddRoomCard({
 
 export default function RoomsTabScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ create?: string | string[] }>();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
 
@@ -182,17 +183,35 @@ export default function RoomsTabScreen() {
   const canExpand = filteredRooms.length > PREVIEW_ROOMS_COUNT;
   const visibleRooms = showAllRooms ? filteredRooms : filteredRooms.slice(0, PREVIEW_ROOMS_COUNT);
 
-  const openCreateRoomForm = () => {
+  const openCreateRoomForm = useCallback(() => {
     clearError();
     setCreateRoomError(null);
     setIsCreateRoomOpen(true);
-  };
+  }, [clearError]);
 
-  const closeCreateRoomForm = () => {
+  const closeCreateRoomForm = useCallback(() => {
     setIsCreateRoomOpen(false);
     setCreateRoomError(null);
     setNewRoomName("");
-  };
+  }, []);
+
+  const shouldOpenCreateForm = useMemo(() => {
+    if (!params.create) {
+      return false;
+    }
+
+    const normalizedValue = Array.isArray(params.create) ? params.create[0] ?? "" : params.create;
+    return normalizedValue === "1" || normalizedValue.toLowerCase() === "true";
+  }, [params.create]);
+
+  useEffect(() => {
+    if (!shouldOpenCreateForm) {
+      return;
+    }
+
+    openCreateRoomForm();
+    router.setParams({ create: undefined });
+  }, [openCreateRoomForm, router, shouldOpenCreateForm]);
 
   const handleCreateRoom = async () => {
     const normalizedName = newRoomName.trim();

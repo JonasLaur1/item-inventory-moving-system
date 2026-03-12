@@ -150,10 +150,16 @@ export default function HomeTabScreen() {
 
       <View className="mt-8 flex-row gap-3">
         <QuickActionCard
-          title="Scan QR"
-          subtitle="Scan QR Code"
-          icon="camera"
+          title="Add Room"
+          subtitle="Create New Room"
+          icon="plus"
           variant="primary"
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/rooms",
+              params: { create: "1" },
+            })
+          }
         />
         <QuickActionCard
           title="Add Box"

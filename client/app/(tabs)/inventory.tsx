@@ -9,7 +9,6 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
@@ -136,11 +135,10 @@ export default function InventoryTabScreen() {
 
       <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>
         <QuickActionCard
-          title="Scan QR"
-          subtitle="Assign or find box"
-          icon="camera"
+          title="Add Item"
+          subtitle="Create Unassigned Item"
+          icon="plus"
           variant="primary"
-          onPress={() => router.push("/(tabs)/scan")}
         />
         <QuickActionCard title="Add Box" subtitle="Create new box" icon="plus" variant="secondary" />
       </View>
