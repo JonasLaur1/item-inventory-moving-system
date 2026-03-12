@@ -7,6 +7,7 @@ import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
+import { boxService } from "@/lib/box.service";
 import { locationService, type LocationDetails } from "@/lib/location.service";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -23,7 +24,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function getMinutesAgo(occurredAt: string, nowMs: number) {
+type EditableStatus = "packed" | "unpacked";
+
+const editableStatuses: { label: string; value: EditableStatus }[] = [
+  { label: "Packed", value: "packed" },
+  { label: "Unpacked", value: "unpacked" },
+];
+
+function getMinutesAgo(occurredAt: string, nowMs: number): number {
   const timestamp = new Date(occurredAt).getTime();
 
   if (Number.isNaN(timestamp)) {
@@ -33,7 +41,7 @@ function getMinutesAgo(occurredAt: string, nowMs: number) {
   return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
 }
 
-function formatRelativeTime(minutesAgo: number) {
+function formatRelativeTime(minutesAgo: number): string {
   if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
     return "Unknown";
   }
@@ -92,6 +100,11 @@ export default function RoomDetailsScreen() {
   const [isDeletingRoom, setIsDeletingRoom] = useState(false);
   const [deleteRoomError, setDeleteRoomError] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newBoxName, setNewBoxName] = useState("");
+  const [newBoxStatus, setNewBoxStatus] = useState<EditableStatus>("unpacked");
+  const [createBoxError, setCreateBoxError] = useState<string | null>(null);
+  const [isCreatingBox, setIsCreatingBox] = useState(false);
 
   const loadRoom = useCallback(
     async (refresh: boolean) => {
@@ -257,6 +270,57 @@ export default function RoomDetailsScreen() {
     setDeleteRoomError(null);
   }, [isDeletingRoom]);
 
+  const openCreateModal = useCallback(() => {
+    if (!room) {
+      return;
+    }
+
+    setCreateBoxError(null);
+    setNewBoxName("");
+    setNewBoxStatus("unpacked");
+    setIsCreateModalOpen(true);
+  }, [room]);
+
+  const closeCreateModal = useCallback(() => {
+    if (isCreatingBox) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+    setCreateBoxError(null);
+  }, [isCreatingBox]);
+
+  const createBoxInRoom = useCallback(async () => {
+    if (!room) {
+      return;
+    }
+
+    const normalizedName = newBoxName.trim();
+    if (!normalizedName) {
+      setCreateBoxError("Box name is required.");
+      return;
+    }
+
+    setIsCreatingBox(true);
+    setCreateBoxError(null);
+
+    try {
+      const boxId = await boxService.createBox({
+        name: normalizedName,
+        locationId: room.id,
+        status: newBoxStatus,
+      });
+      setIsCreateModalOpen(false);
+      await loadRoom(true);
+      router.push({ pathname: "/box/[id]", params: { id: boxId } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create box.";
+      setCreateBoxError(message);
+    } finally {
+      setIsCreatingBox(false);
+    }
+  }, [loadRoom, newBoxName, newBoxStatus, room, router]);
+
   if (isLoading && !room) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -273,7 +337,14 @@ export default function RoomDetailsScreen() {
         className="flex-1"
         data={room ? boxes : []}
         keyExtractor={(box) => box.id}
-        renderItem={({ item }) => <BoxCard box={item} compact={isCompact} />}
+        renderItem={({ item }) => (
+          <BoxCard
+            box={item}
+            compact={isCompact}
+            onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: item.id } })}
+            onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: item.id, edit: "1" } })}
+          />
+        )}
         ItemSeparatorComponent={() => <View className="h-3" />}
         ListHeaderComponent={
           <View className="mt-2">
@@ -347,32 +418,30 @@ export default function RoomDetailsScreen() {
                           </View>
                         </>
                       ) : (
-                        <>
-                          <View className="flex-row items-center gap-2">
-                            <View className="flex-1">
-                              <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
-                              <Text className="mt-1 text-xs text-text-tertiary">
-                                {room.boxes} boxes • {room.items} items
-                              </Text>
-                            </View>
-                            <Pressable
-                              onPress={openNameEditor}
-                              hitSlop={8}
-                              className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
-                              disabled={isDeletingRoom}
-                            >
-                              <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
-                            </Pressable>
-                            <Pressable
-                              onPress={openDeleteModal}
-                              hitSlop={8}
-                              className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
-                              disabled={isDeletingRoom}
-                            >
-                              <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
-                            </Pressable>
+                        <View className="flex-row items-center gap-2">
+                          <View className="flex-1">
+                            <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
+                            <Text className="mt-1 text-xs text-text-tertiary">
+                              {room.boxes} boxes • {room.items} items
+                            </Text>
                           </View>
-                        </>
+                          <Pressable
+                            onPress={openNameEditor}
+                            hitSlop={8}
+                            className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                            disabled={isDeletingRoom}
+                          >
+                            <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                          </Pressable>
+                          <Pressable
+                            onPress={openDeleteModal}
+                            hitSlop={8}
+                            className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
+                            disabled={isDeletingRoom}
+                          >
+                            <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
+                          </Pressable>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -397,7 +466,7 @@ export default function RoomDetailsScreen() {
                 </View>
 
                 <View className="mb-4 mt-8">
-                  <SectionHeader title="Boxes" actionLabel={`${boxes.length} total`} />
+                  <SectionHeader title="Boxes" actionLabel="Add Box" onPressAction={openCreateModal} />
                 </View>
               </>
             ) : null}
@@ -407,13 +476,74 @@ export default function RoomDetailsScreen() {
           room ? (
             <EmptyStateCard
               title="No boxes yet"
-              description="Add your first box to this room from the inventory flow."
+              description="Create your first box for this room."
             />
           ) : null
         }
         contentContainerStyle={{ paddingHorizontal: isCompact ? 16 : 20, paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
       />
+
+      <AppModal
+        visible={isCreateModalOpen}
+        title="Create box"
+        description={room ? `This box will be created in "${room.name}".` : "Create a box."}
+        onRequestClose={closeCreateModal}
+        maxWidth={420}
+      >
+        <FormInput
+          value={newBoxName}
+          onChangeText={setNewBoxName}
+          placeholder="Box name (e.g. Kitchen Box #1)"
+          autoCapitalize="words"
+          autoCorrect={false}
+          editable={!isCreatingBox}
+          maxLength={80}
+        />
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Status</Text>
+          <View className="mt-2 flex-row gap-2">
+            {editableStatuses.map((option) => {
+              const isActive = option.value === newBoxStatus;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setNewBoxStatus(option.value)}
+                  disabled={isCreatingBox}
+                  className={`flex-1 items-center rounded-control border py-2.5 ${
+                    isActive
+                      ? "border-primary bg-primary/15"
+                      : "border-border-default bg-bg-input/60"
+                  }`}
+                >
+                  <Text className="text-sm font-semibold text-text-primary">{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {createBoxError ? (
+          <Text className="mt-3 text-xs text-crimson">{createBoxError}</Text>
+        ) : null}
+
+        <View className={`${createBoxError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeCreateModal}
+            disabled={isCreatingBox}
+            className="flex-1"
+          />
+          <Button
+            label={isCreatingBox ? "Creating..." : "Create"}
+            onPress={() => void createBoxInRoom()}
+            disabled={isCreatingBox}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
 
       <AppModal
         visible={isDeleteModalOpen}

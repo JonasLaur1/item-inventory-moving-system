@@ -17,10 +17,10 @@ type BoxCardProps = {
   box: InventoryBox;
   compact?: boolean;
   onPressOpen?: (box: InventoryBox) => void;
-  onPressMove?: (box: InventoryBox) => void;
+  onPressEdit?: (box: InventoryBox) => void;
 };
 
-export function BoxCard({ box, compact = false, onPressOpen, onPressMove }: BoxCardProps) {
+export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxCardProps) {
   const isPacked = box.status === "Packed";
 
   return (
@@ -55,10 +55,10 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressMove }: BoxC
           <Text className="text-xs font-semibold text-text-secondary">Open</Text>
         </Pressable>
         <Pressable
-          onPress={onPressMove ? () => onPressMove(box) : undefined}
+          onPress={onPressEdit ? () => onPressEdit(box) : undefined}
           className="flex-1 items-center rounded-control border border-border-default bg-bg-input/60 py-2.5"
         >
-          <Text className="text-xs font-semibold text-text-secondary">Move</Text>
+          <Text className="text-xs font-semibold text-text-secondary">Edit</Text>
         </Pressable>
       </View>
     </View>
