@@ -166,6 +166,12 @@ export default function HomeTabScreen() {
           subtitle="Add New Box"
           icon="plus"
           variant="secondary"
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/inventory",
+              params: { create: "1" },
+            })
+          }
         />
       </View>
 

@@ -16,7 +16,7 @@ import { useBoxes } from "@/hooks/use-boxes";
 import { useLocations } from "@/hooks/use-locations";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
@@ -79,6 +79,7 @@ function mapBoxStatus(status: "packed" | "unpacked"): InventoryBoxStatus {
 
 export default function InventoryTabScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ create?: string | string[] }>();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const isNarrow = width < 360;
@@ -173,14 +174,14 @@ export default function InventoryTabScreen() {
     });
   }, [activeRoom, activeStatus, boxes, search]);
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     clearError();
     setCreateBoxError(null);
     setNewBoxName("");
     setNewBoxStatus("unpacked");
     setNewBoxLocationId(locations[0]?.id ?? "");
     setIsCreateModalOpen(true);
-  };
+  }, [clearError, locations]);
 
   const closeCreateModal = () => {
     if (isCreating) {
@@ -190,6 +191,24 @@ export default function InventoryTabScreen() {
     setIsCreateModalOpen(false);
     setCreateBoxError(null);
   };
+
+  const shouldOpenCreateModal = useMemo(() => {
+    if (!params.create) {
+      return false;
+    }
+
+    const normalizedValue = Array.isArray(params.create) ? params.create[0] ?? "" : params.create;
+    return normalizedValue === "1" || normalizedValue.toLowerCase() === "true";
+  }, [params.create]);
+
+  useEffect(() => {
+    if (!shouldOpenCreateModal) {
+      return;
+    }
+
+    openCreateModal();
+    router.setParams({ create: undefined });
+  }, [openCreateModal, router, shouldOpenCreateModal]);
 
   const handleCreateBox = async () => {
     const normalizedName = newBoxName.trim();
