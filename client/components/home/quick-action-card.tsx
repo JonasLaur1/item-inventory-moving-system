@@ -40,7 +40,7 @@ export function QuickActionCard({
       }
       iconContainerClassName={isPrimary ? "bg-white/15" : "bg-primary/20"}
       titleClassName="text-text-primary"
-      subtitleClassName={isPrimary ? "text-text-secondary/80" : "text-text-tertiary"}
+      subtitleClassName={isPrimary ? "text-text-primary" : "text-text-tertiary"}
       {...props}
     />
   );

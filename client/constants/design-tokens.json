@@ -1,8 +1,8 @@
 {
   "colors": {
     "brand": {
-      "primary": "#2E6FF2",
-      "crimson": "#EF4444",
+      "primary": "#2D6EF0",
+      "crimson": "#FF7A7A",
       "emerald": "#10B981"
     },
     "dark": {
@@ -10,28 +10,28 @@
       "bgElevated": "#1C2433",
       "bgInput": "#2D3748",
       "bgDisabled": "#1F2937",
-      "borderDefault": "#2A3342",
-      "borderSubtle": "#1F2937",
-      "borderStrong": "#3A465A",
+      "borderDefault": "#64748B",
+      "borderSubtle": "#4A5568",
+      "borderStrong": "#7B8AA4",
       "textPrimary": "#FFFFFF",
       "textSecondary": "#E2E8F0",
       "textTertiary": "#94A3B8",
       "textDisabled": "#4A5568",
-      "textLink": "#2E6FF2"
+      "textLink": "#60A5FA"
     },
     "light": {
       "bgBase": "#F8FAFC",
       "bgElevated": "#FFFFFF",
       "bgInput": "#E2E8F0",
       "bgDisabled": "#E2E8F0",
-      "borderDefault": "#CBD5E1",
-      "borderSubtle": "#E2E8F0",
-      "borderStrong": "#94A3B8",
+      "borderDefault": "#7C8CA5",
+      "borderSubtle": "#94A3B8",
+      "borderStrong": "#64748B",
       "textPrimary": "#0F172A",
       "textSecondary": "#1E293B",
       "textTertiary": "#64748B",
       "textDisabled": "#CBD5E1",
-      "textLink": "#2E6FF2"
+      "textLink": "#2563EB"
     }
   },
   "radius": {
