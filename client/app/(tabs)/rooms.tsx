@@ -1,7 +1,6 @@
 import { Button } from "@/components/button";
 import { DashboardCard } from "@/components/home/dashboard-card";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
-import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { SectionHeader } from "@/components/home/section-header";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
@@ -153,32 +152,6 @@ export default function RoomsTabScreen() {
     const packedBoxes = filteredRooms.reduce((total, room) => total + room.packedBoxes, 0);
     return totalBoxes === 0 ? 0 : Math.round((packedBoxes / totalBoxes) * 100);
   }, [filteredRooms]);
-
-  const roomsWithLowProgress = useMemo(
-    () =>
-      filteredRooms
-        .filter((room) => {
-          const derivedStatus = getRoomStatus(room);
-          return derivedStatus !== "Done" && derivedStatus !== "Empty";
-        })
-        .sort((a, b) => a.packedBoxes / Math.max(a.boxes, 1) - b.packedBoxes / Math.max(b.boxes, 1))
-        .slice(0, 3),
-    [filteredRooms],
-  );
-  const priorityRows: InventoryItemRowData[] = useMemo(
-    () =>
-      roomsWithLowProgress.map((room) => {
-        const remainingBoxes = Math.max(room.boxes - room.packedBoxes, 0);
-        return {
-          id: `priority-${room.id}`,
-          title: room.name,
-          subtitle: `${remainingBoxes} boxes left to pack`,
-          badgeText: "Prioritize",
-          icon: "alert-circle",
-        };
-      }),
-    [roomsWithLowProgress],
-  );
 
   const canExpand = filteredRooms.length > PREVIEW_ROOMS_COUNT;
   const visibleRooms = showAllRooms ? filteredRooms : filteredRooms.slice(0, PREVIEW_ROOMS_COUNT);
@@ -358,19 +331,6 @@ export default function RoomsTabScreen() {
         ) : null}
       </View>
 
-      <View className="mt-8">
-        <SectionHeader title="Packing Priorities" actionLabel={`${roomsWithLowProgress.length} rooms`} />
-        <View className="mt-4 gap-3">
-          {roomsWithLowProgress.length === 0 ? (
-            <EmptyStateCard
-              title="Everything is on track"
-              description="No active rooms need extra attention right now."
-            />
-          ) : (
-            priorityRows.map((row) => <ItemRow key={row.id} item={row} />)
-          )}
-        </View>
-      </View>
     </TabScreenLayout>
   );
 }
