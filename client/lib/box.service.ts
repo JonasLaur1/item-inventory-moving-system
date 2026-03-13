@@ -1,3 +1,4 @@
+import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
 
 type BoxStatus = "packed" | "unpacked";
@@ -120,10 +121,10 @@ function normalizeFragility(value: string | null): boolean {
   return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
 }
 
-async function assertUserOwnsLocation(locationId: string, userId: string): Promise<void> {
+async function assertUserOwnsLocation(locationId: string, userId: string): Promise<string> {
   const { data, error } = await supabase
     .from("locations")
-    .select("id")
+    .select("id,name")
     .eq("id", locationId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -132,6 +133,8 @@ async function assertUserOwnsLocation(locationId: string, userId: string): Promi
   if (!data) {
     throw new Error("Room not found.");
   }
+
+  return data.name;
 }
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -265,7 +268,7 @@ async function createBox(input: CreateBoxInput): Promise<string> {
 
   const userId = await getCurrentUserId();
 
-  await assertUserOwnsLocation(locationId, userId);
+  const locationName = await assertUserOwnsLocation(locationId, userId);
 
   const { data, error } = await supabase
     .from("boxes")
@@ -282,6 +285,22 @@ async function createBox(input: CreateBoxInput): Promise<string> {
   if (!data?.id) {
     throw new Error("Failed to create box.");
   }
+
+  await activityService.writeActivitySafely({
+    type: "Created",
+    entityType: "box",
+    entityId: data.id,
+    title: "Box created",
+    description: `Created box "${name}" in "${locationName}".`,
+    roomName: locationName,
+    boxName: name,
+    next: {
+      name,
+      status,
+      locationId,
+      locationName,
+    },
+  });
 
   return data.id;
 }
@@ -306,7 +325,19 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
 
   const userId = await getCurrentUserId();
 
-  await assertUserOwnsLocation(locationId, userId);
+  const { data: previousBox, error: previousBoxError } = await supabase
+    .from("boxes")
+    .select("id,name,status,location_id")
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (previousBoxError) throw previousBoxError;
+  if (!previousBox) {
+    throw new Error("Box not found.");
+  }
+
+  const nextLocationNameFromOwnership = await assertUserOwnsLocation(locationId, userId);
 
   const { data, error } = await supabase
     .from("boxes")
@@ -324,6 +355,90 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
   if (!data) {
     throw new Error("Box not found.");
   }
+
+  const previousStatus = normalizeStatus(previousBox.status);
+  const hasNameChanged = previousBox.name !== name;
+  const hasLocationChanged = previousBox.location_id !== locationId;
+  const hasStatusChanged = previousStatus !== status;
+  const hasAnyChange = hasNameChanged || hasLocationChanged || hasStatusChanged;
+
+  if (!hasAnyChange) {
+    return;
+  }
+
+  const locationIds = Array.from(
+    new Set([previousBox.location_id, locationId].filter((value): value is string => Boolean(value))),
+  );
+  const locationNameMap = await getLocationNameMap(userId, locationIds);
+  const previousLocationName = previousBox.location_id
+    ? (locationNameMap.get(previousBox.location_id) ?? "Unknown room")
+    : "Unknown room";
+  const nextLocationName = locationNameMap.get(locationId) ?? nextLocationNameFromOwnership;
+
+  if (hasLocationChanged) {
+    await activityService.writeActivitySafely({
+      type: "Moved",
+      entityType: "box",
+      entityId: normalizedBoxId,
+      title: "Box moved",
+      description: `Moved box "${name}" from "${previousLocationName}" to "${nextLocationName}".`,
+      roomName: nextLocationName,
+      boxName: name,
+      previous: {
+        locationId: previousBox.location_id,
+        locationName: previousLocationName,
+      },
+      next: {
+        locationId,
+        locationName: nextLocationName,
+      },
+    });
+    return;
+  }
+
+  if (hasStatusChanged && status === "packed") {
+    await activityService.writeActivitySafely({
+      type: "Packed",
+      entityType: "box",
+      entityId: normalizedBoxId,
+      title: "Box packed",
+      description: `Marked box "${name}" as packed.`,
+      roomName: nextLocationName,
+      boxName: name,
+      previous: { status: previousStatus },
+      next: { status },
+    });
+    return;
+  }
+
+  const changeDetails: string[] = [];
+  if (hasNameChanged) {
+    changeDetails.push(`renamed from "${previousBox.name}"`);
+  }
+  if (hasStatusChanged) {
+    changeDetails.push(`status set to "${status}"`);
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Updated",
+    entityType: "box",
+    entityId: normalizedBoxId,
+    title: "Box updated",
+    description:
+      changeDetails.length > 0
+        ? `Updated box "${name}": ${changeDetails.join(", ")}.`
+        : `Updated box "${name}".`,
+    roomName: nextLocationName,
+    boxName: name,
+    previous: {
+      name: previousBox.name,
+      status: previousStatus,
+    },
+    next: {
+      name,
+      status,
+    },
+  });
 }
 
 async function deleteBox(boxId: string): Promise<void> {
@@ -333,6 +448,18 @@ async function deleteBox(boxId: string): Promise<void> {
   }
 
   const userId = await getCurrentUserId();
+
+  const { data: boxBeforeDelete, error: boxBeforeDeleteError } = await supabase
+    .from("boxes")
+    .select("id,name,status,location_id")
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (boxBeforeDeleteError) throw boxBeforeDeleteError;
+  if (!boxBeforeDelete) {
+    throw new Error("Box not found.");
+  }
 
   const { count, error: countError } = await supabase
     .from("items")
@@ -364,6 +491,30 @@ async function deleteBox(boxId: string): Promise<void> {
   if (!data) {
     throw new Error("Box not found.");
   }
+
+  const locationNameMap = await getLocationNameMap(
+    userId,
+    boxBeforeDelete.location_id ? [boxBeforeDelete.location_id] : [],
+  );
+  const locationName = boxBeforeDelete.location_id
+    ? (locationNameMap.get(boxBeforeDelete.location_id) ?? "Unknown room")
+    : "Unknown room";
+
+  await activityService.writeActivitySafely({
+    type: "Deleted",
+    entityType: "box",
+    entityId: boxBeforeDelete.id,
+    title: "Box deleted",
+    description: `Deleted box "${boxBeforeDelete.name}".`,
+    roomName: locationName,
+    boxName: boxBeforeDelete.name,
+    previous: {
+      name: boxBeforeDelete.name,
+      status: normalizeStatus(boxBeforeDelete.status),
+      locationId: boxBeforeDelete.location_id,
+      locationName,
+    },
+  });
 }
 
 export const boxService = {
