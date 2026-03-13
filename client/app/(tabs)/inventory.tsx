@@ -3,7 +3,6 @@ import { FormInput } from "@/components/form-input";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
-import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { FilterGroup } from "@/components/ui/filter-group";
@@ -14,6 +13,7 @@ import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Colors } from "@/constants/theme";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useLocations } from "@/hooks/use-locations";
+import { itemService } from "@/lib/item.service";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -27,12 +27,6 @@ const statusFilters: StatusFilter[] = ["All", "Packed", "Unpacked", "Fragile"];
 const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
   { label: "Unpacked", value: "unpacked" },
-];
-
-const unassignedItems: InventoryItemRowData[] = [
-  { id: "u-1", title: "Laptop Charger", subtitle: "Office", badgeText: "Move soon" },
-  { id: "u-2", title: "Photo Album", subtitle: "Living Room", badgeText: "Fragile" },
-  { id: "u-3", title: "Tool Set", subtitle: "Garage", badgeText: "Heavy" },
 ];
 
 function getMinutesAgo(occurredAt: string, nowMs: number): number {
@@ -77,6 +71,20 @@ function mapBoxStatus(status: "packed" | "unpacked"): InventoryBoxStatus {
   return status === "packed" ? "Packed" : "Unpacked";
 }
 
+function parseQuantity(value: string): number | null {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(normalizedValue);
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    return null;
+  }
+
+  return parsedValue;
+}
+
 export default function InventoryTabScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ create?: string | string[] }>();
@@ -105,11 +113,20 @@ export default function InventoryTabScreen() {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
   const [activeRoom, setActiveRoom] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState("");
   const [newBoxLocationId, setNewBoxLocationId] = useState("");
   const [newBoxStatus, setNewBoxStatus] = useState<EditableStatus>("unpacked");
   const [createBoxError, setCreateBoxError] = useState<string | null>(null);
+
+  const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [newItemNotes, setNewItemNotes] = useState("");
+  const [newItemBoxId, setNewItemBoxId] = useState("");
+  const [createItemError, setCreateItemError] = useState<string | null>(null);
+  const [isCreatingItem, setIsCreatingItem] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -146,8 +163,19 @@ export default function InventoryTabScreen() {
     }
   }, [isCreateModalOpen, locations, newBoxLocationId]);
 
+  useEffect(() => {
+    if (!isCreateItemModalOpen) {
+      return;
+    }
+
+    if (!newItemBoxId && summaryBoxes.length > 0) {
+      setNewItemBoxId(summaryBoxes[0].id);
+    }
+  }, [isCreateItemModalOpen, newItemBoxId, summaryBoxes]);
+
   const packedCount = boxes.filter((box) => box.status === "Packed").length;
   const unpackedCount = boxes.length - packedCount;
+  const totalItemsCount = summaryBoxes.reduce((total, box) => total + box.itemsCount, 0);
   const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
   const roomFilters = useMemo(
     () => ["All", ...Array.from(new Set(boxes.map((box) => box.room))).sort((a, b) => a.localeCompare(b))],
@@ -191,6 +219,24 @@ export default function InventoryTabScreen() {
     setIsCreateModalOpen(false);
     setCreateBoxError(null);
   };
+
+  const openCreateItemModal = useCallback(() => {
+    setCreateItemError(null);
+    setNewItemName("");
+    setNewItemQuantity("1");
+    setNewItemNotes("");
+    setNewItemBoxId(summaryBoxes[0]?.id ?? "");
+    setIsCreateItemModalOpen(true);
+  }, [summaryBoxes]);
+
+  const closeCreateItemModal = useCallback(() => {
+    if (isCreatingItem) {
+      return;
+    }
+
+    setIsCreateItemModalOpen(false);
+    setCreateItemError(null);
+  }, [isCreatingItem]);
 
   const shouldOpenCreateModal = useMemo(() => {
     if (!params.create) {
@@ -245,6 +291,45 @@ export default function InventoryTabScreen() {
     }
   };
 
+  const handleCreateItem = useCallback(async () => {
+    const normalizedName = newItemName.trim();
+    if (!normalizedName) {
+      setCreateItemError("Item name is required.");
+      return;
+    }
+
+    const parsedQuantity = parseQuantity(newItemQuantity);
+    if (!parsedQuantity) {
+      setCreateItemError("Quantity must be a whole number greater than 0.");
+      return;
+    }
+
+    if (!newItemBoxId) {
+      setCreateItemError("Box is required.");
+      return;
+    }
+
+    setIsCreatingItem(true);
+    setCreateItemError(null);
+
+    try {
+      await itemService.createItem({
+        name: normalizedName,
+        quantity: parsedQuantity,
+        notes: newItemNotes,
+        boxId: newItemBoxId,
+      });
+
+      setIsCreateItemModalOpen(false);
+      await Promise.all([refreshBoxes(), refreshLocations()]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create item.";
+      setCreateItemError(message);
+    } finally {
+      setIsCreatingItem(false);
+    }
+  }, [newItemBoxId, newItemName, newItemNotes, newItemQuantity, refreshBoxes, refreshLocations]);
+
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
       {errorMessage ? (
@@ -274,8 +359,8 @@ export default function InventoryTabScreen() {
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
         <MetricCard
-          label="Loose Items"
-          value={String(unassignedItems.length)}
+          label="Total Items"
+          value={String(totalItemsCount)}
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
       </View>
@@ -283,9 +368,10 @@ export default function InventoryTabScreen() {
       <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>
         <QuickActionCard
           title="Add Item"
-          subtitle="Create Unassigned Item"
+          subtitle="Create and assign to box"
           icon="plus"
           variant="primary"
+          onPress={openCreateItemModal}
         />
         <QuickActionCard
           title="Add Box"
@@ -393,14 +479,99 @@ export default function InventoryTabScreen() {
         </View>
       </View>
 
-      <View className="mt-8">
-        <SectionHeader title="Unassigned Items" actionLabel={`${unassignedItems.length} items`} />
-        <View className="mt-4 gap-3">
-          {unassignedItems.map((item) => (
-            <ItemRow key={item.id} item={item} />
-          ))}
+      <AppModal
+        visible={isCreateItemModalOpen}
+        title="Create item"
+        description="Set item details and select a box."
+        onRequestClose={closeCreateItemModal}
+        maxWidth={420}
+      >
+        <FormInput
+          value={newItemName}
+          onChangeText={setNewItemName}
+          placeholder="Item name"
+          autoCapitalize="sentences"
+          autoCorrect={false}
+          editable={!isCreatingItem}
+          maxLength={120}
+        />
+
+        <View className="mt-4">
+          <FormInput
+            value={newItemQuantity}
+            onChangeText={setNewItemQuantity}
+            placeholder="Quantity"
+            keyboardType="number-pad"
+            editable={!isCreatingItem}
+            maxLength={4}
+          />
         </View>
-      </View>
+
+        <View className="mt-4">
+          <FormInput
+            value={newItemNotes}
+            onChangeText={setNewItemNotes}
+            placeholder="Notes (optional)"
+            autoCapitalize="sentences"
+            editable={!isCreatingItem}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            style={{ minHeight: 84, paddingTop: 12 }}
+            maxLength={300}
+          />
+        </View>
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
+          <View className="mt-2 gap-2">
+            {summaryBoxes.length === 0 ? (
+              <Text className="text-xs text-text-tertiary">
+                No boxes found. Create a box first before adding items.
+              </Text>
+            ) : (
+              summaryBoxes.map((box) => {
+                const isActive = box.id === newItemBoxId;
+                return (
+                  <Pressable
+                    key={box.id}
+                    onPress={() => setNewItemBoxId(box.id)}
+                    disabled={isCreatingItem}
+                    className={`rounded-control border px-3 py-2.5 ${
+                      isActive
+                        ? "border-primary bg-primary/15"
+                        : "border-border-default bg-bg-input/60"
+                    }`}
+                  >
+                    <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
+                    <Text className="mt-1 text-xs text-text-tertiary">{box.locationName}</Text>
+                  </Pressable>
+                );
+              })
+            )}
+          </View>
+        </View>
+
+        {createItemError ? (
+          <Text className="mt-3 text-xs text-crimson">{createItemError}</Text>
+        ) : null}
+
+        <View className={`${createItemError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeCreateItemModal}
+            disabled={isCreatingItem}
+            className="flex-1"
+          />
+          <Button
+            label={isCreatingItem ? "Creating..." : "Create"}
+            onPress={() => void handleCreateItem()}
+            disabled={isCreatingItem || summaryBoxes.length === 0}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
 
       <AppModal
         visible={isCreateModalOpen}
