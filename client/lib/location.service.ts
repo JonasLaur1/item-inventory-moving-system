@@ -1,3 +1,4 @@
+import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
 
 type LocationRow = {
@@ -148,12 +149,29 @@ async function createLocation(name: string): Promise<void> {
 
   const userId = await getCurrentUserId();
 
-  const { error } = await supabase.from("locations").insert({
-    user_id: userId,
-    name: trimmedName,
-  });
+  const { data, error } = await supabase
+    .from("locations")
+    .insert({
+      user_id: userId,
+      name: trimmedName,
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data?.id) {
+    throw new Error("Failed to create room.");
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Created",
+    entityType: "location",
+    entityId: data.id,
+    title: "Room created",
+    description: `Created room "${trimmedName}".`,
+    roomName: trimmedName,
+    next: { name: trimmedName },
+  });
 }
 
 async function updateLocationName(locationId: string, name: string): Promise<void> {
@@ -169,6 +187,18 @@ async function updateLocationName(locationId: string, name: string): Promise<voi
 
   const userId = await getCurrentUserId();
 
+  const { data: existingLocation, error: existingError } = await supabase
+    .from("locations")
+    .select("id,name")
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (!existingLocation) {
+    throw new Error("Room not found.");
+  }
+
   const { data, error } = await supabase
     .from("locations")
     .update({ name: trimmedName })
@@ -181,6 +211,21 @@ async function updateLocationName(locationId: string, name: string): Promise<voi
   if (!data) {
     throw new Error("Room not found.");
   }
+
+  if (existingLocation.name === trimmedName) {
+    return;
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Updated",
+    entityType: "location",
+    entityId: normalizedLocationId,
+    title: "Room updated",
+    description: `Renamed room "${existingLocation.name}" to "${trimmedName}".`,
+    roomName: trimmedName,
+    previous: { name: existingLocation.name },
+    next: { name: trimmedName },
+  });
 }
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -199,6 +244,20 @@ async function deleteLocation(locationId: string): Promise<void> {
   }
 
   const userId = await getCurrentUserId();
+
+  const { data: locationBeforeDelete, error: locationFetchError } = await supabase
+    .from("locations")
+    .select("id,name")
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (locationFetchError) {
+    throw locationFetchError;
+  }
+  if (!locationBeforeDelete) {
+    throw new Error("Room not found.");
+  }
 
   const { data, error } = await supabase
     .from("locations")
@@ -219,6 +278,16 @@ async function deleteLocation(locationId: string): Promise<void> {
   if (!data) {
     throw new Error("Room not found.");
   }
+
+  await activityService.writeActivitySafely({
+    type: "Deleted",
+    entityType: "location",
+    entityId: locationBeforeDelete.id,
+    title: "Room deleted",
+    description: `Deleted room "${locationBeforeDelete.name}".`,
+    roomName: locationBeforeDelete.name,
+    previous: { name: locationBeforeDelete.name },
+  });
 }
 
 async function getLocationDetails(locationId: string): Promise<LocationDetails> {
