@@ -7,6 +7,7 @@ import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { useActivityHistory } from "@/hooks/use-activity-history";
 import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
@@ -24,20 +25,52 @@ type Room = {
   icon: RoomCardProps["icon"];
 };
 
-type Activity = {
-  id: string;
-  item: string;
-  detail: string;
-  time: string;
-  icon: keyof typeof Feather.glyphMap;
-};
+function getMinutesAgo(occurredAt: string, nowMs: number): number {
+  const timestamp = new Date(occurredAt).getTime();
 
-const recentActivity: Activity[] = [
-  { id: "1", item: "Toaster", detail: "Added to Kitchen Box #3", time: "2m ago", icon: "archive" },
-  { id: "2", item: "Winter Jacket", detail: "Moved to Master Bedroom Box #5", time: "15m ago", icon: "package" },
-  { id: "3", item: "Photo Frame", detail: "Marked as fragile", time: "40m ago", icon: "alert-circle" },
-  { id: "4", item: "Tool Set", detail: "Added to Garage Box #2", time: "1h ago", icon: "tool" },
-];
+  if (Number.isNaN(timestamp)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
+}
+
+function formatRelativeTime(minutesAgo: number): string {
+  if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
+    return "Unknown";
+  }
+
+  if (minutesAgo < 1) {
+    return "Just now";
+  }
+
+  if (minutesAgo < 60) {
+    return `${minutesAgo}m ago`;
+  }
+
+  if (minutesAgo < 24 * 60) {
+    return `${Math.floor(minutesAgo / 60)}h ago`;
+  }
+
+  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
+}
+
+function getActivityIcon(type: string): keyof typeof Feather.glyphMap {
+  switch (type) {
+    case "Created":
+      return "plus-square";
+    case "Updated":
+      return "edit-3";
+    case "Moved":
+      return "repeat";
+    case "Deleted":
+      return "trash-2";
+    case "Packed":
+      return "archive";
+    default:
+      return "clock";
+  }
+}
 
 export default function HomeTabScreen() {
   const router = useRouter();
@@ -51,6 +84,14 @@ export default function HomeTabScreen() {
     errorMessage,
     refreshLocations,
   } = useLocations();
+  const {
+    events: recentEvents,
+    isLoading: isActivityLoading,
+    isRefreshing: isActivityRefreshing,
+    errorMessage: activityErrorMessage,
+    refreshActivity,
+    clearError: clearActivityError,
+  } = useActivityHistory(4);
   const hasFocusedOnceRef = useRef(false);
 
   useFocusEffect(
@@ -60,8 +101,8 @@ export default function HomeTabScreen() {
         return;
       }
 
-      void refreshLocations();
-    }, [refreshLocations]),
+      void Promise.all([refreshLocations(), refreshActivity()]);
+    }, [refreshActivity, refreshLocations]),
   );
 
   const rooms: Room[] = useMemo(
@@ -98,15 +139,21 @@ export default function HomeTabScreen() {
 
   const visibleRooms = showAllRooms ? rooms : rooms.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
-    () =>
-      recentActivity.slice(0, 4).map((activity) => ({
-        id: activity.id,
-        title: activity.item,
-        subtitle: activity.detail,
-        badgeText: activity.time,
-        icon: activity.icon,
-      })),
-    [],
+    () => {
+      const nowMs = Date.now();
+
+      return recentEvents.map((event) => {
+        const minutesAgo = getMinutesAgo(event.occurredAt, nowMs);
+        return {
+          id: event.id,
+          title: event.title,
+          subtitle: event.description,
+          badgeText: formatRelativeTime(minutesAgo),
+          icon: getActivityIcon(event.type),
+        };
+      });
+    },
+    [recentEvents],
   );
 
   return (
@@ -228,10 +275,33 @@ export default function HomeTabScreen() {
 
       <View className="mt-4">
         <SectionHeader title="Recent Activity" />
+        {activityErrorMessage ? (
+          <RetryErrorCard
+            message={activityErrorMessage}
+            isRetrying={isActivityRefreshing}
+            retryingLabel="Refreshing..."
+            onRetry={() => {
+              clearActivityError();
+              void refreshActivity();
+            }}
+            className="mt-4"
+          />
+        ) : null}
         <View className="mt-4 gap-3">
-          {recentActivityRows.map((activity) => (
-            <ItemRow key={activity.id} item={activity} />
-          ))}
+          {recentActivityRows.length > 0 ? (
+            recentActivityRows.map((activity) => (
+              <ItemRow key={activity.id} item={activity} />
+            ))
+          ) : (
+            <EmptyStateCard
+              title={isActivityLoading || isActivityRefreshing ? "Loading activity..." : "No activity yet"}
+              description={
+                isActivityLoading || isActivityRefreshing
+                  ? "Fetching your latest activity."
+                  : "Your latest inventory actions will appear here."
+              }
+            />
+          )}
         </View>
       </View>
     </TabScreenLayout>

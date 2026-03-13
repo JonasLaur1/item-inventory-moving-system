@@ -1,9 +1,10 @@
 import { Colors } from "@/constants/theme";
 import { MetaPill } from "@/components/ui/meta-pill";
+import type { ActivityType } from "@/lib/activity.service";
 import { Feather } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
-export type ActivityEventType = "Packed" | "Moved" | "Created" | "Scanned" | "Flagged";
+export type ActivityEventType = ActivityType;
 
 export type ActivityEvent = {
   id: string;
@@ -79,17 +80,17 @@ function getEventTone(type: ActivityEventType) {
         badgeBgClassName: "bg-primary/15",
         badgeTextClassName: "text-text-link",
       };
-    case "Scanned":
+    case "Updated":
       return {
-        icon: "camera" as const,
+        icon: "edit-3" as const,
         iconBgClassName: "bg-bg-input",
         iconColor: Colors.dark.textSecondary,
         badgeBgClassName: "bg-bg-input",
         badgeTextClassName: "text-text-secondary",
       };
-    case "Flagged":
+    case "Deleted":
       return {
-        icon: "alert-circle" as const,
+        icon: "trash-2" as const,
         iconBgClassName: "bg-crimson/20",
         iconColor: Colors.dark.crimson,
         badgeBgClassName: "bg-crimson/20",
