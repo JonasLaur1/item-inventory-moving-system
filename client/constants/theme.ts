@@ -3,7 +3,7 @@ import designTokens from './design-tokens.json';
 
 const { brand, light, dark } = designTokens.colors;
 
-export const Colors = {
+const palettes = {
   light: {
     primary: brand.primary,
     crimson: brand.crimson,
@@ -37,6 +37,24 @@ export const Colors = {
     textTertiary: dark.textTertiary,
     textDisabled: dark.textDisabled,
     textLink: dark.textLink,
+  },
+};
+
+export type AppThemeName = keyof typeof palettes;
+export type ThemePalette = typeof palettes.light;
+
+let activeTheme: AppThemeName = 'dark';
+
+export function setActiveTheme(theme: AppThemeName) {
+  activeTheme = theme;
+}
+
+export const ColorPalettes = palettes;
+
+export const Colors = {
+  light: palettes.light,
+  get dark(): ThemePalette {
+    return palettes[activeTheme];
   },
 };
 

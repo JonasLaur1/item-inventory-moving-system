@@ -6,8 +6,8 @@ import { ActivityIndicator, View } from "react-native";
 import { vars } from "nativewind";
 import "react-native-reanimated";
 import "../global.css";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ColorPalettes } from "@/constants/theme";
+import { ThemePreferenceProvider, useThemePreference } from "@/hooks/use-theme-preference";
 import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
@@ -21,7 +21,7 @@ function hexToRgbTriplet(hex: string) {
   return `${r} ${g} ${b}`;
 }
 
-function buildThemeVars(theme: typeof Colors.light) {
+function buildThemeVars(theme: typeof ColorPalettes.light) {
   return vars({
     "--color-bg-base": hexToRgbTriplet(theme.bgBase),
     "--color-bg-elevated": hexToRgbTriplet(theme.bgElevated),
@@ -39,13 +39,21 @@ function buildThemeVars(theme: typeof Colors.light) {
 }
 
 const themeVars = {
-  light: buildThemeVars(Colors.light),
-  dark: buildThemeVars(Colors.dark),
+  light: buildThemeVars(ColorPalettes.light),
+  dark: buildThemeVars(ColorPalettes.dark),
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const activeThemeVars = colorScheme === "dark" ? themeVars.dark : themeVars.light;
+  return (
+    <ThemePreferenceProvider>
+      <RootLayoutContent />
+    </ThemePreferenceProvider>
+  );
+}
+
+function RootLayoutContent() {
+  const { resolvedTheme } = useThemePreference();
+  const activeThemeVars = resolvedTheme === "dark" ? themeVars.dark : themeVars.light;
   const router = useRouter();
   const segments = useSegments();
   const currentRootSegment = segments[0];
@@ -108,7 +116,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={resolvedTheme === "dark" ? DarkTheme : DefaultTheme}>
       <View style={activeThemeVars} className="flex-1 bg-bg-base">
         <Stack initialRouteName="index">
           <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -120,7 +128,7 @@ export default function RootLayout() {
           <Stack.Screen name="box/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       </View>
     </ThemeProvider>
   );
