@@ -17,13 +17,13 @@ export function SearchBar({
 }: SearchBarProps) {
   return (
     <View
-      className={`h-[48px] flex-row items-center rounded-control border border-border-default bg-bg-elevated/70 px-4 ${containerClassName}`}
+      className={`h-[48px] flex-row items-center rounded-control border border-border-strong bg-bg-input px-4 ${containerClassName}`}
     >
-      <Feather name="search" size={16} color={Colors.dark.textTertiary} />
+      <Feather name="search" size={16} color={Colors.dark.textSecondary} />
       <TextInput
         className={`ml-3 flex-1 text-sm text-text-primary ${inputClassName}`}
         placeholder={placeholder}
-        placeholderTextColor={placeholderTextColor ?? Colors.dark.textTertiary}
+        placeholderTextColor={placeholderTextColor ?? Colors.dark.textSecondary}
         selectionColor={selectionColor ?? Colors.dark.primary}
         {...props}
       />

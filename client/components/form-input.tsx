@@ -23,7 +23,7 @@ export function FormInput({
 }: FormInputProps) {
   const palette = Colors.dark;
   const sharedInputProps = {
-    placeholderTextColor: props.placeholderTextColor ?? palette.textTertiary,
+    placeholderTextColor: props.placeholderTextColor ?? palette.textSecondary,
     selectionColor: props.selectionColor ?? palette.primary,
     ...props,
   };
@@ -35,12 +35,12 @@ export function FormInput({
       ) : null}
 
       {leftIcon || rightElement ? (
-        <View className="min-h-[52px] flex-row items-center rounded-control border border-border-default bg-bg-elevated/75 px-4">
+        <View className="min-h-[52px] flex-row items-center rounded-control border border-border-strong bg-bg-input px-4">
           {leftIcon ? (
             <Feather
               name={leftIcon}
               size={18}
-              color={palette.textTertiary}
+              color={palette.textSecondary}
               style={{ marginRight: 10 }}
             />
           ) : null}
@@ -55,7 +55,7 @@ export function FormInput({
         </View>
       ) : (
         <TextInput
-          className={`w-full rounded-control bg-bg-elevated px-4 py-3 text-base text-text-primary ${showDefaultBorder ? "border border-border-default" : ""} ${inputClassName}`}
+          className={`w-full rounded-control bg-bg-input px-4 py-3 text-base text-text-primary ${showDefaultBorder ? "border border-border-strong" : ""} ${inputClassName}`}
           style={props.style}
           {...sharedInputProps}
         />
