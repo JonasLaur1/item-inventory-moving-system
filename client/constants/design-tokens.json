@@ -22,16 +22,16 @@
     "light": {
       "bgBase": "#F8FAFC",
       "bgElevated": "#FFFFFF",
-      "bgInput": "#E2E8F0",
-      "bgDisabled": "#E2E8F0",
-      "borderDefault": "#7C8CA5",
-      "borderSubtle": "#94A3B8",
-      "borderStrong": "#64748B",
+      "bgInput": "#F1F5F9",
+      "bgDisabled": "#EAF0F6",
+      "borderDefault": "#64748B",
+      "borderSubtle": "#7C8CA5",
+      "borderStrong": "#475569",
       "textPrimary": "#0F172A",
       "textSecondary": "#1E293B",
-      "textTertiary": "#64748B",
-      "textDisabled": "#CBD5E1",
-      "textLink": "#2563EB"
+      "textTertiary": "#526176",
+      "textDisabled": "#5C6C81",
+      "textLink": "#1D4ED8"
     }
   },
   "radius": {
