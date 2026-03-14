@@ -1,10 +1,13 @@
-import { Colors } from "@/constants/theme";
+import { ColorPalettes } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
+  const { resolvedTheme } = useThemePreference();
+  const palette = ColorPalettes[resolvedTheme];
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 10);
 
@@ -12,8 +15,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.dark.textLink,
-        tabBarInactiveTintColor: Colors.dark.textTertiary,
+        tabBarActiveTintColor: palette.textLink,
+        tabBarInactiveTintColor: palette.textTertiary,
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -21,8 +24,8 @@ export default function TabLayout() {
           marginTop: 2,
         },
         tabBarStyle: {
-          backgroundColor: Colors.dark.bgElevated,
-          borderTopColor: Colors.dark.borderDefault,
+          backgroundColor: palette.bgElevated,
+          borderTopColor: palette.borderDefault,
           borderTopWidth: 1,
           height: 58 + bottomInset,
           paddingTop: 8,
@@ -61,9 +64,9 @@ export default function TabLayout() {
                 alignItems: "center",
                 justifyContent: "center",
                 marginTop: -26,
-                backgroundColor: focused ? Colors.dark.primary : `${Colors.dark.primary}D1`,
+                backgroundColor: focused ? palette.primary : `${palette.primary}D1`,
                 borderWidth: 2,
-                borderColor: Colors.dark.bgElevated,
+                borderColor: palette.bgElevated,
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.3,
@@ -71,7 +74,7 @@ export default function TabLayout() {
                 elevation: 8,
               }}
             >
-              <Feather name="camera" size={20} color={Colors.dark.textPrimary} />
+              <Feather name="camera" size={20} color={palette.textPrimary} />
             </View>
           ),
         }}
