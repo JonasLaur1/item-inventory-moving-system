@@ -11,11 +11,12 @@ import { Colors } from "@/constants/theme";
 import { boxService, type BoxDetails, type BoxDetailsItem, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
 import { locationService, type LocationSummary } from "@/lib/location.service";
+import { generateBoxQrDataUrl } from "@/utils/box-qr";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type EditableStatus = "packed" | "unpacked";
@@ -144,6 +145,13 @@ export default function BoxDetailsScreen() {
   const [itemPendingDelete, setItemPendingDelete] = useState<BoxDetailsItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [deleteItemError, setDeleteItemError] = useState<string | null>(null);
+  const [qrDeepLink, setQrDeepLink] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false);
+  const [qrErrorMessage, setQrErrorMessage] = useState<string | null>(null);
+  const [isSharingQr, setIsSharingQr] = useState(false);
+  const [shareQrError, setShareQrError] = useState<string | null>(null);
+  const [qrVersion, setQrVersion] = useState(0);
 
   const loadBox = useCallback(
     async (refresh: boolean) => {
@@ -215,6 +223,55 @@ export default function BoxDetailsScreen() {
     setEditedLocationId(box.locationId);
     setEditedStatus(box.status);
   }, [box]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!box) {
+      setQrDeepLink(null);
+      setQrDataUrl(null);
+      setQrErrorMessage(null);
+      setShareQrError(null);
+      setIsGeneratingQr(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setIsGeneratingQr(true);
+    setQrErrorMessage(null);
+    setShareQrError(null);
+
+    void (async () => {
+      try {
+        const generatedQr = await generateBoxQrDataUrl(box.id);
+
+        if (!isActive) {
+          return;
+        }
+
+        setQrDeepLink(generatedQr.deepLink);
+        setQrDataUrl(generatedQr.dataUrl);
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "Failed to generate QR code.";
+        setQrDeepLink(null);
+        setQrDataUrl(null);
+        setQrErrorMessage(message);
+      } finally {
+        if (isActive) {
+          setIsGeneratingQr(false);
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [box, qrVersion]);
 
   const saveBox = useCallback(async () => {
     if (!box) {
@@ -461,6 +518,35 @@ export default function BoxDetailsScreen() {
     }
   }, [itemPendingDelete, loadBox]);
 
+  const shareBoxDeepLink = useCallback(async () => {
+    if (!box || !qrDeepLink || isSharingQr) {
+      return;
+    }
+
+    setIsSharingQr(true);
+    setShareQrError(null);
+
+    try {
+      await Share.share({
+        title: `${box.name} QR link`,
+        message: `Open "${box.name}" in BoxIt:\n${qrDeepLink}`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to share box link.";
+      setShareQrError(message);
+    } finally {
+      setIsSharingQr(false);
+    }
+  }, [box, isSharingQr, qrDeepLink]);
+
+  const retryGenerateQr = useCallback(() => {
+    if (isGeneratingQr) {
+      return;
+    }
+
+    setQrVersion((previousValue) => previousValue + 1);
+  }, [isGeneratingQr]);
+
   if (isLoading && !box) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -567,6 +653,58 @@ export default function BoxDetailsScreen() {
                 value={box.isFragile ? "Yes" : "No"}
                 style={{ width: "48.5%" }}
               />
+            </View>
+
+            <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/70 p-4">
+              <SectionHeader title="QR Label" />
+
+              {isGeneratingQr ? (
+                <View className="mt-4 items-center justify-center rounded-control border border-border-default bg-bg-input/60 px-4 py-8">
+                  <ActivityIndicator />
+                  <Text className="mt-3 text-xs text-text-tertiary">Generating QR code...</Text>
+                </View>
+              ) : qrDataUrl ? (
+                <>
+                  <View className="mt-4 items-center rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
+                    <Image
+                      source={{ uri: qrDataUrl }}
+                      style={{ width: 196, height: 196 }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text className="mt-4 text-xs text-text-tertiary">{qrDeepLink}</Text>
+                  <View className="mt-4 flex-row gap-3">
+                    <Button
+                      label={isSharingQr ? "Sharing..." : "Share Box Link"}
+                      onPress={() => void shareBoxDeepLink()}
+                      disabled={isSharingQr}
+                      className="flex-1"
+                    />
+                    <Button
+                      label="Regenerate"
+                      variant="secondary"
+                      onPress={retryGenerateQr}
+                      disabled={isSharingQr}
+                      className="flex-1"
+                    />
+                  </View>
+                </>
+              ) : (
+                <View className="mt-4 rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
+                  <Text className="text-sm font-semibold text-text-primary">Could not generate QR code.</Text>
+                  <Text className="mt-1 text-xs text-text-tertiary">
+                    {qrErrorMessage ?? "Try generating again."}
+                  </Text>
+                  <Button
+                    label="Retry"
+                    variant="secondary"
+                    onPress={retryGenerateQr}
+                    className="mt-4"
+                  />
+                </View>
+              )}
+
+              {shareQrError ? <Text className="mt-3 text-xs text-crimson">{shareQrError}</Text> : null}
             </View>
 
             <View className="mt-6">
