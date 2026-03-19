@@ -6,6 +6,7 @@ type AppModalProps = {
   title: string;
   description?: string;
   onRequestClose: () => void;
+  showCornerClose?: boolean;
   children?: ReactNode;
   maxWidth?: number;
   closeOnBackdropPress?: boolean;
@@ -17,6 +18,7 @@ export function AppModal({
   title,
   description,
   onRequestClose,
+  showCornerClose = false,
   children,
   maxWidth = 420,
   closeOnBackdropPress = false,
@@ -33,6 +35,16 @@ export function AppModal({
           className={`w-full rounded-modal border border-border-default bg-bg-elevated p-5 shadow-modal ${contentClassName}`}
           style={{ maxWidth }}
         >
+          {showCornerClose ? (
+            <Pressable
+              className="absolute right-3 top-3 h-8 w-8 items-center justify-center rounded-full bg-bg-input/80"
+              onPress={onRequestClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close modal"
+            >
+              <Text className="text-base font-semibold text-text-primary">X</Text>
+            </Pressable>
+          ) : null}
           <Text className="text-lg font-semibold text-text-primary">{title}</Text>
           {description ? (
             <Text className="mt-2 text-sm leading-5 text-text-secondary">{description}</Text>

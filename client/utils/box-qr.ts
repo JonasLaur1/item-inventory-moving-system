@@ -1,11 +1,17 @@
 import QRCode from "qrcode";
 
 const APP_DEEP_LINK_SCHEME = "client";
-const DEFAULT_QR_SIZE = 320;
+const APP_LINK_HOST = "boxit.app";
+
+export type QrMatrix = {
+  size: number;
+  modules: boolean[];
+};
 
 export type GeneratedBoxQr = {
   deepLink: string;
-  dataUrl: string;
+  appLinkUrl: string;
+  matrix: QrMatrix;
 };
 
 export function buildBoxDeepLink(boxId: string): string {
@@ -18,26 +24,61 @@ export function buildBoxDeepLink(boxId: string): string {
   return `${APP_DEEP_LINK_SCHEME}://box/${encodeURIComponent(normalizedBoxId)}`;
 }
 
-export async function generateQrDataUrl(value: string, size = DEFAULT_QR_SIZE): Promise<string> {
+export function buildBoxAppLink(boxId: string): string {
+  const normalizedBoxId = boxId.trim();
+
+  if (!normalizedBoxId) {
+    throw new Error("Box id is required.");
+  }
+
+  return `https://${APP_LINK_HOST}/box/${encodeURIComponent(normalizedBoxId)}`;
+}
+
+export function generateQrMatrix(value: string): QrMatrix {
   const normalizedValue = value.trim();
 
   if (!normalizedValue) {
     throw new Error("QR value is required.");
   }
 
-  return QRCode.toDataURL(normalizedValue, {
+  const qr = QRCode.create(normalizedValue, {
+    errorCorrectionLevel: "M",
+  });
+  const size = qr.modules.size;
+  const modules = Array.from(qr.modules.data, (value) => value === 1);
+
+  return { size, modules };
+}
+
+export async function generateQrDataUrl(value: string, size = 640): Promise<string> {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    throw new Error("QR value is required.");
+  }
+
+  const svgMarkup = await QRCode.toString(normalizedValue, {
+    type: "svg",
     width: size,
     margin: 1,
     errorCorrectionLevel: "M",
   });
+
+  const encodedSvgMarkup = encodeURIComponent(svgMarkup)
+    .replaceAll("'", "%27")
+    .replaceAll('"', "%22");
+
+  return `data:image/svg+xml;utf8,${encodedSvgMarkup}`;
 }
 
-export async function generateBoxQrDataUrl(boxId: string, size = DEFAULT_QR_SIZE): Promise<GeneratedBoxQr> {
+export function generateBoxQrData(boxId: string): GeneratedBoxQr {
   const deepLink = buildBoxDeepLink(boxId);
-  const dataUrl = await generateQrDataUrl(deepLink, size);
+  const appLinkUrl = buildBoxAppLink(boxId);
+  const matrix = generateQrMatrix(appLinkUrl);
 
   return {
     deepLink,
-    dataUrl,
+    appLinkUrl,
+    matrix,
   };
 }

@@ -11,12 +11,14 @@ import { Colors } from "@/constants/theme";
 import { boxService, type BoxDetails, type BoxDetailsItem, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
 import { locationService, type LocationSummary } from "@/lib/location.service";
-import { generateBoxQrDataUrl } from "@/utils/box-qr";
-import { Feather } from "@expo/vector-icons";
+import { generateBoxQrData, generateQrDataUrl, type QrMatrix } from "@/utils/box-qr";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Print from "expo-print";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import Svg, { Rect } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type EditableStatus = "packed" | "unpacked";
@@ -26,6 +28,8 @@ const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
   { label: "Unpacked", value: "unpacked" },
 ];
+const QR_DISPLAY_SIZE = 196;
+const QR_QUIET_ZONE_MODULES = 4;
 
 function getMinutesAgo(occurredAt: string, nowMs: number): number {
   const timestamp = new Date(occurredAt).getTime();
@@ -145,13 +149,14 @@ export default function BoxDetailsScreen() {
   const [itemPendingDelete, setItemPendingDelete] = useState<BoxDetailsItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [deleteItemError, setDeleteItemError] = useState<string | null>(null);
-  const [qrDeepLink, setQrDeepLink] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrAppLinkUrl, setQrAppLinkUrl] = useState<string | null>(null);
+  const [qrMatrix, setQrMatrix] = useState<QrMatrix | null>(null);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
   const [qrErrorMessage, setQrErrorMessage] = useState<string | null>(null);
   const [isSharingQr, setIsSharingQr] = useState(false);
   const [shareQrError, setShareQrError] = useState<string | null>(null);
   const [qrVersion, setQrVersion] = useState(0);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const loadBox = useCallback(
     async (refresh: boolean) => {
@@ -227,9 +232,9 @@ export default function BoxDetailsScreen() {
   useEffect(() => {
     let isActive = true;
 
-    if (!box) {
-      setQrDeepLink(null);
-      setQrDataUrl(null);
+    if (!box || !isQrModalOpen) {
+      setQrAppLinkUrl(null);
+      setQrMatrix(null);
       setQrErrorMessage(null);
       setShareQrError(null);
       setIsGeneratingQr(false);
@@ -244,22 +249,22 @@ export default function BoxDetailsScreen() {
 
     void (async () => {
       try {
-        const generatedQr = await generateBoxQrDataUrl(box.id);
+        const generatedQr = generateBoxQrData(box.id);
 
         if (!isActive) {
           return;
         }
 
-        setQrDeepLink(generatedQr.deepLink);
-        setQrDataUrl(generatedQr.dataUrl);
+        setQrAppLinkUrl(generatedQr.appLinkUrl);
+        setQrMatrix(generatedQr.matrix);
       } catch (error) {
         if (!isActive) {
           return;
         }
 
         const message = error instanceof Error ? error.message : "Failed to generate QR code.";
-        setQrDeepLink(null);
-        setQrDataUrl(null);
+        setQrAppLinkUrl(null);
+        setQrMatrix(null);
         setQrErrorMessage(message);
       } finally {
         if (isActive) {
@@ -271,7 +276,32 @@ export default function BoxDetailsScreen() {
     return () => {
       isActive = false;
     };
-  }, [box, qrVersion]);
+  }, [box, isQrModalOpen, qrVersion]);
+
+  const qrDarkCells = useMemo(() => {
+    if (!qrMatrix) {
+      return [];
+    }
+
+    const modulesPerSide = qrMatrix.size + QR_QUIET_ZONE_MODULES * 2;
+    const cellSize = QR_DISPLAY_SIZE / modulesPerSide;
+    const cells: { x: number; y: number; size: number; key: string }[] = [];
+
+    for (let row = 0; row < qrMatrix.size; row += 1) {
+      for (let column = 0; column < qrMatrix.size; column += 1) {
+        const index = row * qrMatrix.size + column;
+        if (!qrMatrix.modules[index]) {
+          continue;
+        }
+
+        const x = (column + QR_QUIET_ZONE_MODULES) * cellSize;
+        const y = (row + QR_QUIET_ZONE_MODULES) * cellSize;
+        cells.push({ x, y, size: cellSize, key: `${row}-${column}` });
+      }
+    }
+
+    return cells;
+  }, [qrMatrix]);
 
   const saveBox = useCallback(async () => {
     if (!box) {
@@ -518,8 +548,8 @@ export default function BoxDetailsScreen() {
     }
   }, [itemPendingDelete, loadBox]);
 
-  const shareBoxDeepLink = useCallback(async () => {
-    if (!box || !qrDeepLink || isSharingQr) {
+  const printBoxQrLabel = useCallback(async () => {
+    if (!box || !qrAppLinkUrl || isSharingQr) {
       return;
     }
 
@@ -527,17 +557,63 @@ export default function BoxDetailsScreen() {
     setShareQrError(null);
 
     try {
-      await Share.share({
-        title: `${box.name} QR link`,
-        message: `Open "${box.name}" in BoxIt:\n${qrDeepLink}`,
+      const qrDataUrl = await generateQrDataUrl(qrAppLinkUrl, 720);
+      const safeBoxName = box.name
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+
+      await Print.printAsync({
+        html: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${safeBoxName} QR Label</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .page {
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+      }
+      .label {
+        width: 320px;
+        text-align: center;
+      }
+      .title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+      .qr {
+        width: 280px;
+        height: 280px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="label">
+        <div class="title">${safeBoxName}</div>
+        <img class="qr" src="${qrDataUrl}" alt="Box QR code" />
+      </div>
+    </div>
+  </body>
+</html>`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to share box link.";
+      const message = error instanceof Error ? error.message : "Failed to open print dialog.";
       setShareQrError(message);
     } finally {
       setIsSharingQr(false);
     }
-  }, [box, isSharingQr, qrDeepLink]);
+  }, [box, isSharingQr, qrAppLinkUrl]);
 
   const retryGenerateQr = useCallback(() => {
     if (isGeneratingQr) {
@@ -546,6 +622,23 @@ export default function BoxDetailsScreen() {
 
     setQrVersion((previousValue) => previousValue + 1);
   }, [isGeneratingQr]);
+
+  const openQrModal = useCallback(() => {
+    if (!box) {
+      return;
+    }
+
+    setShareQrError(null);
+    setIsQrModalOpen(true);
+  }, [box]);
+
+  const closeQrModal = useCallback(() => {
+    if (isSharingQr) {
+      return;
+    }
+
+    setIsQrModalOpen(false);
+  }, [isSharingQr]);
 
   if (isLoading && !box) {
     return (
@@ -606,6 +699,14 @@ export default function BoxDetailsScreen() {
                 </View>
                 <View className="flex-row gap-2">
                   <Pressable
+                    onPress={openQrModal}
+                    hitSlop={8}
+                    className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                    disabled={isDeleting}
+                  >
+                    <MaterialCommunityIcons name="qrcode" size={20} color={Colors.dark.textPrimary} />
+                  </Pressable>
+                  <Pressable
                     onPress={openEditModal}
                     hitSlop={8}
                     className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
@@ -655,58 +756,6 @@ export default function BoxDetailsScreen() {
               />
             </View>
 
-            <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/70 p-4">
-              <SectionHeader title="QR Label" />
-
-              {isGeneratingQr ? (
-                <View className="mt-4 items-center justify-center rounded-control border border-border-default bg-bg-input/60 px-4 py-8">
-                  <ActivityIndicator />
-                  <Text className="mt-3 text-xs text-text-tertiary">Generating QR code...</Text>
-                </View>
-              ) : qrDataUrl ? (
-                <>
-                  <View className="mt-4 items-center rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
-                    <Image
-                      source={{ uri: qrDataUrl }}
-                      style={{ width: 196, height: 196 }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text className="mt-4 text-xs text-text-tertiary">{qrDeepLink}</Text>
-                  <View className="mt-4 flex-row gap-3">
-                    <Button
-                      label={isSharingQr ? "Sharing..." : "Share Box Link"}
-                      onPress={() => void shareBoxDeepLink()}
-                      disabled={isSharingQr}
-                      className="flex-1"
-                    />
-                    <Button
-                      label="Regenerate"
-                      variant="secondary"
-                      onPress={retryGenerateQr}
-                      disabled={isSharingQr}
-                      className="flex-1"
-                    />
-                  </View>
-                </>
-              ) : (
-                <View className="mt-4 rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
-                  <Text className="text-sm font-semibold text-text-primary">Could not generate QR code.</Text>
-                  <Text className="mt-1 text-xs text-text-tertiary">
-                    {qrErrorMessage ?? "Try generating again."}
-                  </Text>
-                  <Button
-                    label="Retry"
-                    variant="secondary"
-                    onPress={retryGenerateQr}
-                    className="mt-4"
-                  />
-                </View>
-              )}
-
-              {shareQrError ? <Text className="mt-3 text-xs text-crimson">{shareQrError}</Text> : null}
-            </View>
-
             <View className="mt-6">
               <SectionHeader title="Items in this box" actionLabel="Add Item" onPressAction={openCreateItemModal} />
               <View className="mt-3 gap-3">
@@ -730,6 +779,70 @@ export default function BoxDetailsScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <AppModal
+        visible={isQrModalOpen}
+        title="Box QR label"
+        description="Scan this QR code to open the box directly in the app."
+        onRequestClose={closeQrModal}
+        showCornerClose
+        maxWidth={420}
+      >
+        {isGeneratingQr ? (
+          <View className="items-center justify-center rounded-control border border-border-default bg-bg-input/60 px-4 py-8">
+            <ActivityIndicator />
+            <Text className="mt-3 text-xs text-text-tertiary">Generating QR code...</Text>
+          </View>
+        ) : qrMatrix ? (
+          <>
+            <View className="items-center rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
+              <Svg width={QR_DISPLAY_SIZE} height={QR_DISPLAY_SIZE} viewBox={`0 0 ${QR_DISPLAY_SIZE} ${QR_DISPLAY_SIZE}`}>
+                <Rect x={0} y={0} width={QR_DISPLAY_SIZE} height={QR_DISPLAY_SIZE} fill="#FFFFFF" />
+                {qrDarkCells.map((cell) => (
+                  <Rect
+                    key={cell.key}
+                    x={cell.x}
+                    y={cell.y}
+                    width={cell.size}
+                    height={cell.size}
+                    fill="#000000"
+                  />
+                ))}
+              </Svg>
+            </View>
+            <View className="mt-4 flex-row gap-3">
+              <Button
+                label={isSharingQr ? "Printing..." : "Print"}
+                onPress={() => void printBoxQrLabel()}
+                disabled={isSharingQr}
+                className="flex-1"
+              />
+              <Button
+                label="Regenerate"
+                variant="secondary"
+                onPress={retryGenerateQr}
+                disabled={isSharingQr}
+                className="flex-1"
+              />
+            </View>
+          </>
+        ) : (
+          <View className="rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
+            <Text className="text-sm font-semibold text-text-primary">Could not generate QR code.</Text>
+            <Text className="mt-1 text-xs text-text-tertiary">
+              {qrErrorMessage ?? "Try generating again."}
+            </Text>
+            <Button
+              label="Retry"
+              variant="secondary"
+              onPress={retryGenerateQr}
+              className="mt-4"
+            />
+          </View>
+        )}
+
+        {shareQrError ? <Text className="mt-3 text-xs text-crimson">{shareQrError}</Text> : null}
+      </AppModal>
 
       <AppModal
         visible={isItemModalOpen}
