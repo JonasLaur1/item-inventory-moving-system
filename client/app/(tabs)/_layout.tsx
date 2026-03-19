@@ -55,6 +55,7 @@ export default function TabLayout() {
         name="scan"
         options={{
           title: "Scan",
+          tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => (
             <View
               style={{
