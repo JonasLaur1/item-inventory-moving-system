@@ -126,7 +126,8 @@ export default function ActivityTabScreen() {
           normalizedSearch.length === 0 ||
           event.title.toLowerCase().includes(normalizedSearch) ||
           event.description.toLowerCase().includes(normalizedSearch) ||
-          event.room.toLowerCase().includes(normalizedSearch) ||
+          event.location.toLowerCase().includes(normalizedSearch) ||
+          (event.room ? event.room.toLowerCase().includes(normalizedSearch) : false) ||
           (event.box ? event.box.toLowerCase().includes(normalizedSearch) : false);
 
         const matchesType = activeType === "All" || event.type === activeType;
@@ -212,7 +213,7 @@ export default function ActivityTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search activity, room, or box"
+          placeholder="Search activity, location, room, or box"
           containerClassName="flex-1"
         />
         <Pressable

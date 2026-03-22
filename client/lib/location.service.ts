@@ -296,7 +296,7 @@ async function createLocation(input: string | CreateLocationInput): Promise<void
     entityId: data.id,
     title: "Location created",
     description: `Created location "${trimmedName}".`,
-    roomName: trimmedName,
+    locationName: trimmedName,
     next: { name: trimmedName, kind },
   });
 }
@@ -384,7 +384,7 @@ async function updateLocation(locationId: string, input: UpdateLocationInput): P
     entityId: normalizedLocationId,
     title: "Location updated",
     description: `Updated location "${nextName}".`,
-    roomName: nextName,
+    locationName: nextName,
     previous: {
       name: existingLocation.name,
       kind: normalizeLocationKind(existingLocation.kind),
@@ -450,7 +450,7 @@ async function deleteLocation(locationId: string): Promise<void> {
     entityId: locationBeforeDelete.id,
     title: "Location deleted",
     description: `Deleted location "${locationBeforeDelete.name}".`,
-    roomName: locationBeforeDelete.name,
+    locationName: locationBeforeDelete.name,
     previous: { name: locationBeforeDelete.name },
   });
 }

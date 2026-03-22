@@ -258,10 +258,11 @@ async function createRoom(input: CreateRoomInput): Promise<string> {
 
   await activityService.writeActivitySafely({
     type: "Created",
-    entityType: "location",
+    entityType: "room",
     entityId: data.id,
     title: "Room created",
     description: `Created room "${name}" in "${locationName}".`,
+    locationName,
     roomName: name,
     next: {
       name,
@@ -397,19 +398,26 @@ async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void>
     return;
   }
 
+  const previousLocationName =
+    existingRoom.location_id === nextLocationId
+      ? nextLocationName
+      : await assertUserOwnsLocation(existingRoom.location_id, userId);
+
   await activityService.writeActivitySafely({
     type: existingRoom.location_id !== nextLocationId ? "Moved" : "Updated",
-    entityType: "location",
+    entityType: "room",
     entityId: normalizedRoomId,
     title: existingRoom.location_id !== nextLocationId ? "Room moved" : "Room updated",
     description:
       existingRoom.location_id !== nextLocationId
         ? `Moved room "${nextName}" to "${nextLocationName}".`
         : `Updated room "${nextName}".`,
+    locationName: nextLocationName,
     roomName: nextName,
     previous: {
       name: existingRoom.name,
       locationId: existingRoom.location_id,
+      locationName: previousLocationName,
     },
     next: {
       name: nextName,
@@ -443,6 +451,8 @@ async function deleteRoom(roomId: string): Promise<void> {
     throw new Error("Room not found.");
   }
 
+  const locationName = await assertUserOwnsLocation(roomBeforeDelete.location_id, userId);
+
   const { data, error } = await supabase
     .from("rooms")
     .delete()
@@ -464,14 +474,16 @@ async function deleteRoom(roomId: string): Promise<void> {
 
   await activityService.writeActivitySafely({
     type: "Deleted",
-    entityType: "location",
+    entityType: "room",
     entityId: roomBeforeDelete.id,
     title: "Room deleted",
     description: `Deleted room "${roomBeforeDelete.name}".`,
+    locationName,
     roomName: roomBeforeDelete.name,
     previous: {
       name: roomBeforeDelete.name,
       locationId: roomBeforeDelete.location_id,
+      locationName,
     },
   });
 }

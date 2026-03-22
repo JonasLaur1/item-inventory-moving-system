@@ -383,6 +383,7 @@ async function createBox(input: CreateBoxInput): Promise<string> {
     entityId: data.id,
     title: "Box created",
     description: `Created box "${name}" in room "${roomContext.roomName}".`,
+    locationName: roomContext.parentLocationName,
     roomName: roomContext.roomName,
     boxName: name,
     next: {
@@ -468,6 +469,7 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       entityId: normalizedBoxId,
       title: "Box moved",
       description: `Moved box "${name}" from room "${previousRoomName}" to room "${nextRoom.roomName}".`,
+      locationName: nextRoom.parentLocationName,
       roomName: nextRoom.roomName,
       boxName: name,
       previous: {
@@ -493,6 +495,7 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       entityId: normalizedBoxId,
       title: "Box packed",
       description: `Marked box "${name}" as packed.`,
+      locationName: nextRoom.parentLocationName,
       roomName: nextRoom.roomName,
       boxName: name,
       previous: { status: previousStatus },
@@ -518,6 +521,7 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       changeDetails.length > 0
         ? `Updated box "${name}": ${changeDetails.join(", ")}.`
         : `Updated box "${name}".`,
+    locationName: nextRoom.parentLocationName,
     roomName: nextRoom.roomName,
     boxName: name,
     previous: {
@@ -595,6 +599,7 @@ async function deleteBox(boxId: string): Promise<void> {
     entityId: boxBeforeDelete.id,
     title: "Box deleted",
     description: `Deleted box "${boxBeforeDelete.name}".`,
+    locationName: roomContext?.parentLocationName ?? null,
     roomName,
     boxName: boxBeforeDelete.name,
     previous: {

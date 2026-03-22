@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
 export type ActivityType = "Created" | "Updated" | "Moved" | "Deleted" | "Packed";
-export type ActivityEntityType = "location" | "box" | "item";
+export type ActivityEntityType = "location" | "room" | "box" | "item";
 
 export type ActivityPreviousNext = Record<string, unknown>;
 
@@ -11,6 +11,7 @@ export type WriteActivityInput = {
   entityId: string;
   title: string;
   description: string;
+  locationName?: string | null;
   roomName?: string | null;
   boxName?: string | null;
   previous?: ActivityPreviousNext;
@@ -22,7 +23,8 @@ export type ActivityFeedEvent = {
   type: ActivityType;
   title: string;
   description: string;
-  room: string;
+  location: string;
+  room?: string;
   box?: string;
   occurredAt: string;
   entityType: ActivityEntityType;
@@ -74,7 +76,7 @@ function normalizeActivityType(rawType: string | null): ActivityType {
 function normalizeEntityType(rawValue: unknown): ActivityEntityType {
   const normalized = readString(rawValue)?.toLowerCase();
 
-  if (normalized === "location" || normalized === "box" || normalized === "item") {
+  if (normalized === "location" || normalized === "room" || normalized === "box" || normalized === "item") {
     return normalized;
   }
 
@@ -89,8 +91,13 @@ function buildMeta(input: WriteActivityInput): Record<string, unknown> {
     description: input.description,
   };
 
+  const locationName = readString(input.locationName);
   const roomName = readString(input.roomName);
   const boxName = readString(input.boxName);
+
+  if (locationName) {
+    meta.locationName = locationName;
+  }
 
   if (roomName) {
     meta.roomName = roomName;
@@ -111,6 +118,15 @@ function buildMeta(input: WriteActivityInput): Record<string, unknown> {
   return meta;
 }
 
+function readNestedName(meta: Record<string, unknown>, branch: "previous" | "next", key: string): string | null {
+  const nested = meta[branch];
+  if (!isRecord(nested)) {
+    return null;
+  }
+
+  return readString(nested[key]);
+}
+
 function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
   const meta = isRecord(row.meta) ? row.meta : {};
   const type = normalizeActivityType(row.type);
@@ -118,7 +134,18 @@ function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
   const entityId = readString(meta.entityId) ?? row.id;
   const title = readString(meta.title) ?? `${type} ${entityType}`;
   const description = readString(meta.description) ?? "No additional details.";
-  const room = readString(meta.roomName) ?? "Unknown room";
+  const isLegacyRoomEvent = entityType === "location" && title.toLowerCase().startsWith("room ");
+  const location =
+    readString(meta.locationName) ??
+    readNestedName(meta, "next", "locationName") ??
+    readNestedName(meta, "previous", "locationName") ??
+    (!isLegacyRoomEvent && entityType === "location" ? readString(meta.roomName) : null) ??
+    "Unknown location";
+  const room =
+    readString(meta.roomName) ??
+    readNestedName(meta, "next", "roomName") ??
+    readNestedName(meta, "previous", "roomName") ??
+    undefined;
   const box = readString(meta.boxName) ?? undefined;
 
   return {
@@ -126,6 +153,7 @@ function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
     type,
     title,
     description,
+    location,
     room,
     box,
     occurredAt: row.created_at ?? new Date().toISOString(),
@@ -155,9 +183,10 @@ async function writeActivity(input: WriteActivityInput): Promise<void> {
   const { error } = await supabase.from("activity_log").insert({
     user_id: userId,
     type: input.type,
-    location_id: null,
-    box_id: null,
-    item_id: null,
+    location_id: input.entityType === "location" ? normalizedEntityId : null,
+    room_id: input.entityType === "room" ? normalizedEntityId : null,
+    box_id: input.entityType === "box" ? normalizedEntityId : null,
+    item_id: input.entityType === "item" ? normalizedEntityId : null,
     meta: buildMeta({
       ...input,
       entityId: normalizedEntityId,

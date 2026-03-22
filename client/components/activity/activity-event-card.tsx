@@ -11,7 +11,8 @@ export type ActivityEvent = {
   type: ActivityEventType;
   title: string;
   description: string;
-  room: string;
+  location: string;
+  room?: string;
   box?: string;
   occurredAt: string;
 };
@@ -46,7 +47,8 @@ export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) 
       </View>
 
       <View className="mt-4 flex-row flex-wrap gap-2">
-        <MetaPill icon="map-pin" text={event.room} />
+        <MetaPill icon="map-pin" text={event.location} />
+        {event.room ? <MetaPill icon="home" text={event.room} /> : null}
         {event.box ? <MetaPill icon="archive" text={event.box} /> : null}
         <MetaPill icon="clock" text={timeLabel} />
       </View>

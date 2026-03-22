@@ -294,6 +294,7 @@ async function createItem(input: CreateItemInput): Promise<string> {
     entityId: data.id,
     title: "Item created",
     description: `Added item "${name}" to "${targetBox.name}".`,
+    locationName: targetBox.locationName,
     roomName: targetBox.roomName,
     boxName: targetBox.name,
     next: {
@@ -397,6 +398,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
       entityId: normalizedItemId,
       title: "Item moved",
       description: `Moved item "${name}" from "${previousBox.name}" to "${targetBox.name}".`,
+      locationName: targetBox.locationName,
       roomName: targetBox.roomName,
       boxName: targetBox.name,
       previous: {
@@ -443,6 +445,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
       changeDetails.length > 0
         ? `Updated item "${name}": ${changeDetails.join(", ")}.`
         : `Updated item "${name}".`,
+    locationName: targetBox.locationName,
     roomName: targetBox.roomName,
     boxName: targetBox.name,
     previous: {
@@ -506,6 +509,7 @@ async function deleteItem(itemId: string): Promise<void> {
     entityId: itemBeforeDelete.id,
     title: "Item deleted",
     description: `Deleted item "${itemName}" from "${boxContext.name}".`,
+    locationName: boxContext.locationName,
     roomName: boxContext.roomName,
     boxName: boxContext.name,
     previous: {
