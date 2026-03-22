@@ -6,6 +6,7 @@ export type InventoryItemRowData = {
   id: string;
   title: string;
   subtitle?: string;
+  quantity?: number;
   badgeText?: string;
   icon?: keyof typeof Feather.glyphMap;
 };
@@ -25,7 +26,16 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
         <Feather name={item.icon ?? "tag"} size={16} color={Colors.dark.primary} />
       </View>
       <View className="ml-3 flex-1">
-        <Text className="text-sm font-semibold text-text-primary">{item.title}</Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm font-semibold text-text-primary">{item.title}</Text>
+          {typeof item.quantity === "number" ? (
+            <View className="rounded-full bg-primary/15 px-2 py-0.5">
+              <Text className="text-[10px] font-semibold uppercase text-text-link">
+                Qty {item.quantity}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         {item.subtitle ? <Text className="mt-1 text-xs text-text-tertiary">{item.subtitle}</Text> : null}
       </View>
       <View className={`${hasActions ? "items-end gap-2" : ""}`}>

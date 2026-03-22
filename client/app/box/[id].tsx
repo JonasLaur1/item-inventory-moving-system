@@ -87,7 +87,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
     id: item.id,
     title: item.name,
     subtitle: item.notes?.trim() ? item.notes : undefined,
-    badgeText: item.quantity > 1 ? `x${item.quantity}` : undefined,
+    quantity: item.quantity,
     icon: "package",
   };
 }
