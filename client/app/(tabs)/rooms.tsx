@@ -20,7 +20,7 @@ import { ActivityIndicator, Text, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
 type RoomStatus = "Done" | "Packing" | "Started" | "Empty";
-type Room = {
+type LocationCard = {
   id: string;
   name: string;
   icon: RoomCardProps["icon"];
@@ -29,12 +29,12 @@ type Room = {
   items: number;
 };
 
-const PREVIEW_ROOMS_COUNT = 5;
+const PREVIEW_LOCATIONS_COUNT = 5;
 const ROOM_GRID_CARD_MIN_HEIGHT = 170;
 
-function getRoomStatus(room: Pick<Room, "boxes" | "packedBoxes">): RoomStatus {
-  const totalBoxes = Math.max(room.boxes, 0);
-  const packedBoxes = Math.max(room.packedBoxes, 0);
+function getRoomStatus(location: Pick<LocationCard, "boxes" | "packedBoxes">): RoomStatus {
+  const totalBoxes = Math.max(location.boxes, 0);
+  const packedBoxes = Math.max(location.packedBoxes, 0);
 
   if (totalBoxes === 0 || packedBoxes === 0) {
     return "Empty";
@@ -53,7 +53,7 @@ function getRoomStatus(room: Pick<Room, "boxes" | "packedBoxes">): RoomStatus {
   return "Packing";
 }
 
-function AddRoomCard({
+function AddLocationCard({
   style,
   disabled,
   onPress,
@@ -65,8 +65,8 @@ function AddRoomCard({
   return (
     <DashboardCard
       icon={<Feather name="plus" size={20} color={Colors.dark.primary} />}
-      title="Add Room"
-      subtitle="Create a new room"
+      title="Add Location"
+      subtitle="Create a new place"
       className="border border-dashed border-border-strong bg-bg-elevated/40"
       iconContainerClassName="h-14 w-14 rounded-xl bg-primary/20"
       titleClassName="text-base text-text-primary"
@@ -96,10 +96,10 @@ export default function RoomsTabScreen() {
   } = useLocations();
 
   const [search, setSearch] = useState("");
-  const [showAllRooms, setShowAllRooms] = useState(false);
-  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
-  const [newRoomName, setNewRoomName] = useState("");
-  const [createRoomError, setCreateRoomError] = useState<string | null>(null);
+  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
+  const [newLocationName, setNewLocationName] = useState("");
+  const [createLocationError, setCreateLocationError] = useState<string | null>(null);
   const hasFocusedOnceRef = useRef(false);
 
   useFocusEffect(
@@ -113,7 +113,7 @@ export default function RoomsTabScreen() {
     }, [refreshLocations]),
   );
 
-  const rooms: Room[] = useMemo(
+  const mappedLocations: LocationCard[] = useMemo(
     () =>
       locations.map((location) => ({
         id: location.id,
@@ -126,46 +126,48 @@ export default function RoomsTabScreen() {
     [locations],
   );
 
-  const filteredRooms = useMemo(() => {
+  const filteredLocations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return rooms;
+      return mappedLocations;
     }
 
-    return rooms.filter((room) => {
-      const derivedStatus = getRoomStatus(room).toLowerCase();
+    return mappedLocations.filter((location) => {
+      const derivedStatus = getRoomStatus(location).toLowerCase();
       return (
-        room.name.toLowerCase().includes(normalizedSearch) ||
+        location.name.toLowerCase().includes(normalizedSearch) ||
         derivedStatus.includes(normalizedSearch)
       );
     });
-  }, [rooms, search]);
+  }, [mappedLocations, search]);
 
   const totalItems = useMemo(
-    () => filteredRooms.reduce((total, room) => total + room.items, 0),
-    [filteredRooms],
+    () => filteredLocations.reduce((total, location) => total + location.items, 0),
+    [filteredLocations],
   );
 
   const packedPercentage = useMemo(() => {
-    const totalBoxes = filteredRooms.reduce((total, room) => total + room.boxes, 0);
-    const packedBoxes = filteredRooms.reduce((total, room) => total + room.packedBoxes, 0);
+    const totalBoxes = filteredLocations.reduce((total, location) => total + location.boxes, 0);
+    const packedBoxes = filteredLocations.reduce((total, location) => total + location.packedBoxes, 0);
     return totalBoxes === 0 ? 0 : Math.round((packedBoxes / totalBoxes) * 100);
-  }, [filteredRooms]);
+  }, [filteredLocations]);
 
-  const canExpand = filteredRooms.length > PREVIEW_ROOMS_COUNT;
-  const visibleRooms = showAllRooms ? filteredRooms : filteredRooms.slice(0, PREVIEW_ROOMS_COUNT);
+  const canExpand = filteredLocations.length > PREVIEW_LOCATIONS_COUNT;
+  const visibleLocations = showAllLocations
+    ? filteredLocations
+    : filteredLocations.slice(0, PREVIEW_LOCATIONS_COUNT);
 
-  const openCreateRoomForm = useCallback(() => {
+  const openCreateLocationForm = useCallback(() => {
     clearError();
-    setCreateRoomError(null);
-    setIsCreateRoomOpen(true);
+    setCreateLocationError(null);
+    setIsCreateLocationOpen(true);
   }, [clearError]);
 
-  const closeCreateRoomForm = useCallback(() => {
-    setIsCreateRoomOpen(false);
-    setCreateRoomError(null);
-    setNewRoomName("");
+  const closeCreateLocationForm = useCallback(() => {
+    setIsCreateLocationOpen(false);
+    setCreateLocationError(null);
+    setNewLocationName("");
   }, []);
 
   const shouldOpenCreateForm = useMemo(() => {
@@ -182,30 +184,30 @@ export default function RoomsTabScreen() {
       return;
     }
 
-    openCreateRoomForm();
+    openCreateLocationForm();
     router.setParams({ create: undefined });
-  }, [openCreateRoomForm, router, shouldOpenCreateForm]);
+  }, [openCreateLocationForm, router, shouldOpenCreateForm]);
 
-  const handleCreateRoom = async () => {
-    const normalizedName = newRoomName.trim();
+  const handleCreateLocation = async () => {
+    const normalizedName = newLocationName.trim();
 
     if (!normalizedName) {
-      setCreateRoomError("Room name is required.");
+      setCreateLocationError("Location name is required.");
       return;
     }
 
-    setCreateRoomError(null);
+    setCreateLocationError(null);
 
     try {
       await createLocation(normalizedName);
-      closeCreateRoomForm();
+      closeCreateLocationForm();
     } catch (error) {
       if (error instanceof Error) {
-        setCreateRoomError(error.message);
+        setCreateLocationError(error.message);
         return;
       }
 
-      setCreateRoomError("Failed to create room.");
+      setCreateLocationError("Failed to create location.");
     }
   };
 
@@ -225,7 +227,7 @@ export default function RoomsTabScreen() {
         <MetricCard
           label="Total Items"
           value={String(totalItems)}
-          hint={`${filteredRooms.length} rooms`}
+          hint={`${filteredLocations.length} locations`}
           className="flex-1"
           valueClassName="text-[30px] font-black leading-[34px] text-text-primary"
         />
@@ -243,43 +245,43 @@ export default function RoomsTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search rooms or status"
+          placeholder="Search locations or status"
         />
       </View>
 
       <View className="mt-8">
         <SectionHeader
-          title="Rooms"
-          actionLabel={canExpand ? (showAllRooms ? "Show Less" : "View All") : undefined}
-          onPressAction={canExpand ? () => setShowAllRooms((prev) => !prev) : undefined}
+          title="Locations"
+          actionLabel={canExpand ? (showAllLocations ? "Show Less" : "View All") : undefined}
+          onPressAction={canExpand ? () => setShowAllLocations((prev) => !prev) : undefined}
         />
 
-        {isCreateRoomOpen ? (
+        {isCreateLocationOpen ? (
           <View className="mt-4 rounded-card border border-border-default bg-bg-elevated/75 p-4">
             <FormInput
-              value={newRoomName}
-              onChangeText={setNewRoomName}
-              placeholder="Room name (e.g. Kitchen)"
+              value={newLocationName}
+              onChangeText={setNewLocationName}
+              placeholder="Location name (e.g. Home)"
               autoCapitalize="words"
               autoCorrect={false}
               maxLength={60}
             />
 
-            {createRoomError ? (
-              <Text className="mt-2 text-xs text-text-tertiary">{createRoomError}</Text>
+            {createLocationError ? (
+              <Text className="mt-2 text-xs text-text-tertiary">{createLocationError}</Text>
             ) : null}
 
             <View className="mt-4 flex-row gap-3">
               <Button
-                label={isCreating ? "Creating..." : "Create Room"}
-                onPress={() => void handleCreateRoom()}
+                label={isCreating ? "Creating..." : "Create Location"}
+                onPress={() => void handleCreateLocation()}
                 disabled={isCreating}
                 className="flex-1"
               />
               <Button
                 label="Cancel"
                 variant="secondary"
-                onPress={closeCreateRoomForm}
+                onPress={closeCreateLocationForm}
                 disabled={isCreating}
                 className="flex-1"
               />
@@ -287,44 +289,44 @@ export default function RoomsTabScreen() {
           </View>
         ) : null}
 
-        {isLoading && rooms.length === 0 ? (
+        {isLoading && mappedLocations.length === 0 ? (
           <View className="mt-6 items-center">
             <ActivityIndicator />
           </View>
         ) : (
           <CardGrid
-            items={visibleRooms}
+            items={visibleLocations}
             compact={isCompact}
             itemMinHeight={ROOM_GRID_CARD_MIN_HEIGHT}
             className="mt-4"
-            keyExtractor={(room) => room.id}
-            renderItem={(room, contentStyle) => (
+            keyExtractor={(location) => location.id}
+            renderItem={(location, contentStyle) => (
               <RoomCard
-                name={room.name}
-                packed={room.packedBoxes}
-                total={room.boxes}
-                icon={room.icon}
+                name={location.name}
+                packed={location.packedBoxes}
+                total={location.boxes}
+                icon={location.icon}
                 style={contentStyle}
-                onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
+                onPress={() => router.push({ pathname: "/location/[id]", params: { id: location.id } })}
               />
             )}
             footer={(contentStyle) => (
-              <AddRoomCard
+              <AddLocationCard
                 style={contentStyle}
-                onPress={openCreateRoomForm}
+                onPress={openCreateLocationForm}
                 disabled={isCreating}
               />
             )}
           />
         )}
 
-        {!isLoading && !errorMessage && filteredRooms.length === 0 ? (
+        {!isLoading && !errorMessage && filteredLocations.length === 0 ? (
           <EmptyStateCard
-            title={search.trim().length > 0 ? "No rooms match your search" : "No rooms yet"}
+            title={search.trim().length > 0 ? "No locations match your search" : "No locations yet"}
             description={
               search.trim().length > 0
                 ? "Try a different search query."
-                : "Create your first room to start organizing your inventory."
+                : "Create your first location to start organizing your inventory."
             }
             containerClassName="mt-4"
           />

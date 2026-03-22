@@ -12,7 +12,7 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Colors } from "@/constants/theme";
 import { useBoxes } from "@/hooks/use-boxes";
-import { useLocations } from "@/hooks/use-locations";
+import { useRooms } from "@/hooks/use-rooms";
 import { itemService } from "@/lib/item.service";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -103,11 +103,7 @@ export default function InventoryTabScreen() {
     createBox,
     clearError,
   } = useBoxes();
-  const {
-    locations,
-    isLoading: isLocationsLoading,
-    refreshLocations,
-  } = useLocations();
+  const { rooms, isLoading: isRoomsLoading, refreshRooms } = useRooms();
 
   const [search, setSearch] = useState("");
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
@@ -116,7 +112,7 @@ export default function InventoryTabScreen() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState("");
-  const [newBoxLocationId, setNewBoxLocationId] = useState("");
+  const [newBoxRoomId, setNewBoxRoomId] = useState("");
   const [newBoxStatus, setNewBoxStatus] = useState<EditableStatus>("unpacked");
   const [createBoxError, setCreateBoxError] = useState<string | null>(null);
 
@@ -136,8 +132,8 @@ export default function InventoryTabScreen() {
         return;
       }
 
-      void Promise.all([refreshBoxes(), refreshLocations()]);
-    }, [refreshBoxes, refreshLocations]),
+      void Promise.all([refreshBoxes(), refreshRooms()]);
+    }, [refreshBoxes, refreshRooms]),
   );
 
   const boxes: InventoryBox[] = useMemo(
@@ -145,7 +141,7 @@ export default function InventoryTabScreen() {
       summaryBoxes.map((box) => ({
         id: box.id,
         label: box.name,
-        room: box.locationName,
+        room: `${box.parentLocationName} / ${box.roomName}`,
         itemsCount: box.itemsCount,
         isFragile: box.isFragile,
         status: mapBoxStatus(box.status),
@@ -159,10 +155,10 @@ export default function InventoryTabScreen() {
       return;
     }
 
-    if (!newBoxLocationId && locations.length > 0) {
-      setNewBoxLocationId(locations[0].id);
+    if (!newBoxRoomId && rooms.length > 0) {
+      setNewBoxRoomId(rooms[0].id);
     }
-  }, [isCreateModalOpen, locations, newBoxLocationId]);
+  }, [isCreateModalOpen, newBoxRoomId, rooms]);
 
   useEffect(() => {
     if (!isCreateItemModalOpen) {
@@ -208,9 +204,9 @@ export default function InventoryTabScreen() {
     setCreateBoxError(null);
     setNewBoxName("");
     setNewBoxStatus("unpacked");
-    setNewBoxLocationId(locations[0]?.id ?? "");
+    setNewBoxRoomId(rooms[0]?.id ?? "");
     setIsCreateModalOpen(true);
-  }, [clearError, locations]);
+  }, [clearError, rooms]);
 
   const closeCreateModal = () => {
     if (isCreating) {
@@ -266,7 +262,7 @@ export default function InventoryTabScreen() {
       return;
     }
 
-    if (!newBoxLocationId) {
+    if (!newBoxRoomId) {
       setCreateBoxError("Room is required.");
       return;
     }
@@ -276,12 +272,12 @@ export default function InventoryTabScreen() {
     try {
       const createdId = await createBox({
         name: normalizedName,
-        locationId: newBoxLocationId,
+        roomId: newBoxRoomId,
         status: newBoxStatus,
       });
 
       setIsCreateModalOpen(false);
-      await refreshLocations();
+      await refreshRooms();
       router.push({ pathname: "/box/[id]", params: { id: createdId } });
     } catch (error) {
       if (error instanceof Error) {
@@ -324,7 +320,7 @@ export default function InventoryTabScreen() {
       });
 
       setIsCreateItemModalOpen(false);
-      await Promise.all([refreshBoxes(), refreshLocations()]);
+      await Promise.all([refreshBoxes(), refreshRooms()]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create item.";
       setCreateItemError(message);
@@ -338,7 +334,7 @@ export default function InventoryTabScreen() {
     newItemNotes,
     newItemQuantity,
     refreshBoxes,
-    refreshLocations,
+    refreshRooms,
   ]);
 
   return (
@@ -583,7 +579,9 @@ export default function InventoryTabScreen() {
                     }`}
                   >
                     <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">{box.locationName}</Text>
+                    <Text className="mt-1 text-xs text-text-tertiary">
+                      {box.parentLocationName} / {box.roomName}
+                    </Text>
                   </Pressable>
                 );
               })
@@ -632,19 +630,19 @@ export default function InventoryTabScreen() {
         <View className="mt-4">
           <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
           <View className="mt-2 gap-2">
-            {locations.length === 0 ? (
+            {rooms.length === 0 ? (
               <Text className="text-xs text-text-tertiary">
-                {isLocationsLoading
+                {isRoomsLoading
                   ? "Loading rooms..."
-                  : "No rooms found. Create a room first from the Rooms tab."}
+                  : "No rooms found. Create a room first from a location."}
               </Text>
             ) : (
-              locations.map((location) => {
-                const isActive = location.id === newBoxLocationId;
+              rooms.map((room) => {
+                const isActive = room.id === newBoxRoomId;
                 return (
                   <Pressable
-                    key={location.id}
-                    onPress={() => setNewBoxLocationId(location.id)}
+                    key={room.id}
+                    onPress={() => setNewBoxRoomId(room.id)}
                     disabled={isCreating}
                     className={`rounded-control border px-3 py-2.5 ${
                       isActive
@@ -652,7 +650,8 @@ export default function InventoryTabScreen() {
                         : "border-border-default bg-bg-input/60"
                     }`}
                   >
-                    <Text className="text-sm font-semibold text-text-primary">{location.name}</Text>
+                    <Text className="text-sm font-semibold text-text-primary">{room.name}</Text>
+                    <Text className="mt-1 text-xs text-text-tertiary">{room.locationName}</Text>
                   </Pressable>
                 );
               })
@@ -698,7 +697,7 @@ export default function InventoryTabScreen() {
           <Button
             label={isCreating ? "Creating..." : "Create"}
             onPress={() => void handleCreateBox()}
-            disabled={isCreating || locations.length === 0}
+            disabled={isCreating || rooms.length === 0}
             className="flex-1"
           />
         </View>

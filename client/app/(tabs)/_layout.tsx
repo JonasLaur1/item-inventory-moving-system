@@ -84,7 +84,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="rooms"
         options={{
-          title: "Rooms",
+          title: "Locations",
           tabBarIcon: ({ color }) => <Feather name="grid" size={18} color={color} />,
         }}
       />

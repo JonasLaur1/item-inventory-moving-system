@@ -8,7 +8,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
 import { boxService } from "@/lib/box.service";
-import { locationService, type LocationDetails } from "@/lib/location.service";
+import { roomService, type RoomDetails } from "@/lib/room.service";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -89,7 +89,7 @@ export default function RoomDetailsScreen() {
     return Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
   }, [params.id]);
 
-  const [room, setRoom] = useState<LocationDetails | null>(null);
+  const [room, setRoom] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -123,7 +123,7 @@ export default function RoomDetailsScreen() {
       }
 
       try {
-        const details = await locationService.getLocationDetails(roomId);
+        const details = await roomService.getRoomDetails(roomId);
         setRoom(details);
         setErrorMessage(null);
       } catch (error) {
@@ -216,7 +216,7 @@ export default function RoomDetailsScreen() {
     setEditNameError(null);
 
     try {
-      await locationService.updateLocationName(room.id, normalizedName);
+      await roomService.updateRoomName(room.id, normalizedName);
       setRoom((previousRoom) => (previousRoom ? { ...previousRoom, name: normalizedName } : previousRoom));
       setIsEditingName(false);
       await loadRoom(true);
@@ -237,7 +237,7 @@ export default function RoomDetailsScreen() {
     setDeleteRoomError(null);
 
     try {
-      await locationService.deleteLocation(room.id);
+      await roomService.deleteRoom(room.id);
 
       if (router.canGoBack()) {
         router.back();
@@ -307,7 +307,7 @@ export default function RoomDetailsScreen() {
     try {
       const boxId = await boxService.createBox({
         name: normalizedName,
-        locationId: room.id,
+        roomId: room.id,
         status: newBoxStatus,
       });
       setIsCreateModalOpen(false);
@@ -422,7 +422,7 @@ export default function RoomDetailsScreen() {
                           <View className="flex-1">
                             <Text className="text-lg font-bold leading-6 text-text-primary">{room.name}</Text>
                             <Text className="mt-1 text-xs text-text-tertiary">
-                              {room.boxes} boxes • {room.items} items
+                              {room.locationName} • {room.boxes} boxes • {room.items} items
                             </Text>
                           </View>
                           <Pressable

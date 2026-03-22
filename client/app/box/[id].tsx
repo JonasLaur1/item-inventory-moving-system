@@ -10,7 +10,7 @@ import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
 import { boxService, type BoxDetails, type BoxDetailsItem, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
-import { locationService, type LocationSummary } from "@/lib/location.service";
+import { roomService, type RoomSummary } from "@/lib/room.service";
 import { generateBoxQrData, generateQrDataUrl, type QrMatrix } from "@/utils/box-qr";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Print from "expo-print";
@@ -121,14 +121,14 @@ export default function BoxDetailsScreen() {
   }, [params.edit]);
 
   const [box, setBox] = useState<BoxDetails | null>(null);
-  const [locations, setLocations] = useState<LocationSummary[]>([]);
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [availableBoxes, setAvailableBoxes] = useState<BoxSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(shouldStartEditing);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editedName, setEditedName] = useState("");
-  const [editedLocationId, setEditedLocationId] = useState("");
+  const [editedRoomId, setEditedRoomId] = useState("");
   const [editedStatus, setEditedStatus] = useState<EditableStatus>("unpacked");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function BoxDetailsScreen() {
       if (!boxId) {
         setErrorMessage("Box id is missing.");
         setBox(null);
-        setLocations([]);
+        setRooms([]);
         setAvailableBoxes([]);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -179,13 +179,13 @@ export default function BoxDetailsScreen() {
       }
 
       try {
-        const [boxDetails, locationList, boxList] = await Promise.all([
+        const [boxDetails, roomList, boxList] = await Promise.all([
           boxService.getBoxDetails(boxId),
-          locationService.listLocationSummaries(),
+          roomService.listRoomSummaries(),
           boxService.listBoxes(),
         ]);
         setBox(boxDetails);
-        setLocations(locationList);
+        setRooms(roomList);
         setAvailableBoxes(boxList);
         setErrorMessage(null);
       } catch (error) {
@@ -227,7 +227,7 @@ export default function BoxDetailsScreen() {
     }
 
     setEditedName(box.name);
-    setEditedLocationId(box.locationId);
+    setEditedRoomId(box.roomId);
     setEditedStatus(box.status);
   }, [box]);
 
@@ -316,14 +316,14 @@ export default function BoxDetailsScreen() {
       return;
     }
 
-    if (!editedLocationId) {
+    if (!editedRoomId) {
       setSaveError("Room is required.");
       return;
     }
 
     if (
       normalizedName === box.name &&
-      editedLocationId === box.locationId &&
+      editedRoomId === box.roomId &&
       editedStatus === box.status
     ) {
       setSaveError(null);
@@ -337,7 +337,7 @@ export default function BoxDetailsScreen() {
     try {
       await boxService.updateBox(box.id, {
         name: normalizedName,
-        locationId: editedLocationId,
+        roomId: editedRoomId,
         status: editedStatus,
       });
       setIsEditModalOpen(false);
@@ -348,7 +348,7 @@ export default function BoxDetailsScreen() {
     } finally {
       setIsSaving(false);
     }
-  }, [box, editedLocationId, editedName, editedStatus, loadBox]);
+  }, [box, editedName, editedRoomId, editedStatus, loadBox]);
 
   const openEditModal = useCallback(() => {
     if (!box) {
@@ -356,7 +356,7 @@ export default function BoxDetailsScreen() {
     }
 
     setEditedName(box.name);
-    setEditedLocationId(box.locationId);
+    setEditedRoomId(box.roomId);
     setEditedStatus(box.status);
     setSaveError(null);
     setIsEditModalOpen(true);
@@ -368,7 +368,7 @@ export default function BoxDetailsScreen() {
     }
 
     setEditedName(box.name);
-    setEditedLocationId(box.locationId);
+    setEditedRoomId(box.roomId);
     setEditedStatus(box.status);
     setSaveError(null);
     setIsEditModalOpen(false);
@@ -708,7 +708,9 @@ export default function BoxDetailsScreen() {
                       <Text className="text-lg font-bold text-text-primary">{box.name}</Text>
                       <View className="mt-1 flex-row items-center">
                         <Feather name="map-pin" size={12} color={Colors.dark.textTertiary} />
-                        <Text className="ml-1 text-xs text-text-tertiary">{box.locationName}</Text>
+                      <Text className="ml-1 text-xs text-text-tertiary">
+                        {box.parentLocationName} / {box.roomName}
+                      </Text>
                       </View>
                     </View>
                   </View>
@@ -949,7 +951,9 @@ export default function BoxDetailsScreen() {
             {itemModalMode === "create" && box ? (
               <View className="rounded-control border border-primary bg-primary/15 px-3 py-2.5">
                 <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
-                <Text className="mt-1 text-xs text-text-tertiary">{box.locationName}</Text>
+                <Text className="mt-1 text-xs text-text-tertiary">
+                  {box.parentLocationName} / {box.roomName}
+                </Text>
               </View>
             ) : availableBoxes.length > 0 ? (
               availableBoxes.map((availableBox) => {
@@ -966,7 +970,9 @@ export default function BoxDetailsScreen() {
                     }`}
                   >
                     <Text className="text-sm font-semibold text-text-primary">{availableBox.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">{availableBox.locationName}</Text>
+                    <Text className="mt-1 text-xs text-text-tertiary">
+                      {availableBox.parentLocationName} / {availableBox.roomName}
+                    </Text>
                   </Pressable>
                 );
               })
@@ -1017,13 +1023,13 @@ export default function BoxDetailsScreen() {
         <View className="mt-4">
           <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
           <View className="mt-2 gap-2">
-            {locations.length > 0 ? (
-              locations.map((location) => {
-                const isActive = location.id === editedLocationId;
+            {rooms.length > 0 ? (
+              rooms.map((room) => {
+                const isActive = room.id === editedRoomId;
                 return (
                   <Pressable
-                    key={location.id}
-                    onPress={() => setEditedLocationId(location.id)}
+                    key={room.id}
+                    onPress={() => setEditedRoomId(room.id)}
                     disabled={isSaving}
                     className={`rounded-control border px-3 py-2.5 ${
                       isActive
@@ -1031,7 +1037,8 @@ export default function BoxDetailsScreen() {
                         : "border-border-default bg-bg-input/60"
                     }`}
                   >
-                    <Text className="text-sm font-semibold text-text-primary">{location.name}</Text>
+                    <Text className="text-sm font-semibold text-text-primary">{room.name}</Text>
+                    <Text className="mt-1 text-xs text-text-tertiary">{room.locationName}</Text>
                   </Pressable>
                 );
               })

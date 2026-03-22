@@ -17,7 +17,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-type Room = {
+type LocationCard = {
   id: string;
   name: string;
   packed: number;
@@ -76,7 +76,7 @@ export default function HomeTabScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
-  const [showAllRooms, setShowAllRooms] = useState(false);
+  const [showAllLocations, setShowAllLocations] = useState(false);
   const {
     locations,
     isLoading,
@@ -105,7 +105,7 @@ export default function HomeTabScreen() {
     }, [refreshActivity, refreshLocations]),
   );
 
-  const rooms: Room[] = useMemo(
+  const locationsForCards: LocationCard[] = useMemo(
     () =>
       locations.map((location) => ({
         id: location.id,
@@ -118,12 +118,12 @@ export default function HomeTabScreen() {
   );
 
   const totalBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.total, 0),
-    [rooms],
+    () => locationsForCards.reduce((total, location) => total + location.total, 0),
+    [locationsForCards],
   );
   const packedBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.packed, 0),
-    [rooms],
+    () => locationsForCards.reduce((total, location) => total + location.packed, 0),
+    [locationsForCards],
   );
   const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
   const boxesLeft = totalBoxes - packedBoxes;
@@ -137,7 +137,7 @@ export default function HomeTabScreen() {
     return { radius, strokeWidth, circumference, offset };
   }, [percentage]);
 
-  const visibleRooms = showAllRooms ? rooms : rooms.slice(0, 2);
+  const visibleLocations = showAllLocations ? locationsForCards : locationsForCards.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
       const nowMs = Date.now();
@@ -197,8 +197,8 @@ export default function HomeTabScreen() {
 
       <View className="mt-8 flex-row gap-3">
         <QuickActionCard
-          title="Add Room"
-          subtitle="Create New Room"
+          title="Add Location"
+          subtitle="Create New Location"
           icon="plus"
           variant="primary"
           onPress={() =>
@@ -233,41 +233,41 @@ export default function HomeTabScreen() {
         ) : null}
 
         <SectionHeader
-          title="Priority Rooms"
-          actionLabel={rooms.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
+          title="Priority Locations"
+          actionLabel={locationsForCards.length > 2 ? (showAllLocations ? "Show Less" : "Show All") : undefined}
           onPressAction={
-            rooms.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
+            locationsForCards.length > 2 ? () => setShowAllLocations((prev) => !prev) : undefined
           }
         />
 
         <CardGrid
-          items={visibleRooms}
+          items={visibleLocations}
           compact={isCompact}
           className="mt-4"
-          keyExtractor={(room) => room.id}
-          renderItem={(room) => (
+          keyExtractor={(location) => location.id}
+          renderItem={(location) => (
             <RoomCard
-              name={room.name}
-              packed={room.packed}
-              total={room.total}
-              icon={room.icon}
-              onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
+              name={location.name}
+              packed={location.packed}
+              total={location.total}
+              icon={location.icon}
+              onPress={() => router.push({ pathname: "/location/[id]", params: { id: location.id } })}
             />
           )}
         />
 
-        {isLoading && rooms.length === 0 ? (
+        {isLoading && locationsForCards.length === 0 ? (
           <EmptyStateCard
-            title="Loading rooms..."
-            description="Fetching your locations and box progress."
+            title="Loading locations..."
+            description="Fetching your locations and progress."
             containerClassName="mt-4"
           />
         ) : null}
 
-        {!isLoading && !errorMessage && rooms.length === 0 ? (
+        {!isLoading && !errorMessage && locationsForCards.length === 0 ? (
           <EmptyStateCard
-            title="No rooms yet"
-            description="Create a room from the Rooms tab to see progress here."
+            title="No locations yet"
+            description="Create a location from the Locations tab to see progress here."
             containerClassName="mt-4"
           />
         ) : null}
