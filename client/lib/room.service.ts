@@ -1,0 +1,486 @@
+import { activityService } from "@/lib/activity.service";
+import { supabase } from "@/lib/supabase";
+
+type RoomRow = {
+  id: string;
+  location_id: string;
+  name: string;
+  cover_image_url: string | null;
+  sort_order: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type BoxRow = {
+  id: string;
+  room_id: string | null;
+  status: string | null;
+  updated_at: string | null;
+  fragility: string | null;
+  name: string | null;
+  item_count: Array<{ count: number | null }> | null;
+};
+
+type LocationRow = {
+  id: string;
+  name: string;
+};
+
+export type RoomSummary = {
+  id: string;
+  locationId: string;
+  locationName: string;
+  name: string;
+  coverImageUrl: string | null;
+  sortOrder: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  boxes: number;
+  packedBoxes: number;
+  items: number;
+};
+
+export type RoomDetailsBox = {
+  id: string;
+  name: string;
+  status: string | null;
+  updatedAt: string | null;
+  itemsCount: number;
+  isFragile: boolean;
+};
+
+export type RoomDetails = RoomSummary & {
+  boxList: RoomDetailsBox[];
+};
+
+export type CreateRoomInput = {
+  locationId: string;
+  name: string;
+};
+
+export type UpdateRoomInput = {
+  locationId?: string;
+  name?: string;
+};
+
+async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+
+  const userId = data.user?.id;
+  if (!userId) {
+    throw new Error("No authenticated user found.");
+  }
+
+  return userId;
+}
+
+function getNestedCount(value: BoxRow["item_count"]): number {
+  if (!Array.isArray(value) || value.length === 0) {
+    return 0;
+  }
+
+  return value.reduce((total, entry) => {
+    const count = entry?.count;
+    return total + (typeof count === "number" ? count : 0);
+  }, 0);
+}
+
+function normalizeFragility(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === "none" || normalized === "normal" || normalized === "not_fragile") {
+    return false;
+  }
+
+  return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const possibleCode = (error as { code?: unknown }).code;
+  return possibleCode === "23503";
+}
+
+async function getLocationNameMap(userId: string, locationIds: string[]): Promise<Map<string, string>> {
+  if (locationIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id,name")
+    .eq("user_id", userId)
+    .in("id", locationIds);
+
+  if (error) throw error;
+
+  const map = new Map<string, string>();
+  (data ?? []).forEach((location: LocationRow) => {
+    map.set(location.id, location.name);
+  });
+
+  return map;
+}
+
+function mapRoomSummaries(
+  rooms: RoomRow[],
+  boxes: BoxRow[],
+  locationNameMap: Map<string, string>,
+): RoomSummary[] {
+  const roomStats = new Map<string, { boxes: number; packedBoxes: number; items: number }>();
+
+  for (const room of rooms) {
+    roomStats.set(room.id, { boxes: 0, packedBoxes: 0, items: 0 });
+  }
+
+  for (const box of boxes) {
+    if (!box.room_id || !roomStats.has(box.room_id)) {
+      continue;
+    }
+
+    const current = roomStats.get(box.room_id);
+    if (!current) {
+      continue;
+    }
+
+    current.boxes += 1;
+    if (box.status?.toLowerCase() === "packed") {
+      current.packedBoxes += 1;
+    }
+    current.items += getNestedCount(box.item_count);
+  }
+
+  return rooms.map((room) => {
+    const stats = roomStats.get(room.id) ?? { boxes: 0, packedBoxes: 0, items: 0 };
+
+    return {
+      id: room.id,
+      locationId: room.location_id,
+      locationName: locationNameMap.get(room.location_id) ?? "Unknown location",
+      name: room.name,
+      coverImageUrl: room.cover_image_url,
+      sortOrder: room.sort_order ?? 0,
+      createdAt: room.created_at,
+      updatedAt: room.updated_at,
+      boxes: stats.boxes,
+      packedBoxes: stats.packedBoxes,
+      items: stats.items,
+    };
+  });
+}
+
+async function listRoomSummaries(locationId?: string): Promise<RoomSummary[]> {
+  const userId = await getCurrentUserId();
+
+  let query = supabase
+    .from("rooms")
+    .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (locationId?.trim()) {
+    query = query.eq("location_id", locationId.trim());
+  }
+
+  const { data: rooms, error: roomsError } = await query;
+
+  if (roomsError) throw roomsError;
+  if (!rooms || rooms.length === 0) {
+    return [];
+  }
+
+  const roomIds = rooms.map((room: RoomRow) => room.id);
+  const locationIds = Array.from(new Set(rooms.map((room: RoomRow) => room.location_id)));
+
+  const [locationNameMap, boxesResult] = await Promise.all([
+    getLocationNameMap(userId, locationIds),
+    supabase.from("boxes").select("id,room_id,status,updated_at,fragility,name,item_count:items(count)").in("room_id", roomIds),
+  ]);
+
+  if (boxesResult.error) throw boxesResult.error;
+
+  return mapRoomSummaries(rooms, boxesResult.data ?? [], locationNameMap);
+}
+
+async function assertUserOwnsLocation(locationId: string, userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id,name")
+    .eq("id", locationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Location not found.");
+  }
+
+  return data.name;
+}
+
+async function createRoom(input: CreateRoomInput): Promise<string> {
+  const locationId = input.locationId.trim();
+  const name = input.name.trim();
+
+  if (!locationId) {
+    throw new Error("Location is required.");
+  }
+  if (!name) {
+    throw new Error("Room name is required.");
+  }
+
+  const userId = await getCurrentUserId();
+  const locationName = await assertUserOwnsLocation(locationId, userId);
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .insert({
+      user_id: userId,
+      location_id: locationId,
+      name,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) {
+    throw new Error("Failed to create room.");
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Created",
+    entityType: "location",
+    entityId: data.id,
+    title: "Room created",
+    description: `Created room "${name}" in "${locationName}".`,
+    roomName: name,
+    next: {
+      name,
+      locationId,
+      locationName,
+    },
+  });
+
+  return data.id;
+}
+
+async function getRoomDetails(roomId: string): Promise<RoomDetails> {
+  const normalizedRoomId = roomId.trim();
+  if (!normalizedRoomId) {
+    throw new Error("Room id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: room, error: roomError } = await supabase
+    .from("rooms")
+    .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
+    .eq("id", normalizedRoomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (roomError) throw roomError;
+  if (!room) {
+    throw new Error("Room not found.");
+  }
+
+  const [locationNameMap, boxesResult] = await Promise.all([
+    getLocationNameMap(userId, [room.location_id]),
+    supabase
+      .from("boxes")
+      .select("id,room_id,name,status,updated_at,fragility,item_count:items(count)")
+      .eq("room_id", normalizedRoomId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  if (boxesResult.error) throw boxesResult.error;
+
+  const summary = mapRoomSummaries(
+    [room],
+    (boxesResult.data ?? []).map((box: BoxRow) => ({
+      id: box.id,
+      room_id: room.id,
+      status: box.status,
+      updated_at: box.updated_at,
+      fragility: box.fragility,
+      name: box.name,
+      item_count: box.item_count,
+    })),
+    locationNameMap,
+  )[0];
+
+  const boxList: RoomDetailsBox[] = (boxesResult.data ?? []).map((box: BoxRow, index: number) => ({
+    id: box.id,
+    name: box.name?.trim() || `Box #${index + 1}`,
+    status: box.status,
+    updatedAt: box.updated_at,
+    itemsCount: getNestedCount(box.item_count),
+    isFragile: normalizeFragility(box.fragility),
+  }));
+
+  return {
+    ...summary,
+    boxList,
+  };
+}
+
+async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void> {
+  const normalizedRoomId = roomId.trim();
+  if (!normalizedRoomId) {
+    throw new Error("Room id is required.");
+  }
+
+  const name = input.name?.trim();
+  const locationId = input.locationId?.trim();
+
+  if (input.name !== undefined && !name) {
+    throw new Error("Room name is required.");
+  }
+
+  if (input.locationId !== undefined && !locationId) {
+    throw new Error("Location is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: existingRoom, error: existingError } = await supabase
+    .from("rooms")
+    .select("id,name,location_id")
+    .eq("id", normalizedRoomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (!existingRoom) {
+    throw new Error("Room not found.");
+  }
+
+  const nextLocationId = locationId ?? existingRoom.location_id;
+  const nextName = name ?? existingRoom.name;
+  const nextLocationName = await assertUserOwnsLocation(nextLocationId, userId);
+
+  const updates: Record<string, string> = {};
+  if (name !== undefined) {
+    updates.name = nextName;
+  }
+  if (locationId !== undefined) {
+    updates.location_id = nextLocationId;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .update(updates)
+    .eq("id", normalizedRoomId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Room not found.");
+  }
+
+  if (existingRoom.name === nextName && existingRoom.location_id === nextLocationId) {
+    return;
+  }
+
+  await activityService.writeActivitySafely({
+    type: existingRoom.location_id !== nextLocationId ? "Moved" : "Updated",
+    entityType: "location",
+    entityId: normalizedRoomId,
+    title: existingRoom.location_id !== nextLocationId ? "Room moved" : "Room updated",
+    description:
+      existingRoom.location_id !== nextLocationId
+        ? `Moved room "${nextName}" to "${nextLocationName}".`
+        : `Updated room "${nextName}".`,
+    roomName: nextName,
+    previous: {
+      name: existingRoom.name,
+      locationId: existingRoom.location_id,
+    },
+    next: {
+      name: nextName,
+      locationId: nextLocationId,
+      locationName: nextLocationName,
+    },
+  });
+}
+
+async function updateRoomName(roomId: string, name: string): Promise<void> {
+  await updateRoom(roomId, { name });
+}
+
+async function deleteRoom(roomId: string): Promise<void> {
+  const normalizedRoomId = roomId.trim();
+  if (!normalizedRoomId) {
+    throw new Error("Room id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: roomBeforeDelete, error: roomFetchError } = await supabase
+    .from("rooms")
+    .select("id,name,location_id")
+    .eq("id", normalizedRoomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (roomFetchError) throw roomFetchError;
+  if (!roomBeforeDelete) {
+    throw new Error("Room not found.");
+  }
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .delete()
+    .eq("id", normalizedRoomId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (isForeignKeyViolation(error)) {
+      throw new Error("Room has boxes. Remove or move its boxes before deleting it.");
+    }
+
+    throw error;
+  }
+  if (!data) {
+    throw new Error("Room not found.");
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Deleted",
+    entityType: "location",
+    entityId: roomBeforeDelete.id,
+    title: "Room deleted",
+    description: `Deleted room "${roomBeforeDelete.name}".`,
+    roomName: roomBeforeDelete.name,
+    previous: {
+      name: roomBeforeDelete.name,
+      locationId: roomBeforeDelete.location_id,
+    },
+  });
+}
+
+export const roomService = {
+  listRoomSummaries,
+  createRoom,
+  getRoomDetails,
+  updateRoom,
+  updateRoomName,
+  deleteRoom,
+};

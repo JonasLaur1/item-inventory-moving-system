@@ -1,8 +1,21 @@
 import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
 
+export type LocationKind = "start" | "destination" | "other";
+
 type LocationRow = {
   id: string;
+  name: string;
+  kind: string | null;
+  cover_image_url: string | null;
+  sort_order: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type RoomRow = {
+  id: string;
+  location_id: string;
   name: string;
   cover_image_url: string | null;
   sort_order: number | null;
@@ -11,22 +24,32 @@ type LocationRow = {
 };
 
 type BoxRow = {
-  location_id: string | null;
-  status: string | null;
-  item_count: Array<{ count: number | null }> | null;
-};
-
-type RoomDetailsBoxRow = {
   id: string;
-  name: string;
+  room_id: string | null;
   status: string | null;
   updated_at: string | null;
   fragility: string | null;
+  name: string | null;
   item_count: Array<{ count: number | null }> | null;
 };
 
 export type LocationSummary = {
   id: string;
+  name: string;
+  kind: LocationKind;
+  coverImageUrl: string | null;
+  sortOrder: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  rooms: number;
+  boxes: number;
+  packedBoxes: number;
+  items: number;
+};
+
+export type LocationDetailsRoom = {
+  id: string;
+  locationId: string;
   name: string;
   coverImageUrl: string | null;
   sortOrder: number;
@@ -39,6 +62,8 @@ export type LocationSummary = {
 
 export type LocationDetailsBox = {
   id: string;
+  roomId: string;
+  roomName: string;
   name: string;
   status: string | null;
   updatedAt: string | null;
@@ -47,7 +72,20 @@ export type LocationDetailsBox = {
 };
 
 export type LocationDetails = LocationSummary & {
+  roomList: LocationDetailsRoom[];
   boxList: LocationDetailsBox[];
+};
+
+export type CreateLocationInput = {
+  name: string;
+  kind?: LocationKind;
+};
+
+export type UpdateLocationInput = {
+  name?: string;
+  kind?: LocationKind;
+  sortOrder?: number;
+  coverImageUrl?: string | null;
 };
 
 async function getCurrentUserId(): Promise<string> {
@@ -87,161 +125,14 @@ function normalizeFragility(value: string | null): boolean {
   return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
 }
 
-function mapLocationSummaries(locations: LocationRow[], boxes: BoxRow[]): LocationSummary[] {
-  const locationStats = new Map<string, { boxes: number; packedBoxes: number; items: number }>();
+function normalizeLocationKind(value: string | null | undefined): LocationKind {
+  const normalized = value?.trim().toLowerCase();
 
-  for (const location of locations) {
-    locationStats.set(location.id, { boxes: 0, packedBoxes: 0, items: 0 });
+  if (normalized === "start" || normalized === "destination" || normalized === "other") {
+    return normalized;
   }
 
-  for (const box of boxes) {
-    if (!box.location_id || !locationStats.has(box.location_id)) {
-      continue;
-    }
-
-    const current = locationStats.get(box.location_id);
-    if (!current) {
-      continue;
-    }
-
-    current.boxes += 1;
-
-    const normalizedStatus = box.status?.toLowerCase();
-    if (normalizedStatus === "packed") {
-      current.packedBoxes += 1;
-    }
-
-    current.items += getNestedCount(box.item_count);
-  }
-
-  return locations.map((location) => {
-    const stats = locationStats.get(location.id) ?? { boxes: 0, packedBoxes: 0, items: 0 };
-    return {
-      id: location.id,
-      name: location.name,
-      coverImageUrl: location.cover_image_url,
-      sortOrder: location.sort_order ?? 0,
-      createdAt: location.created_at,
-      updatedAt: location.updated_at,
-      boxes: stats.boxes,
-      packedBoxes: stats.packedBoxes,
-      items: stats.items,
-    };
-  });
-}
-
-async function listLocationSummaries(): Promise<LocationSummary[]> {
-  const userId = await getCurrentUserId();
-
-  const { data: locations, error: locationsError } = await supabase
-    .from("locations")
-    .select("id,name,cover_image_url,sort_order,created_at,updated_at")
-    .eq("user_id", userId)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (locationsError) throw locationsError;
-  if (!locations || locations.length === 0) {
-    return [];
-  }
-
-  const locationIds = locations.map((location) => location.id);
-
-  const { data: boxes, error: boxesError } = await supabase
-    .from("boxes")
-    .select("location_id,status,item_count:items(count)")
-    .in("location_id", locationIds);
-
-  if (boxesError) throw boxesError;
-
-  return mapLocationSummaries(locations ?? [], boxes ?? []);
-}
-
-async function createLocation(name: string): Promise<void> {
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    throw new Error("Location name is required.");
-  }
-
-  const userId = await getCurrentUserId();
-
-  const { data, error } = await supabase
-    .from("locations")
-    .insert({
-      user_id: userId,
-      name: trimmedName,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id) {
-    throw new Error("Failed to create room.");
-  }
-
-  await activityService.writeActivitySafely({
-    type: "Created",
-    entityType: "location",
-    entityId: data.id,
-    title: "Room created",
-    description: `Created room "${trimmedName}".`,
-    roomName: trimmedName,
-    next: { name: trimmedName },
-  });
-}
-
-async function updateLocationName(locationId: string, name: string): Promise<void> {
-  const normalizedLocationId = locationId.trim();
-  if (!normalizedLocationId) {
-    throw new Error("Location id is required.");
-  }
-
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    throw new Error("Location name is required.");
-  }
-
-  const userId = await getCurrentUserId();
-
-  const { data: existingLocation, error: existingError } = await supabase
-    .from("locations")
-    .select("id,name")
-    .eq("id", normalizedLocationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-  if (!existingLocation) {
-    throw new Error("Room not found.");
-  }
-
-  const { data, error } = await supabase
-    .from("locations")
-    .update({ name: trimmedName })
-    .eq("id", normalizedLocationId)
-    .eq("user_id", userId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error("Room not found.");
-  }
-
-  if (existingLocation.name === trimmedName) {
-    return;
-  }
-
-  await activityService.writeActivitySafely({
-    type: "Updated",
-    entityType: "location",
-    entityId: normalizedLocationId,
-    title: "Room updated",
-    description: `Renamed room "${existingLocation.name}" to "${trimmedName}".`,
-    roomName: trimmedName,
-    previous: { name: existingLocation.name },
-    next: { name: trimmedName },
-  });
+  return "other";
 }
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -251,6 +142,266 @@ function isForeignKeyViolation(error: unknown): boolean {
 
   const possibleCode = (error as { code?: unknown }).code;
   return possibleCode === "23503";
+}
+
+type LocationAggregation = {
+  rooms: RoomRow[];
+  boxesByRoomId: Map<string, BoxRow[]>;
+};
+
+async function getLocationAggregation(userId: string, locationIds: string[]): Promise<LocationAggregation> {
+  if (locationIds.length === 0) {
+    return {
+      rooms: [],
+      boxesByRoomId: new Map<string, BoxRow[]>(),
+    };
+  }
+
+  const { data: rooms, error: roomsError } = await supabase
+    .from("rooms")
+    .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
+    .eq("user_id", userId)
+    .in("location_id", locationIds)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (roomsError) throw roomsError;
+
+  const roomIds = (rooms ?? []).map((room: RoomRow) => room.id);
+  if (roomIds.length === 0) {
+    return {
+      rooms: rooms ?? [],
+      boxesByRoomId: new Map<string, BoxRow[]>(),
+    };
+  }
+
+  const { data: boxes, error: boxesError } = await supabase
+    .from("boxes")
+    .select("id,room_id,status,updated_at,fragility,name,item_count:items(count)")
+    .in("room_id", roomIds);
+
+  if (boxesError) throw boxesError;
+
+  const boxesByRoomId = new Map<string, BoxRow[]>();
+  (boxes ?? []).forEach((box: BoxRow) => {
+    if (!box.room_id) {
+      return;
+    }
+
+    const current = boxesByRoomId.get(box.room_id) ?? [];
+    current.push(box);
+    boxesByRoomId.set(box.room_id, current);
+  });
+
+  return {
+    rooms: rooms ?? [],
+    boxesByRoomId,
+  };
+}
+
+function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAggregation): LocationSummary[] {
+  const roomsByLocationId = new Map<string, RoomRow[]>();
+  aggregation.rooms.forEach((room) => {
+    const current = roomsByLocationId.get(room.location_id) ?? [];
+    current.push(room);
+    roomsByLocationId.set(room.location_id, current);
+  });
+
+  return locations.map((location) => {
+    const locationRooms = roomsByLocationId.get(location.id) ?? [];
+    let boxes = 0;
+    let packedBoxes = 0;
+    let items = 0;
+
+    locationRooms.forEach((room) => {
+      const roomBoxes = aggregation.boxesByRoomId.get(room.id) ?? [];
+      boxes += roomBoxes.length;
+
+      roomBoxes.forEach((box) => {
+        if (box.status?.toLowerCase() === "packed") {
+          packedBoxes += 1;
+        }
+        items += getNestedCount(box.item_count);
+      });
+    });
+
+    return {
+      id: location.id,
+      name: location.name,
+      kind: normalizeLocationKind(location.kind),
+      coverImageUrl: location.cover_image_url,
+      sortOrder: location.sort_order ?? 0,
+      createdAt: location.created_at,
+      updatedAt: location.updated_at,
+      rooms: locationRooms.length,
+      boxes,
+      packedBoxes,
+      items,
+    };
+  });
+}
+
+async function listLocationSummaries(): Promise<LocationSummary[]> {
+  const userId = await getCurrentUserId();
+
+  const { data: locations, error: locationsError } = await supabase
+    .from("locations")
+    .select("id,name,kind,cover_image_url,sort_order,created_at,updated_at")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (locationsError) throw locationsError;
+  if (!locations || locations.length === 0) {
+    return [];
+  }
+
+  const aggregation = await getLocationAggregation(
+    userId,
+    locations.map((location: LocationRow) => location.id),
+  );
+
+  return mapLocationSummaries(locations, aggregation);
+}
+
+async function createLocation(input: string | CreateLocationInput): Promise<void> {
+  const normalizedInput = typeof input === "string" ? { name: input } : input;
+
+  const trimmedName = normalizedInput.name.trim();
+  if (!trimmedName) {
+    throw new Error("Location name is required.");
+  }
+
+  const kind = normalizeLocationKind(normalizedInput.kind);
+  const userId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("locations")
+    .insert({
+      user_id: userId,
+      name: trimmedName,
+      kind,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) {
+    throw new Error("Failed to create location.");
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Created",
+    entityType: "location",
+    entityId: data.id,
+    title: "Location created",
+    description: `Created location "${trimmedName}".`,
+    roomName: trimmedName,
+    next: { name: trimmedName, kind },
+  });
+}
+
+async function updateLocation(locationId: string, input: UpdateLocationInput): Promise<void> {
+  const normalizedLocationId = locationId.trim();
+  if (!normalizedLocationId) {
+    throw new Error("Location id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: existingLocation, error: existingError } = await supabase
+    .from("locations")
+    .select("id,name,kind,sort_order,cover_image_url")
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (!existingLocation) {
+    throw new Error("Location not found.");
+  }
+
+  const nextName = input.name !== undefined ? input.name.trim() : existingLocation.name;
+  if (!nextName) {
+    throw new Error("Location name is required.");
+  }
+
+  const nextKind = input.kind !== undefined ? normalizeLocationKind(input.kind) : normalizeLocationKind(existingLocation.kind);
+  const nextSortOrder = input.sortOrder ?? existingLocation.sort_order ?? 0;
+  const nextCoverImageUrl =
+    input.coverImageUrl !== undefined ? input.coverImageUrl : existingLocation.cover_image_url;
+
+  const updates: {
+    name?: string;
+    kind?: LocationKind;
+    sort_order?: number;
+    cover_image_url?: string | null;
+  } = {};
+
+  if (input.name !== undefined) {
+    updates.name = nextName;
+  }
+  if (input.kind !== undefined) {
+    updates.kind = nextKind;
+  }
+  if (input.sortOrder !== undefined) {
+    updates.sort_order = nextSortOrder;
+  }
+  if (input.coverImageUrl !== undefined) {
+    updates.cover_image_url = nextCoverImageUrl;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("locations")
+    .update(updates)
+    .eq("id", normalizedLocationId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Location not found.");
+  }
+
+  const hasChanges =
+    nextName !== existingLocation.name ||
+    nextKind !== normalizeLocationKind(existingLocation.kind) ||
+    nextSortOrder !== (existingLocation.sort_order ?? 0) ||
+    nextCoverImageUrl !== existingLocation.cover_image_url;
+
+  if (!hasChanges) {
+    return;
+  }
+
+  await activityService.writeActivitySafely({
+    type: "Updated",
+    entityType: "location",
+    entityId: normalizedLocationId,
+    title: "Location updated",
+    description: `Updated location "${nextName}".`,
+    roomName: nextName,
+    previous: {
+      name: existingLocation.name,
+      kind: normalizeLocationKind(existingLocation.kind),
+      sortOrder: existingLocation.sort_order ?? 0,
+      coverImageUrl: existingLocation.cover_image_url,
+    },
+    next: {
+      name: nextName,
+      kind: nextKind,
+      sortOrder: nextSortOrder,
+      coverImageUrl: nextCoverImageUrl,
+    },
+  });
+}
+
+async function updateLocationName(locationId: string, name: string): Promise<void> {
+  await updateLocation(locationId, { name });
 }
 
 async function deleteLocation(locationId: string): Promise<void> {
@@ -268,11 +419,9 @@ async function deleteLocation(locationId: string): Promise<void> {
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (locationFetchError) {
-    throw locationFetchError;
-  }
+  if (locationFetchError) throw locationFetchError;
   if (!locationBeforeDelete) {
-    throw new Error("Room not found.");
+    throw new Error("Location not found.");
   }
 
   const { data, error } = await supabase
@@ -285,22 +434,22 @@ async function deleteLocation(locationId: string): Promise<void> {
 
   if (error) {
     if (isForeignKeyViolation(error)) {
-      throw new Error("Room has boxes. Remove or move its boxes before deleting it.");
+      throw new Error("Location has rooms. Remove or move its rooms before deleting it.");
     }
 
     throw error;
   }
 
   if (!data) {
-    throw new Error("Room not found.");
+    throw new Error("Location not found.");
   }
 
   await activityService.writeActivitySafely({
     type: "Deleted",
     entityType: "location",
     entityId: locationBeforeDelete.id,
-    title: "Room deleted",
-    description: `Deleted room "${locationBeforeDelete.name}".`,
+    title: "Location deleted",
+    description: `Deleted location "${locationBeforeDelete.name}".`,
     roomName: locationBeforeDelete.name,
     previous: { name: locationBeforeDelete.name },
   });
@@ -317,49 +466,65 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   const { data: location, error: locationError } = await supabase
     .from("locations")
-    .select("id,name,cover_image_url,sort_order,created_at,updated_at")
+    .select("id,name,kind,cover_image_url,sort_order,created_at,updated_at")
     .eq("id", normalizedLocationId)
     .eq("user_id", userId)
     .maybeSingle();
 
-  const { data: boxes, error: boxesError } = await supabase
-    .from("boxes")
-    .select("id,name,status,updated_at,fragility,item_count:items(count)")
-    .eq("location_id", normalizedLocationId)
-    .order("created_at", { ascending: true });
-
   if (locationError) throw locationError;
-  if (boxesError) throw boxesError;
   if (!location) {
-    throw new Error("Room not found.");
+    throw new Error("Location not found.");
   }
 
-  const mappedBoxes: LocationDetailsBox[] = (boxes ?? []).map((box: RoomDetailsBoxRow) => ({
-    id: box.id,
-    name: box.name,
-    status: box.status,
-    updatedAt: box.updated_at,
-    itemsCount: getNestedCount(box.item_count),
-    isFragile: normalizeFragility(box.fragility),
-  }));
+  const aggregation = await getLocationAggregation(userId, [normalizedLocationId]);
+  const summary = mapLocationSummaries([location], aggregation)[0];
 
-  const summary = mapLocationSummaries([location], [
-    ...(boxes ?? []).map((box: RoomDetailsBoxRow) => ({
-      location_id: location.id,
+  const roomList: LocationDetailsRoom[] = aggregation.rooms
+    .filter((room) => room.location_id === normalizedLocationId)
+    .map((room) => {
+      const roomBoxes = aggregation.boxesByRoomId.get(room.id) ?? [];
+      const boxes = roomBoxes.length;
+      const packedBoxes = roomBoxes.filter((box) => box.status?.toLowerCase() === "packed").length;
+      const items = roomBoxes.reduce((total, box) => total + getNestedCount(box.item_count), 0);
+
+      return {
+        id: room.id,
+        locationId: room.location_id,
+        name: room.name,
+        coverImageUrl: room.cover_image_url,
+        sortOrder: room.sort_order ?? 0,
+        createdAt: room.created_at,
+        updatedAt: room.updated_at,
+        boxes,
+        packedBoxes,
+        items,
+      };
+    });
+
+  const boxList: LocationDetailsBox[] = roomList.flatMap((room) =>
+    (aggregation.boxesByRoomId.get(room.id) ?? []).map((box: BoxRow, index: number) => ({
+      id: box.id,
+      roomId: room.id,
+      roomName: room.name,
+      name: box.name?.trim() || `Box #${index + 1}`,
       status: box.status,
-      item_count: box.item_count,
+      updatedAt: box.updated_at,
+      itemsCount: getNestedCount(box.item_count),
+      isFragile: normalizeFragility(box.fragility),
     })),
-  ])[0];
+  );
 
   return {
     ...summary,
-    boxList: mappedBoxes,
+    roomList,
+    boxList,
   };
 }
 
 export const locationService = {
   listLocationSummaries,
   createLocation,
+  updateLocation,
   updateLocationName,
   deleteLocation,
   getLocationDetails,

@@ -15,8 +15,22 @@ type ItemRow = {
 type BoxContextRow = {
   id: string;
   name: string;
-  location_id: string | null;
+  room_id: string | null;
   fragility: string | null;
+  room:
+    | {
+        id: string;
+        name: string;
+        location_id: string;
+        location: { id: string; name: string } | Array<{ id: string; name: string }> | null;
+      }
+    | Array<{
+        id: string;
+        name: string;
+        location_id: string;
+        location: { id: string; name: string } | Array<{ id: string; name: string }> | null;
+      }>
+    | null;
 };
 
 export type ItemSummary = {
@@ -127,7 +141,7 @@ function mapItem(item: ItemRow): ItemSummary {
 async function assertUserOwnsBox(boxId: string, userId: string): Promise<BoxContextRow> {
   const { data, error } = await supabase
     .from("boxes")
-    .select("id,name,location_id,fragility")
+    .select("id,name,room_id,fragility,room:rooms(id,name,location_id,location:locations(id,name))")
     .eq("id", boxId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -140,15 +154,38 @@ async function assertUserOwnsBox(boxId: string, userId: string): Promise<BoxCont
   return data;
 }
 
-async function getRoomNameByLocationId(locationId: string | null, userId: string): Promise<string> {
-  if (!locationId) {
+function getNormalizedRoomLocation(
+  box: BoxContextRow,
+): { roomId: string; roomName: string; locationId: string | null; locationName: string } {
+  const room = Array.isArray(box.room) ? box.room[0] : box.room;
+  const location = room && room.location ? (Array.isArray(room.location) ? room.location[0] : room.location) : null;
+
+  if (!room) {
+    return {
+      roomId: box.room_id ?? "",
+      roomName: "Unknown room",
+      locationId: null,
+      locationName: "Unknown location",
+    };
+  }
+
+  return {
+    roomId: room.id,
+    roomName: room.name,
+    locationId: location?.id ?? room.location_id ?? null,
+    locationName: location?.name ?? "Unknown location",
+  };
+}
+
+async function getRoomNameByRoomId(roomId: string | null, userId: string): Promise<string> {
+  if (!roomId) {
     return "Unknown room";
   }
 
   const { data, error } = await supabase
-    .from("locations")
+    .from("rooms")
     .select("name")
-    .eq("id", locationId)
+    .eq("id", roomId)
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -160,14 +197,29 @@ async function getRoomNameByLocationId(locationId: string | null, userId: string
 async function getBoxActivityContext(
   boxId: string,
   userId: string,
-): Promise<{ id: string; name: string; roomName: string; fragility: string | null }> {
+): Promise<{
+  id: string;
+  name: string;
+  roomId: string;
+  roomName: string;
+  locationId: string | null;
+  locationName: string;
+  fragility: string | null;
+}> {
   const box = await assertUserOwnsBox(boxId, userId);
-  const roomName = await getRoomNameByLocationId(box.location_id, userId);
+  const normalizedContext = getNormalizedRoomLocation(box);
+  const roomName =
+    normalizedContext.roomName !== "Unknown room"
+      ? normalizedContext.roomName
+      : await getRoomNameByRoomId(box.room_id, userId);
 
   return {
     id: box.id,
     name: box.name,
+    roomId: normalizedContext.roomId,
     roomName,
+    locationId: normalizedContext.locationId,
+    locationName: normalizedContext.locationName,
     fragility: box.fragility,
   };
 }
@@ -252,6 +304,9 @@ async function createItem(input: CreateItemInput): Promise<string> {
       boxId: targetBox.id,
       boxName: targetBox.name,
       roomName: targetBox.roomName,
+      roomId: targetBox.roomId,
+      locationId: targetBox.locationId,
+      locationName: targetBox.locationName,
     },
   });
 
@@ -348,11 +403,17 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
         boxId: previousBox.id,
         boxName: previousBox.name,
         roomName: previousBox.roomName,
+        roomId: previousBox.roomId,
+        locationId: previousBox.locationId,
+        locationName: previousBox.locationName,
       },
       next: {
         boxId: targetBox.id,
         boxName: targetBox.name,
         roomName: targetBox.roomName,
+        roomId: targetBox.roomId,
+        locationId: targetBox.locationId,
+        locationName: targetBox.locationName,
         isFragile,
       },
     });
@@ -455,6 +516,9 @@ async function deleteItem(itemId: string): Promise<void> {
       boxId: boxContext.id,
       boxName: boxContext.name,
       roomName: boxContext.roomName,
+      roomId: boxContext.roomId,
+      locationId: boxContext.locationId,
+      locationName: boxContext.locationName,
     },
   });
 }
