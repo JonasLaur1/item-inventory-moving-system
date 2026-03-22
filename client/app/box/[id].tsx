@@ -93,6 +93,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
     title: item.name,
     subtitle: item.notes?.trim() ? item.notes : undefined,
     quantity: item.quantity,
+    badgeText: item.isFragile ? "Fragile" : "Not fragile",
     icon: "package",
   };
 }
@@ -140,6 +141,7 @@ export default function BoxDetailsScreen() {
   const [activeItemId, setActiveItemId] = useState("");
   const [itemName, setItemName] = useState("");
   const [itemQuantity, setItemQuantity] = useState("1");
+  const [itemIsFragile, setItemIsFragile] = useState(false);
   const [itemNotes, setItemNotes] = useState("");
   const [editedItemBoxId, setEditedItemBoxId] = useState("");
   const [isSavingItem, setIsSavingItem] = useState(false);
@@ -422,6 +424,7 @@ export default function BoxDetailsScreen() {
     setActiveItemId("");
     setItemName("");
     setItemQuantity("1");
+    setItemIsFragile(false);
     setItemNotes("");
     setEditedItemBoxId(box.id);
     setItemModalError(null);
@@ -438,6 +441,7 @@ export default function BoxDetailsScreen() {
       setActiveItemId(item.id);
       setItemName(item.name);
       setItemQuantity(String(item.quantity));
+      setItemIsFragile(item.isFragile);
       setItemNotes(item.notes ?? "");
       setEditedItemBoxId(box.id);
       setItemModalError(null);
@@ -485,6 +489,7 @@ export default function BoxDetailsScreen() {
         await itemService.createItem({
           name: normalizedName,
           quantity: parsedQuantity,
+          isFragile: itemIsFragile,
           notes: itemNotes,
           boxId: box.id,
         });
@@ -496,6 +501,7 @@ export default function BoxDetailsScreen() {
         await itemService.updateItem(activeItemId, {
           name: normalizedName,
           quantity: parsedQuantity,
+          isFragile: itemIsFragile,
           notes: itemNotes,
           boxId: editedItemBoxId,
         });
@@ -509,7 +515,17 @@ export default function BoxDetailsScreen() {
     } finally {
       setIsSavingItem(false);
     }
-  }, [activeItemId, box, editedItemBoxId, itemModalMode, itemName, itemNotes, itemQuantity, loadBox]);
+  }, [
+    activeItemId,
+    box,
+    editedItemBoxId,
+    itemIsFragile,
+    itemModalMode,
+    itemName,
+    itemNotes,
+    itemQuantity,
+    loadBox,
+  ]);
 
   const openDeleteItemModal = useCallback((item: BoxDetailsItem) => {
     setDeleteItemError(null);
@@ -739,20 +755,28 @@ export default function BoxDetailsScreen() {
                     {formatStatusLabel(box.status)}
                   </Text>
                 </View>
+                <View
+                  className={`min-h-[24px] items-center justify-center rounded-full px-3 py-1 ${
+                    box.isFragile ? "bg-amber-500/20" : "bg-slate-500/20"
+                  }`}
+                >
+                  <Text
+                    className={`text-center text-xs font-semibold leading-[14px] ${
+                      box.isFragile ? "text-amber-300" : "text-slate-300"
+                    }`}
+                  >
+                    {box.isFragile ? "Fragile" : "Not fragile"}
+                  </Text>
+                </View>
                 <MetaPill icon="clock" text={`Updated ${formatUpdatedAt(box.updatedAt)}`} />
               </View>
             </View>
 
-            <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
+            <View className="mt-6">
               <MetricCard
                 label="Items"
                 value={String(box.itemsCount)}
-                style={{ width: "48.5%" }}
-              />
-              <MetricCard
-                label="Fragile"
-                value={box.isFragile ? "Yes" : "No"}
-                style={{ width: "48.5%" }}
+                style={{ width: "100%" }}
               />
             </View>
 
@@ -889,6 +913,34 @@ export default function BoxDetailsScreen() {
             style={{ minHeight: 84, paddingTop: 12 }}
             maxLength={300}
           />
+        </View>
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Fragility</Text>
+          <View className="mt-2 flex-row gap-2">
+            <Pressable
+              onPress={() => setItemIsFragile(false)}
+              disabled={isSavingItem}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                !itemIsFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">Not fragile</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setItemIsFragile(true)}
+              disabled={isSavingItem}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                itemIsFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">Fragile</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View className="mt-4">

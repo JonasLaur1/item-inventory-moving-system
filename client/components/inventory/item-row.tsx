@@ -19,6 +19,11 @@ type ItemRowProps = {
 
 export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
   const hasActions = Boolean(onPressEdit || onPressDelete);
+  const hasQuantity = typeof item.quantity === "number";
+  const hasInlineBadge = hasQuantity && Boolean(item.badgeText);
+  const normalizedBadgeText = item.badgeText?.trim().toLowerCase();
+  const isFragileBadge = normalizedBadgeText === "fragile";
+  const isNotFragileBadge = normalizedBadgeText === "not fragile";
 
   return (
     <View className="flex-row items-center rounded-card border border-border-default bg-bg-elevated/70 p-4">
@@ -28,10 +33,33 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
       <View className="ml-3 flex-1">
         <View className="flex-row items-center gap-2">
           <Text className="text-sm font-semibold text-text-primary">{item.title}</Text>
-          {typeof item.quantity === "number" ? (
+          {hasQuantity ? (
             <View className="rounded-full bg-primary/15 px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase text-text-link">
                 Qty {item.quantity}
+              </Text>
+            </View>
+          ) : null}
+          {hasInlineBadge ? (
+            <View
+              className={`rounded-full px-2 py-0.5 ${
+                isFragileBadge
+                  ? "bg-amber-500/20"
+                  : isNotFragileBadge
+                    ? "bg-slate-500/20"
+                    : "bg-primary/15"
+              }`}
+            >
+              <Text
+                className={`text-[10px] font-semibold uppercase ${
+                  isFragileBadge
+                    ? "text-amber-300"
+                    : isNotFragileBadge
+                      ? "text-slate-300"
+                      : "text-text-link"
+                }`}
+              >
+                {item.badgeText}
               </Text>
             </View>
           ) : null}
@@ -39,7 +67,9 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
         {item.subtitle ? <Text className="mt-1 text-xs text-text-tertiary">{item.subtitle}</Text> : null}
       </View>
       <View className={`${hasActions ? "items-end gap-2" : ""}`}>
-        {item.badgeText ? <Text className="text-xs font-semibold text-text-link">{item.badgeText}</Text> : null}
+        {!hasInlineBadge && item.badgeText ? (
+          <Text className="text-xs font-semibold text-text-link">{item.badgeText}</Text>
+        ) : null}
         {hasActions ? (
           <View className="flex-row gap-2">
             {onPressEdit ? (

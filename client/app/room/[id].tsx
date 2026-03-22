@@ -173,7 +173,7 @@ export default function RoomDetailsScreen() {
       label: box.name || `Box #${index + 1}`,
       room: room.name,
       itemsCount: box.itemsCount,
-      fragileCount: 0,
+      isFragile: box.isFragile,
       status: normalizeBoxStatus(box.status),
       updatedAt: formatUpdatedAt(box.updatedAt),
     }));

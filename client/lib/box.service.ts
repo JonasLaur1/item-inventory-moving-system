@@ -27,6 +27,7 @@ type ItemRow = {
   name: string | null;
   notes: string | null;
   quantity: number | null;
+  is_fragile: boolean | null;
 };
 
 type LocationRow = {
@@ -50,6 +51,7 @@ export type BoxDetailsItem = {
   name: string;
   notes: string | null;
   quantity: number;
+  isFragile: boolean;
 };
 
 export type BoxDetails = BoxSummary & {
@@ -226,7 +228,7 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     getLocationNameMap(userId, box.location_id ? [box.location_id] : []),
     supabase
       .from("items")
-      .select("id,name,notes,quantity")
+      .select("id,name,notes,quantity,is_fragile")
       .eq("user_id", userId)
       .eq("box_id", normalizedBoxId)
       .order("created_at", { ascending: true }),
@@ -239,6 +241,7 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     name: item.name?.trim() || "Unnamed item",
     notes: item.notes,
     quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
+    isFragile: item.is_fragile === true,
   }));
 
   const itemCount = items.length;

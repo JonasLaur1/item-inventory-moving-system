@@ -6,6 +6,7 @@ type ItemRow = {
   name: string | null;
   notes: string | null;
   quantity: number | null;
+  is_fragile: boolean | null;
   box_id: string;
   created_at: string | null;
   updated_at: string | null;
@@ -15,6 +16,7 @@ type BoxContextRow = {
   id: string;
   name: string;
   location_id: string | null;
+  fragility: string | null;
 };
 
 export type ItemSummary = {
@@ -22,6 +24,7 @@ export type ItemSummary = {
   name: string;
   notes: string | null;
   quantity: number;
+  isFragile: boolean;
   boxId: string;
   createdAt: string | null;
   updatedAt: string | null;
@@ -30,6 +33,7 @@ export type ItemSummary = {
 export type CreateItemInput = {
   name: string;
   quantity: number;
+  isFragile?: boolean;
   notes?: string | null;
   boxId: string;
 };
@@ -37,6 +41,7 @@ export type CreateItemInput = {
 export type UpdateItemInput = {
   name: string;
   quantity: number;
+  isFragile?: boolean;
   notes?: string | null;
   boxId: string;
 };
@@ -79,6 +84,24 @@ function normalizeQuantity(quantity: number): number {
   return quantity;
 }
 
+function normalizeItemFragility(isFragile: boolean | undefined): boolean {
+  return isFragile === true;
+}
+
+function normalizeBoxFragility(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === "none" || normalized === "normal" || normalized === "not_fragile") {
+    return false;
+  }
+
+  return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
+}
+
 function normalizeBoxId(boxId: string): string {
   const normalizedBoxId = boxId.trim();
   if (!normalizedBoxId) {
@@ -94,6 +117,7 @@ function mapItem(item: ItemRow): ItemSummary {
     name: item.name?.trim() || "Unnamed item",
     notes: item.notes,
     quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
+    isFragile: item.is_fragile === true,
     boxId: item.box_id,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
@@ -103,7 +127,7 @@ function mapItem(item: ItemRow): ItemSummary {
 async function assertUserOwnsBox(boxId: string, userId: string): Promise<BoxContextRow> {
   const { data, error } = await supabase
     .from("boxes")
-    .select("id,name,location_id")
+    .select("id,name,location_id,fragility")
     .eq("id", boxId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -136,7 +160,7 @@ async function getRoomNameByLocationId(locationId: string | null, userId: string
 async function getBoxActivityContext(
   boxId: string,
   userId: string,
-): Promise<{ id: string; name: string; roomName: string }> {
+): Promise<{ id: string; name: string; roomName: string; fragility: string | null }> {
   const box = await assertUserOwnsBox(boxId, userId);
   const roomName = await getRoomNameByLocationId(box.location_id, userId);
 
@@ -144,7 +168,22 @@ async function getBoxActivityContext(
     id: box.id,
     name: box.name,
     roomName,
+    fragility: box.fragility,
   };
+}
+
+async function markBoxFragileIfNeeded(boxContext: { id: string; fragility: string | null }, userId: string): Promise<void> {
+  if (normalizeBoxFragility(boxContext.fragility)) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("boxes")
+    .update({ fragility: "fragile" })
+    .eq("id", boxContext.id)
+    .eq("user_id", userId);
+
+  if (error) throw error;
 }
 
 async function listItemsByBox(boxId: string): Promise<ItemSummary[]> {
@@ -155,7 +194,7 @@ async function listItemsByBox(boxId: string): Promise<ItemSummary[]> {
 
   const { data, error } = await supabase
     .from("items")
-    .select("id,name,notes,quantity,box_id,created_at,updated_at")
+    .select("id,name,notes,quantity,is_fragile,box_id,created_at,updated_at")
     .eq("user_id", userId)
     .eq("box_id", normalizedBoxId)
     .order("created_at", { ascending: true });
@@ -168,6 +207,7 @@ async function listItemsByBox(boxId: string): Promise<ItemSummary[]> {
 async function createItem(input: CreateItemInput): Promise<string> {
   const name = normalizeName(input.name);
   const quantity = normalizeQuantity(input.quantity);
+  const isFragile = normalizeItemFragility(input.isFragile);
   const notes = normalizeNotes(input.notes);
   const boxId = normalizeBoxId(input.boxId);
   const userId = await getCurrentUserId();
@@ -181,6 +221,7 @@ async function createItem(input: CreateItemInput): Promise<string> {
       box_id: boxId,
       name,
       quantity,
+      is_fragile: isFragile,
       notes,
     })
     .select("id")
@@ -189,6 +230,10 @@ async function createItem(input: CreateItemInput): Promise<string> {
   if (error) throw error;
   if (!data?.id) {
     throw new Error("Failed to create item.");
+  }
+
+  if (isFragile) {
+    await markBoxFragileIfNeeded(targetBox, userId);
   }
 
   await activityService.writeActivitySafely({
@@ -202,6 +247,7 @@ async function createItem(input: CreateItemInput): Promise<string> {
     next: {
       name,
       quantity,
+      isFragile,
       notes,
       boxId: targetBox.id,
       boxName: targetBox.name,
@@ -216,6 +262,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
   const normalizedItemId = itemId.trim();
   const name = normalizeName(input.name);
   const quantity = normalizeQuantity(input.quantity);
+  const isFragile = normalizeItemFragility(input.isFragile);
   const notes = normalizeNotes(input.notes);
   const boxId = normalizeBoxId(input.boxId);
 
@@ -226,7 +273,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
   const userId = await getCurrentUserId();
   const { data: itemBeforeUpdate, error: itemBeforeUpdateError } = await supabase
     .from("items")
-    .select("id,name,notes,quantity,box_id")
+    .select("id,name,notes,quantity,is_fragile,box_id")
     .eq("id", normalizedItemId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -247,6 +294,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
     .update({
       name,
       quantity,
+      is_fragile: isFragile,
       notes,
       box_id: boxId,
     })
@@ -265,15 +313,26 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
     typeof itemBeforeUpdate.quantity === "number" && itemBeforeUpdate.quantity > 0
       ? itemBeforeUpdate.quantity
       : 1;
+  const previousIsFragile = itemBeforeUpdate.is_fragile === true;
   const previousNotes = itemBeforeUpdate.notes?.trim() || null;
   const hasNameChanged = previousName !== name;
   const hasQuantityChanged = previousQuantity !== quantity;
+  const hasFragilityChanged = previousIsFragile !== isFragile;
   const hasNotesChanged = previousNotes !== notes;
   const hasBoxChanged = itemBeforeUpdate.box_id !== boxId;
-  const hasAnyChange = hasNameChanged || hasQuantityChanged || hasNotesChanged || hasBoxChanged;
+  const hasAnyChange =
+    hasNameChanged || hasQuantityChanged || hasFragilityChanged || hasNotesChanged || hasBoxChanged;
 
   if (!hasAnyChange) {
+    if (isFragile) {
+      await markBoxFragileIfNeeded(targetBox, userId);
+    }
+
     return;
+  }
+
+  if (isFragile) {
+    await markBoxFragileIfNeeded(targetBox, userId);
   }
 
   if (hasBoxChanged) {
@@ -294,6 +353,7 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
         boxId: targetBox.id,
         boxName: targetBox.name,
         roomName: targetBox.roomName,
+        isFragile,
       },
     });
     return;
@@ -305,6 +365,9 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
   }
   if (hasQuantityChanged) {
     changeDetails.push(`quantity changed to ${quantity}`);
+  }
+  if (hasFragilityChanged) {
+    changeDetails.push(isFragile ? "marked as fragile" : "marked as not fragile");
   }
   if (hasNotesChanged) {
     changeDetails.push(notes ? "notes updated" : "notes cleared");
@@ -324,11 +387,13 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
     previous: {
       name: previousName,
       quantity: previousQuantity,
+      isFragile: previousIsFragile,
       notes: previousNotes,
     },
     next: {
       name,
       quantity,
+      isFragile,
       notes,
     },
   });
@@ -343,7 +408,7 @@ async function deleteItem(itemId: string): Promise<void> {
   const userId = await getCurrentUserId();
   const { data: itemBeforeDelete, error: itemBeforeDeleteError } = await supabase
     .from("items")
-    .select("id,name,notes,quantity,box_id")
+    .select("id,name,notes,quantity,is_fragile,box_id")
     .eq("id", normalizedItemId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -385,6 +450,7 @@ async function deleteItem(itemId: string): Promise<void> {
     previous: {
       name: itemName,
       quantity,
+      isFragile: itemBeforeDelete.is_fragile === true,
       notes: itemBeforeDelete.notes?.trim() || null,
       boxId: boxContext.id,
       boxName: boxContext.name,

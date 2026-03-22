@@ -8,7 +8,7 @@ export type InventoryBox = {
   label: string;
   room: string;
   itemsCount: number;
-  fragileCount: number;
+  isFragile: boolean;
   status: InventoryBoxStatus;
   updatedAt: string;
 };
@@ -22,6 +22,8 @@ type BoxCardProps = {
 
 export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxCardProps) {
   const isPacked = box.status === "Packed";
+  const fragilePillClassName = box.isFragile ? "bg-amber-500/20" : "bg-slate-500/20";
+  const fragileTextClassName = box.isFragile ? "text-amber-300" : "text-slate-300";
 
   return (
     <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
@@ -30,20 +32,26 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
           <Text className="text-base font-bold text-text-primary">{box.label}</Text>
           <Text className="mt-1 text-xs text-text-tertiary">{box.room}</Text>
         </View>
-        <View
-          className={`rounded-full px-3 py-1 ${
-            isPacked ? "bg-emerald/20" : "bg-crimson/20"
-          }`}
-        >
-          <Text className={`text-xs font-semibold ${isPacked ? "text-emerald" : "text-crimson"}`}>
-            {box.status}
-          </Text>
+        <View className="flex-row flex-wrap justify-end gap-2">
+          <View
+            className={`rounded-full px-3 py-1 ${
+              isPacked ? "bg-emerald/20" : "bg-crimson/20"
+            }`}
+          >
+            <Text className={`text-xs font-semibold ${isPacked ? "text-emerald" : "text-crimson"}`}>
+              {box.status}
+            </Text>
+          </View>
+          <View className={`rounded-full px-3 py-1 ${fragilePillClassName}`}>
+            <Text className={`text-xs font-semibold ${fragileTextClassName}`}>
+              {box.isFragile ? "Fragile" : "Not fragile"}
+            </Text>
+          </View>
         </View>
       </View>
 
       <View className="mt-4 flex-row flex-wrap gap-2">
         <MetaPill icon="archive" text={`${box.itemsCount} items`} />
-        <MetaPill icon="alert-circle" text={`${box.fragileCount} fragile`} />
         <MetaPill icon="clock" text={box.updatedAt} />
       </View>
 

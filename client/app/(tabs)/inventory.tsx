@@ -123,6 +123,7 @@ export default function InventoryTabScreen() {
   const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [newItemIsFragile, setNewItemIsFragile] = useState(false);
   const [newItemNotes, setNewItemNotes] = useState("");
   const [newItemBoxId, setNewItemBoxId] = useState("");
   const [createItemError, setCreateItemError] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export default function InventoryTabScreen() {
         label: box.name,
         room: box.locationName,
         itemsCount: box.itemsCount,
-        fragileCount: box.isFragile ? 1 : 0,
+        isFragile: box.isFragile,
         status: mapBoxStatus(box.status),
         updatedAt: formatUpdatedAt(box.updatedAt),
       })),
@@ -194,7 +195,7 @@ export default function InventoryTabScreen() {
 
       const matchesStatus =
         activeStatus === "All" ||
-        (activeStatus === "Fragile" ? box.fragileCount > 0 : box.status === activeStatus);
+        (activeStatus === "Fragile" ? box.isFragile : box.status === activeStatus);
 
       const matchesRoom = activeRoom === "All" || box.room === activeRoom;
 
@@ -224,6 +225,7 @@ export default function InventoryTabScreen() {
     setCreateItemError(null);
     setNewItemName("");
     setNewItemQuantity("1");
+    setNewItemIsFragile(false);
     setNewItemNotes("");
     setNewItemBoxId(summaryBoxes[0]?.id ?? "");
     setIsCreateItemModalOpen(true);
@@ -316,6 +318,7 @@ export default function InventoryTabScreen() {
       await itemService.createItem({
         name: normalizedName,
         quantity: parsedQuantity,
+        isFragile: newItemIsFragile,
         notes: newItemNotes,
         boxId: newItemBoxId,
       });
@@ -328,7 +331,15 @@ export default function InventoryTabScreen() {
     } finally {
       setIsCreatingItem(false);
     }
-  }, [newItemBoxId, newItemName, newItemNotes, newItemQuantity, refreshBoxes, refreshLocations]);
+  }, [
+    newItemBoxId,
+    newItemIsFragile,
+    newItemName,
+    newItemNotes,
+    newItemQuantity,
+    refreshBoxes,
+    refreshLocations,
+  ]);
 
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
@@ -520,6 +531,34 @@ export default function InventoryTabScreen() {
             style={{ minHeight: 84, paddingTop: 12 }}
             maxLength={300}
           />
+        </View>
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Fragility</Text>
+          <View className="mt-2 flex-row gap-2">
+            <Pressable
+              onPress={() => setNewItemIsFragile(false)}
+              disabled={isCreatingItem}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                !newItemIsFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">Not fragile</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setNewItemIsFragile(true)}
+              disabled={isCreatingItem}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                newItemIsFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">Fragile</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View className="mt-4">

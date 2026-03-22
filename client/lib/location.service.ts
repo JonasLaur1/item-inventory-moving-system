@@ -21,6 +21,7 @@ type RoomDetailsBoxRow = {
   name: string;
   status: string | null;
   updated_at: string | null;
+  fragility: string | null;
   item_count: Array<{ count: number | null }> | null;
 };
 
@@ -42,6 +43,7 @@ export type LocationDetailsBox = {
   status: string | null;
   updatedAt: string | null;
   itemsCount: number;
+  isFragile: boolean;
 };
 
 export type LocationDetails = LocationSummary & {
@@ -69,6 +71,20 @@ function getNestedCount(value: BoxRow["item_count"]): number {
     const count = entry?.count;
     return total + (typeof count === "number" ? count : 0);
   }, 0);
+}
+
+function normalizeFragility(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === "none" || normalized === "normal" || normalized === "not_fragile") {
+    return false;
+  }
+
+  return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
 }
 
 function mapLocationSummaries(locations: LocationRow[], boxes: BoxRow[]): LocationSummary[] {
@@ -308,7 +324,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   const { data: boxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,name,status,updated_at,item_count:items(count)")
+    .select("id,name,status,updated_at,fragility,item_count:items(count)")
     .eq("location_id", normalizedLocationId)
     .order("created_at", { ascending: true });
 
@@ -324,6 +340,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
     status: box.status,
     updatedAt: box.updated_at,
     itemsCount: getNestedCount(box.item_count),
+    isFragile: normalizeFragility(box.fragility),
   }));
 
   const summary = mapLocationSummaries([location], [
