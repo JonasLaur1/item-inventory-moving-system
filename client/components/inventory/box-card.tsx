@@ -1,5 +1,7 @@
 import { MetaPill } from "@/components/ui/meta-pill";
+import { Feather } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
+import { Colors } from "@/constants/theme";
 
 export type InventoryBoxStatus = "Packed" | "Unpacked";
 
@@ -58,14 +60,16 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
       <View className={`mt-4 gap-3 ${compact ? "" : "flex-row"}`}>
         <Pressable
           onPress={onPressOpen ? () => onPressOpen(box) : undefined}
-          className="flex-1 items-center rounded-control border border-border-default bg-bg-input/60 py-2.5"
+          className="flex-1 flex-row items-center justify-center gap-1.5 rounded-control border border-border-default bg-bg-input/60 py-2.5"
         >
+          <Feather name="eye" size={13} color={Colors.dark.textSecondary} />
           <Text className="text-xs font-semibold text-text-secondary">Open</Text>
         </Pressable>
         <Pressable
           onPress={onPressEdit ? () => onPressEdit(box) : undefined}
-          className="flex-1 items-center rounded-control border border-border-default bg-bg-input/60 py-2.5"
+          className="flex-1 flex-row items-center justify-center gap-1.5 rounded-control border border-border-default bg-bg-input/60 py-2.5"
         >
+          <Feather name="edit-2" size={13} color={Colors.dark.textSecondary} />
           <Text className="text-xs font-semibold text-text-secondary">Edit</Text>
         </Pressable>
       </View>

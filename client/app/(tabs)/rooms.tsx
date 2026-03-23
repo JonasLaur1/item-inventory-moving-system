@@ -15,7 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, type ViewStyle } from "react-native";
+import { ActivityIndicator, RefreshControl, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
 type RoomStatus = "Done" | "Packing" | "Started" | "Empty";
@@ -140,12 +140,6 @@ export default function RoomsTabScreen() {
     [filteredLocations],
   );
 
-  const packedPercentage = useMemo(() => {
-    const totalBoxes = filteredLocations.reduce((total, location) => total + location.boxes, 0);
-    const packedBoxes = filteredLocations.reduce((total, location) => total + location.packedBoxes, 0);
-    return totalBoxes === 0 ? 0 : Math.round((packedBoxes / totalBoxes) * 100);
-  }, [filteredLocations]);
-
   const canExpand = filteredLocations.length > PREVIEW_LOCATIONS_COUNT;
   const visibleLocations = showAllLocations
     ? filteredLocations
@@ -154,7 +148,10 @@ export default function RoomsTabScreen() {
   const openModal = useCallback(() => setIsModalOpen(true), []);
 
   return (
-    <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
+    <TabScreenLayout
+      horizontalPadding={isCompact ? 16 : 20}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void refreshLocations()} />}
+    >
       {errorMessage ? (
         <RetryErrorCard
           message={errorMessage}
@@ -165,20 +162,11 @@ export default function RoomsTabScreen() {
         />
       ) : null}
 
-      <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>
+      <View className="mt-6">
         <MetricCard
           label="Total Items"
           value={String(totalItems)}
           hint={`${filteredLocations.length} locations`}
-          className="flex-1"
-          valueClassName="text-[30px] font-black leading-[34px] text-text-primary"
-        />
-        <MetricCard
-          label="Packed"
-          value={`${packedPercentage}%`}
-          hint="By box completion"
-          progress={packedPercentage}
-          className="flex-1"
           valueClassName="text-[30px] font-black leading-[34px] text-text-primary"
         />
       </View>

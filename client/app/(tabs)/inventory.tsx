@@ -169,16 +169,12 @@ export default function InventoryTabScreen() {
   }, [locations, selectedLocationId]);
 
   const locationScopedSummaryBoxes = useMemo(() => {
-    if (locations.length <= 1) {
+    if (!selectedLocationId) {
       return summaryBoxes;
     }
 
-    if (!selectedLocationId) {
-      return [];
-    }
-
     return summaryBoxes.filter((box) => box.parentLocationId === selectedLocationId);
-  }, [locations.length, selectedLocationId, summaryBoxes]);
+  }, [selectedLocationId, summaryBoxes]);
 
   const availableRoomsForBox = useMemo(() => {
     if (locations.length === 0) {
@@ -246,8 +242,14 @@ export default function InventoryTabScreen() {
   const totalItemsCount = locationScopedSummaryBoxes.reduce((total, box) => total + box.itemsCount, 0);
   const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
   const roomFilters = useMemo(
-    () => ["All", ...Array.from(new Set(boxes.map((box) => box.room))).sort((a, b) => a.localeCompare(b))],
-    [boxes],
+    () => [
+      "All",
+      ...rooms
+        .filter((r) => r.locationId === selectedLocationId)
+        .map((r) => `${r.locationName} / ${r.name}`)
+        .sort((a, b) => a.localeCompare(b)),
+    ],
+    [rooms, selectedLocationId],
   );
 
   useEffect(() => {
@@ -510,93 +512,48 @@ export default function InventoryTabScreen() {
         />
       </View>
 
-      {locations.length === 1 ? (
-        <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="flex-1">
-              <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-              <Text className="mt-1 text-sm font-semibold text-text-primary">{selectedLocationName}</Text>
-            </View>
-            <Button
-              label="Add Another"
-              variant="secondary"
-              onPress={() => setIsCreateLocationModalOpen(true)}
-            />
-          </View>
+      <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
+          <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
+            <Text className="text-xs font-semibold text-text-link">Add Location</Text>
+          </Pressable>
         </View>
-      ) : null}
 
-      {locations.length === 2 ? (
-        <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-            <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
-              <Text className="text-xs font-semibold text-text-link">Add Location</Text>
-            </Pressable>
-          </View>
-          <View className="mt-3 flex-row gap-2">
+        <Pressable
+          onPress={() => setIsLocationDropdownOpen((prev) => !prev)}
+          className="mt-3 flex-row items-center justify-between rounded-control border border-border-default bg-bg-input/60 px-3 py-2.5"
+        >
+          <Text className="text-sm font-semibold text-text-primary">{selectedLocationName}</Text>
+          <Feather
+            name={isLocationDropdownOpen ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={Colors.dark.textSecondary}
+          />
+        </Pressable>
+
+        {isLocationDropdownOpen ? (
+          <View className="mt-2 gap-2">
             {locations.map((location) => {
               const isActive = location.id === selectedLocationId;
               return (
                 <Pressable
                   key={location.id}
-                  onPress={() => setSelectedLocationId(location.id)}
-                  className={`flex-1 rounded-control border px-3 py-2.5 ${
+                  onPress={() => {
+                    setSelectedLocationId(location.id);
+                    setIsLocationDropdownOpen(false);
+                  }}
+                  className={`rounded-control border px-3 py-2.5 ${
                     isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
                   }`}
                 >
-                  <Text className="text-center text-sm font-semibold text-text-primary">{location.name}</Text>
+                  <Text className="text-sm font-semibold text-text-primary">{location.name}</Text>
                 </Pressable>
               );
             })}
           </View>
-        </View>
-      ) : null}
-
-      {locations.length > 2 ? (
-        <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-            <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
-              <Text className="text-xs font-semibold text-text-link">Add Location</Text>
-            </Pressable>
-          </View>
-
-          <Pressable
-            onPress={() => setIsLocationDropdownOpen((prev) => !prev)}
-            className="mt-3 flex-row items-center justify-between rounded-control border border-border-default bg-bg-input/60 px-3 py-2.5"
-          >
-            <Text className="text-sm font-semibold text-text-primary">{selectedLocationName}</Text>
-            <Feather
-              name={isLocationDropdownOpen ? "chevron-up" : "chevron-down"}
-              size={16}
-              color={Colors.dark.textSecondary}
-            />
-          </Pressable>
-
-          {isLocationDropdownOpen ? (
-            <View className="mt-2 gap-2">
-              {locations.map((location) => {
-                const isActive = location.id === selectedLocationId;
-                return (
-                  <Pressable
-                    key={location.id}
-                    onPress={() => {
-                      setSelectedLocationId(location.id);
-                      setIsLocationDropdownOpen(false);
-                    }}
-                    className={`rounded-control border px-3 py-2.5 ${
-                      isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
-                    }`}
-                  >
-                    <Text className="text-sm font-semibold text-text-primary">{location.name}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
       <View className="mt-6 flex-row gap-3">
         <SearchBar

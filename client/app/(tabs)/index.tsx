@@ -1,4 +1,3 @@
-import { Colors } from "@/constants/theme";
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
@@ -15,8 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Text, View, useWindowDimensions } from "react-native";
-import Svg, { Circle } from "react-native-svg";
+import { RefreshControl, Text, View, useWindowDimensions } from "react-native";
 
 type LocationCard = {
   id: string;
@@ -119,26 +117,6 @@ export default function HomeTabScreen() {
     [locations],
   );
 
-  const totalBoxes = useMemo(
-    () => locationsForCards.reduce((total, location) => total + location.total, 0),
-    [locationsForCards],
-  );
-  const packedBoxes = useMemo(
-    () => locationsForCards.reduce((total, location) => total + location.packed, 0),
-    [locationsForCards],
-  );
-  const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
-  const boxesLeft = totalBoxes - packedBoxes;
-
-  const progress = useMemo(() => {
-    const radius = 88;
-    const strokeWidth = 18;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference * (1 - percentage / 100);
-
-    return { radius, strokeWidth, circumference, offset };
-  }, [percentage]);
-
   const visibleLocations = showAllLocations ? locationsForCards : locationsForCards.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
@@ -159,44 +137,15 @@ export default function HomeTabScreen() {
   );
 
   return (
-    <TabScreenLayout horizontalPadding={20}>
-      <View className="mt-8 items-center">
-        <View className="relative h-[220px] w-[220px] items-center justify-center">
-          <Svg width={220} height={220} viewBox="0 0 220 220">
-            <Circle
-              cx={110}
-              cy={110}
-              r={progress.radius}
-              stroke={Colors.dark.borderDefault}
-              strokeWidth={progress.strokeWidth}
-              fill="none"
-            />
-            <Circle
-              cx={110}
-              cy={110}
-              r={progress.radius}
-              stroke={Colors.dark.primary}
-              strokeWidth={progress.strokeWidth}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray={progress.circumference}
-              strokeDashoffset={progress.offset}
-              transform="rotate(-90 110 110)"
-            />
-          </Svg>
-
-          <View className="absolute items-center">
-            <Text className="text-5xl font-black text-text-primary">{percentage}%</Text>
-            <Text className="mt-1 text-xs uppercase tracking-[2px] text-text-tertiary">
-              Packed
-            </Text>
-            <Text className="mt-3 text-base font-bold text-text-primary">
-              {boxesLeft} Boxes Left
-            </Text>
-          </View>
-        </View>
-      </View>
-
+    <TabScreenLayout
+      horizontalPadding={20}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing || isActivityRefreshing}
+          onRefresh={() => void Promise.all([refreshLocations(), refreshActivity()])}
+        />
+      }
+    >
       <View className="mt-8 flex-row gap-3">
         <QuickActionCard
           title="Add Location"

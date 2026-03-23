@@ -199,7 +199,7 @@ constants/            -> design-tokens.json, theme.ts
 ### Generic UI (`components/ui/`)
 | Component | Purpose |
 |-----------|---------|
-| `TabScreenLayout` | Wrapper for tab screens (SafeAreaView + optional ScrollView) |
+| `TabScreenLayout` | Wrapper for tab screens (SafeAreaView + optional ScrollView + optional `refreshControl`) |
 | `AppModal` | Modal/dialog |
 | `EmptyStateCard` | Empty state fallback |
 | `RetryErrorCard` | Error state with retry button |
@@ -370,12 +370,7 @@ The `box_status` enum needs to be extended from 2 to 4 values:
 
 > The DB enum must be updated before implementing this. Flag it when working on this feature.
 
-### 2. Packed progress % moved to room level
-- Currently progress % is shown at the location level.
-- Move it to the **room level** — each room card shows its own packing progress (packed boxes / total boxes).
-- Location page no longer shows overall %.
-
-### 3. Location creation flow with room setup
+### 2. Location creation flow with room setup
 When a user creates a new location:
 1. They are prompted to add rooms to that location immediately (not later).
 2. Generic room name **suggestions** are offered: Bedroom, Kitchen, Bathroom, Living Room, Garage, Storage, etc.
@@ -383,20 +378,20 @@ When a user creates a new location:
 4. Room management is only accessible through **Settings → Location Configuration**.
 5. The Rooms tab must **not** have an "Add Room" button.
 
-### 4. Moving mode
+### 3. Moving mode
 - A **"Start Moving"** button is available somewhere in the app.
 - It is only active when the user has **at least 2 locations**.
 - With only 1 location, the app behaves as a simple inventory/list maker — no moving-related UI is shown.
 - When moving mode is active, a **progress bar** appears on the home screen showing overall delivery progress.
 - Moving mode affects QR scan behavior (see below).
 
-### 5. QR scan — delivery confirmation modal
+### 4. QR scan — delivery confirmation modal
 - The QR scanner tab stays in the bottom navigation.
 - When a box QR code is scanned **during moving mode**, a modal appears asking: "Was this box delivered correctly?"
 - Confirming changes the box status to `delivered`.
 - Outside of moving mode, scanning a QR code just navigates to the box detail screen as before.
 
-### 6. Fragile display
+### 5. Fragile display
 - Instead of showing a numeric count (e.g. "0 fragile"), show a label: **"Fragile"** or **"Not fragile"**.
 - Already partially implemented — verify consistency across all screens.
 

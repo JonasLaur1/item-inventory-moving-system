@@ -163,6 +163,8 @@ export default function RoomDetailsScreen() {
     setEditedRoomName(room.name);
   }, [room, isEditingName]);
 
+  const hasBoxes = (room?.boxList?.length ?? 0) > 0;
+
   const boxes: InventoryBox[] = useMemo(() => {
     if (!room) {
       return [];
@@ -436,8 +438,8 @@ export default function RoomDetailsScreen() {
                           <Pressable
                             onPress={openDeleteModal}
                             hitSlop={8}
-                            className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
-                            disabled={isDeletingRoom}
+                            className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasBoxes ? "opacity-40" : ""}`}
+                            disabled={isDeletingRoom || hasBoxes}
                           >
                             <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
                           </Pressable>
@@ -446,6 +448,10 @@ export default function RoomDetailsScreen() {
                     </View>
                   </View>
                 </View>
+
+                {hasBoxes ? (
+                  <Text className="mt-2 text-xs text-text-tertiary">Remove all boxes before deleting this room.</Text>
+                ) : null}
 
                 <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
                   <MetricCard
