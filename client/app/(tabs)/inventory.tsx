@@ -3,6 +3,7 @@ import { FormInput } from "@/components/form-input";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
+import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { FilterGroup } from "@/components/ui/filter-group";
@@ -108,11 +109,8 @@ export default function InventoryTabScreen() {
     locations,
     isLoading: isLocationsLoading,
     isRefreshing: isLocationsRefreshing,
-    isCreating: isCreatingLocation,
     errorMessage: locationErrorMessage,
     refreshLocations,
-    createLocation,
-    clearError: clearLocationError,
   } = useLocations();
   const { rooms, isLoading: isRoomsLoading, refreshRooms } = useRooms();
 
@@ -123,9 +121,7 @@ export default function InventoryTabScreen() {
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
 
-  const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState(false);
-  const [newLocationName, setNewLocationName] = useState("");
-  const [createLocationError, setCreateLocationError] = useState<string | null>(null);
+  const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState("");
@@ -323,22 +319,6 @@ export default function InventoryTabScreen() {
     setCreateItemError(null);
   }, [isCreatingItem]);
 
-  const openAddLocationModal = useCallback(() => {
-    clearLocationError();
-    setCreateLocationError(null);
-    setNewLocationName("");
-    setIsAddLocationModalOpen(true);
-  }, [clearLocationError]);
-
-  const closeAddLocationModal = useCallback(() => {
-    if (isCreatingLocation) {
-      return;
-    }
-
-    setIsAddLocationModalOpen(false);
-    setCreateLocationError(null);
-  }, [isCreatingLocation]);
-
   const shouldOpenCreateModal = useMemo(() => {
     if (!params.create) {
       return false;
@@ -356,37 +336,6 @@ export default function InventoryTabScreen() {
     openCreateModal();
     router.setParams({ create: undefined });
   }, [openCreateModal, router, shouldOpenCreateModal]);
-
-  const handleCreateLocation = useCallback(
-    async (closeModalAfterCreate: boolean) => {
-      const normalizedName = newLocationName.trim();
-
-      if (!normalizedName) {
-        setCreateLocationError("Location name is required.");
-        return;
-      }
-
-      setCreateLocationError(null);
-
-      try {
-        await createLocation(normalizedName);
-        await Promise.all([refreshLocations(), refreshRooms()]);
-        setNewLocationName("");
-
-        if (closeModalAfterCreate) {
-          setIsAddLocationModalOpen(false);
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          setCreateLocationError(error.message);
-          return;
-        }
-
-        setCreateLocationError("Failed to create location.");
-      }
-    },
-    [createLocation, newLocationName, refreshLocations, refreshRooms],
-  );
 
   const handleCreateBox = async () => {
     const normalizedName = newBoxName.trim();
@@ -485,35 +434,24 @@ export default function InventoryTabScreen() {
           />
         ) : null}
 
-        <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-          <Text className="text-base font-semibold text-text-primary">Create your first location</Text>
-          <Text className="mt-1 text-xs text-text-tertiary">
-            You need at least one location before organizing rooms and boxes.
-          </Text>
+        <EmptyStateCard
+          title="No locations yet"
+          description="Create your first location to start organizing rooms and boxes."
+          containerClassName="mt-6"
+        />
+        <Button
+          label="Create Location"
+          onPress={() => setIsCreateLocationModalOpen(true)}
+          className="mt-4"
+        />
 
-          <View className="mt-4">
-            <FormInput
-              value={newLocationName}
-              onChangeText={setNewLocationName}
-              placeholder="Location name (e.g. Home)"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={60}
-              editable={!isCreatingLocation}
-            />
-          </View>
-
-          {createLocationError ? (
-            <Text className="mt-2 text-xs text-text-tertiary">{createLocationError}</Text>
-          ) : null}
-
-          <Button
-            label={isCreatingLocation ? "Creating..." : "Create Location"}
-            onPress={() => void handleCreateLocation(false)}
-            disabled={isCreatingLocation}
-            className="mt-4"
-          />
-        </View>
+        <CreateLocationModal
+          visible={isCreateLocationModalOpen}
+          onClose={() => {
+            setIsCreateLocationModalOpen(false);
+            void refreshLocations();
+          }}
+        />
       </TabScreenLayout>
     );
   }
@@ -582,8 +520,7 @@ export default function InventoryTabScreen() {
             <Button
               label="Add Another"
               variant="secondary"
-              onPress={openAddLocationModal}
-              disabled={isCreatingLocation}
+              onPress={() => setIsCreateLocationModalOpen(true)}
             />
           </View>
         </View>
@@ -593,7 +530,7 @@ export default function InventoryTabScreen() {
         <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
           <View className="flex-row items-center justify-between">
             <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-            <Pressable onPress={openAddLocationModal}>
+            <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
               <Text className="text-xs font-semibold text-text-link">Add Location</Text>
             </Pressable>
           </View>
@@ -620,7 +557,7 @@ export default function InventoryTabScreen() {
         <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
           <View className="flex-row items-center justify-between">
             <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-            <Pressable onPress={openAddLocationModal}>
+            <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
               <Text className="text-xs font-semibold text-text-link">Add Location</Text>
             </Pressable>
           </View>
@@ -758,43 +695,13 @@ export default function InventoryTabScreen() {
         </View>
       </View>
 
-      <AppModal
-        visible={isAddLocationModalOpen}
-        title="Create location"
-        description="Add another location to organize rooms and boxes."
-        onRequestClose={closeAddLocationModal}
-        maxWidth={420}
-      >
-        <FormInput
-          value={newLocationName}
-          onChangeText={setNewLocationName}
-          placeholder="Location name (e.g. Destination House)"
-          autoCapitalize="words"
-          autoCorrect={false}
-          editable={!isCreatingLocation}
-          maxLength={60}
-        />
-
-        {createLocationError ? (
-          <Text className="mt-3 text-xs text-crimson">{createLocationError}</Text>
-        ) : null}
-
-        <View className={`${createLocationError ? "mt-4" : "mt-5"} flex-row gap-3`}>
-          <Button
-            label="Cancel"
-            variant="secondary"
-            onPress={closeAddLocationModal}
-            disabled={isCreatingLocation}
-            className="flex-1"
-          />
-          <Button
-            label={isCreatingLocation ? "Creating..." : "Create"}
-            onPress={() => void handleCreateLocation(true)}
-            disabled={isCreatingLocation}
-            className="flex-1"
-          />
-        </View>
-      </AppModal>
+      <CreateLocationModal
+        visible={isCreateLocationModalOpen}
+        onClose={() => {
+          setIsCreateLocationModalOpen(false);
+          void Promise.all([refreshLocations(), refreshRooms()]);
+        }}
+      />
 
       <AppModal
         visible={isCreateItemModalOpen}

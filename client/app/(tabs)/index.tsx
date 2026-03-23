@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/theme";
+import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
@@ -77,6 +78,7 @@ export default function HomeTabScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const [showAllLocations, setShowAllLocations] = useState(false);
+  const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
   const {
     locations,
     isLoading,
@@ -201,12 +203,7 @@ export default function HomeTabScreen() {
           subtitle="Create New Location"
           icon="plus"
           variant="primary"
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/rooms",
-              params: { create: "1" },
-            })
-          }
+          onPress={() => setIsCreateLocationModalOpen(true)}
         />
         <QuickActionCard
           title="Add Box"
@@ -314,6 +311,10 @@ export default function HomeTabScreen() {
           )}
         </View>
       </View>
+      <CreateLocationModal
+        visible={isCreateLocationModalOpen}
+        onClose={() => setIsCreateLocationModalOpen(false)}
+      />
     </TabScreenLayout>
   );
 }

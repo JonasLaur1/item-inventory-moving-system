@@ -264,7 +264,7 @@ async function listLocationSummaries(): Promise<LocationSummary[]> {
   return mapLocationSummaries(locations, aggregation);
 }
 
-async function createLocation(input: string | CreateLocationInput): Promise<void> {
+async function createLocation(input: string | CreateLocationInput): Promise<{ id: string }> {
   const normalizedInput = typeof input === "string" ? { name: input } : input;
 
   const trimmedName = normalizedInput.name.trim();
@@ -299,6 +299,8 @@ async function createLocation(input: string | CreateLocationInput): Promise<void
     locationName: trimmedName,
     next: { name: trimmedName, kind },
   });
+
+  return { id: data.id };
 }
 
 async function updateLocation(locationId: string, input: UpdateLocationInput): Promise<void> {

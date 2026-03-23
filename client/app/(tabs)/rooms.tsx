@@ -1,4 +1,3 @@
-import { Button } from "@/components/button";
 import { DashboardCard } from "@/components/home/dashboard-card";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { SectionHeader } from "@/components/home/section-header";
@@ -8,15 +7,15 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
-import { FormInput } from "@/components/form-input";
+import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { Colors } from "@/constants/theme";
 import { useLocations } from "@/hooks/use-locations";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Text, type ViewStyle } from "react-native";
+import { useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, type ViewStyle } from "react-native";
 import { View, useWindowDimensions } from "react-native";
 
 type RoomStatus = "Done" | "Packing" | "Started" | "Empty";
@@ -80,7 +79,6 @@ function AddLocationCard({
 
 export default function RoomsTabScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ create?: string | string[] }>();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
 
@@ -88,18 +86,13 @@ export default function RoomsTabScreen() {
     locations,
     isLoading,
     isRefreshing,
-    isCreating,
     errorMessage,
     refreshLocations,
-    createLocation,
-    clearError,
   } = useLocations();
 
   const [search, setSearch] = useState("");
   const [showAllLocations, setShowAllLocations] = useState(false);
-  const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
-  const [newLocationName, setNewLocationName] = useState("");
-  const [createLocationError, setCreateLocationError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const hasFocusedOnceRef = useRef(false);
 
   useFocusEffect(
@@ -158,58 +151,7 @@ export default function RoomsTabScreen() {
     ? filteredLocations
     : filteredLocations.slice(0, PREVIEW_LOCATIONS_COUNT);
 
-  const openCreateLocationForm = useCallback(() => {
-    clearError();
-    setCreateLocationError(null);
-    setIsCreateLocationOpen(true);
-  }, [clearError]);
-
-  const closeCreateLocationForm = useCallback(() => {
-    setIsCreateLocationOpen(false);
-    setCreateLocationError(null);
-    setNewLocationName("");
-  }, []);
-
-  const shouldOpenCreateForm = useMemo(() => {
-    if (!params.create) {
-      return false;
-    }
-
-    const normalizedValue = Array.isArray(params.create) ? params.create[0] ?? "" : params.create;
-    return normalizedValue === "1" || normalizedValue.toLowerCase() === "true";
-  }, [params.create]);
-
-  useEffect(() => {
-    if (!shouldOpenCreateForm) {
-      return;
-    }
-
-    openCreateLocationForm();
-    router.setParams({ create: undefined });
-  }, [openCreateLocationForm, router, shouldOpenCreateForm]);
-
-  const handleCreateLocation = async () => {
-    const normalizedName = newLocationName.trim();
-
-    if (!normalizedName) {
-      setCreateLocationError("Location name is required.");
-      return;
-    }
-
-    setCreateLocationError(null);
-
-    try {
-      await createLocation(normalizedName);
-      closeCreateLocationForm();
-    } catch (error) {
-      if (error instanceof Error) {
-        setCreateLocationError(error.message);
-        return;
-      }
-
-      setCreateLocationError("Failed to create location.");
-    }
-  };
+  const openModal = useCallback(() => setIsModalOpen(true), []);
 
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
@@ -256,39 +198,6 @@ export default function RoomsTabScreen() {
           onPressAction={canExpand ? () => setShowAllLocations((prev) => !prev) : undefined}
         />
 
-        {isCreateLocationOpen ? (
-          <View className="mt-4 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-            <FormInput
-              value={newLocationName}
-              onChangeText={setNewLocationName}
-              placeholder="Location name (e.g. Home)"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={60}
-            />
-
-            {createLocationError ? (
-              <Text className="mt-2 text-xs text-text-tertiary">{createLocationError}</Text>
-            ) : null}
-
-            <View className="mt-4 flex-row gap-3">
-              <Button
-                label={isCreating ? "Creating..." : "Create Location"}
-                onPress={() => void handleCreateLocation()}
-                disabled={isCreating}
-                className="flex-1"
-              />
-              <Button
-                label="Cancel"
-                variant="secondary"
-                onPress={closeCreateLocationForm}
-                disabled={isCreating}
-                className="flex-1"
-              />
-            </View>
-          </View>
-        ) : null}
-
         {isLoading && mappedLocations.length === 0 ? (
           <View className="mt-6 items-center">
             <ActivityIndicator />
@@ -313,8 +222,8 @@ export default function RoomsTabScreen() {
             footer={(contentStyle) => (
               <AddLocationCard
                 style={contentStyle}
-                onPress={openCreateLocationForm}
-                disabled={isCreating}
+                onPress={openModal}
+                disabled={false}
               />
             )}
           />
@@ -333,6 +242,13 @@ export default function RoomsTabScreen() {
         ) : null}
       </View>
 
+      <CreateLocationModal
+        visible={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          void refreshLocations();
+        }}
+      />
     </TabScreenLayout>
   );
 }
