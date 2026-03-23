@@ -9,7 +9,6 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
 import { locationService, type LocationDetails } from "@/lib/location.service";
-import { roomService } from "@/lib/room.service";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -66,11 +65,6 @@ export default function LocationDetailsScreen() {
   const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [deleteLocationError, setDeleteLocationError] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-
-  const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
-  const [newRoomName, setNewRoomName] = useState("");
-  const [createRoomError, setCreateRoomError] = useState<string | null>(null);
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   const loadLocation = useCallback(
     async (refresh: boolean) => {
@@ -233,56 +227,6 @@ export default function LocationDetailsScreen() {
     setDeleteLocationError(null);
   }, [isDeletingLocation]);
 
-  const openCreateRoomModal = useCallback(() => {
-    if (!location) {
-      return;
-    }
-
-    setCreateRoomError(null);
-    setNewRoomName("");
-    setIsCreateRoomModalOpen(true);
-  }, [location]);
-
-  const closeCreateRoomModal = useCallback(() => {
-    if (isCreatingRoom) {
-      return;
-    }
-
-    setIsCreateRoomModalOpen(false);
-    setCreateRoomError(null);
-  }, [isCreatingRoom]);
-
-  const createRoom = useCallback(async () => {
-    if (!location) {
-      return;
-    }
-
-    const normalizedName = newRoomName.trim();
-    if (!normalizedName) {
-      setCreateRoomError("Room name is required.");
-      return;
-    }
-
-    setIsCreatingRoom(true);
-    setCreateRoomError(null);
-
-    try {
-      const roomId = await roomService.createRoom({
-        locationId: location.id,
-        name: normalizedName,
-      });
-
-      setIsCreateRoomModalOpen(false);
-      await loadLocation(true);
-      router.push({ pathname: "/room/[id]", params: { id: roomId } });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create room.";
-      setCreateRoomError(message);
-    } finally {
-      setIsCreatingRoom(false);
-    }
-  }, [loadLocation, location, newRoomName, router]);
-
   if (isLoading && !location) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -423,7 +367,7 @@ export default function LocationDetailsScreen() {
             </View>
 
             <View className="mt-8">
-              <SectionHeader title="Rooms" actionLabel="Add Room" onPressAction={openCreateRoomModal} />
+              <SectionHeader title="Rooms" />
               {locationRooms.length > 0 ? (
                 <CardGrid
                   items={locationRooms}
@@ -443,8 +387,8 @@ export default function LocationDetailsScreen() {
                 />
               ) : (
                 <EmptyStateCard
-                  title="No rooms yet"
-                  description="Create your first room for this location."
+                  title="No rooms"
+                  description="Rooms are set up when a location is created. Manage rooms via Settings → Location Configuration."
                   containerClassName="mt-4"
                 />
               )}
@@ -452,42 +396,6 @@ export default function LocationDetailsScreen() {
           </>
         ) : null}
       </ScrollView>
-
-      <AppModal
-        visible={isCreateRoomModalOpen}
-        title="Create room"
-        description={location ? `This room will be created in "${location.name}".` : "Create a room."}
-        onRequestClose={closeCreateRoomModal}
-        maxWidth={420}
-      >
-        <FormInput
-          value={newRoomName}
-          onChangeText={setNewRoomName}
-          placeholder="Room name (e.g. Kitchen)"
-          autoCapitalize="words"
-          autoCorrect={false}
-          editable={!isCreatingRoom}
-          maxLength={60}
-        />
-
-        {createRoomError ? <Text className="mt-3 text-xs text-crimson">{createRoomError}</Text> : null}
-
-        <View className={`${createRoomError ? "mt-4" : "mt-5"} flex-row gap-3`}>
-          <Button
-            label="Cancel"
-            variant="secondary"
-            onPress={closeCreateRoomModal}
-            disabled={isCreatingRoom}
-            className="flex-1"
-          />
-          <Button
-            label={isCreatingRoom ? "Creating..." : "Create"}
-            onPress={() => void createRoom()}
-            disabled={isCreatingRoom}
-            className="flex-1"
-          />
-        </View>
-      </AppModal>
 
       <AppModal
         visible={isDeleteModalOpen}
