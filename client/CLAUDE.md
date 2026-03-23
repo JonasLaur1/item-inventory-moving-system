@@ -396,11 +396,7 @@ When a user creates a new location:
 - Confirming changes the box status to `delivered`.
 - Outside of moving mode, scanning a QR code just navigates to the box detail screen as before.
 
-### 6. "Add Item" replaces scan in the bottom navigation bar
-- The **bottom tab navigator** replaces the scan tab with an **"Add Item"** button (most frequent user action).
-- The QR scanner is still accessible, but from a different location (e.g. a button within the home or box screen).
-
-### 7. Fragile display
+### 6. Fragile display
 - Instead of showing a numeric count (e.g. "0 fragile"), show a label: **"Fragile"** or **"Not fragile"**.
 - Already partially implemented — verify consistency across all screens.
 

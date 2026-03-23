@@ -222,6 +222,16 @@ export default function HomeTabScreen() {
         />
       </View>
 
+      <View className="mt-3 flex-row gap-3">
+        <QuickActionCard
+          title="Scan Box"
+          subtitle="Scan QR Code"
+          icon="camera"
+          variant="secondary"
+          onPress={() => router.push("/(tabs)/scan")}
+        />
+      </View>
+
       <View className="mt-10">
         {errorMessage ? (
           <RetryErrorCard

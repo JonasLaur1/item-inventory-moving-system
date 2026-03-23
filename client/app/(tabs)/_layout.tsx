@@ -52,9 +52,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="scan"
+        name="add-item"
         options={{
-          title: "Scan",
+          title: "Add Item",
           tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => (
             <View
@@ -75,9 +75,16 @@ export default function TabLayout() {
                 elevation: 8,
               }}
             >
-              <Feather name="camera" size={20} color={palette.textPrimary} />
+              <Feather name="plus" size={20} color={palette.textPrimary} />
             </View>
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="scan"
+        options={{
+          href: null,
         }}
       />
 
