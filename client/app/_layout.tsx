@@ -11,7 +11,7 @@ import { ThemePreferenceProvider, useThemePreference } from "@/hooks/use-theme-p
 import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
-const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "room", "box"]);
+const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "location", "room", "box"]);
 
 function hexToRgbTriplet(hex: string) {
   const normalized = hex.replace("#", "");
@@ -124,6 +124,7 @@ function RootLayoutContent() {
           <Stack.Screen name="forgotpass" options={{ headerShown: false }} />
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+          <Stack.Screen name="location/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="box/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

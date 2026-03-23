@@ -8,6 +8,7 @@ import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { locationService, type LocationDetails } from "@/lib/location.service";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -38,6 +40,8 @@ function getKindLabel(kind: LocationDetails["kind"]): string {
 
 export default function LocationDetailsScreen() {
   const router = useRouter();
+  const { resolvedTheme } = useThemePreference();
+  const themeColors = Colors[resolvedTheme];
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const hasFocusedOnceRef = useRef(false);
   const { width } = useWindowDimensions();
@@ -245,6 +249,7 @@ export default function LocationDetailsScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: isCompact ? 16 : 20, paddingTop: 10, paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void loadLocation(true)} />}
       >
         <View className="flex-row items-center justify-between">
           <Pressable
@@ -252,7 +257,7 @@ export default function LocationDetailsScreen() {
             hitSlop={8}
             className="h-10 w-10 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
           >
-            <Feather name="arrow-left" size={18} color={Colors.dark.textPrimary} />
+            <Feather name="arrow-left" size={18} color={themeColors.textPrimary} />
           </Pressable>
           <Text className="text-base font-semibold text-text-primary">Location Details</Text>
           <View className="h-10 w-10" />
@@ -276,7 +281,7 @@ export default function LocationDetailsScreen() {
                   <MaterialCommunityIcons
                     name={getLocationIcon(location.name)}
                     size={22}
-                    color={Colors.dark.primary}
+                    color={themeColors.primary}
                   />
                 </View>
                 <View className="flex-1">
@@ -329,7 +334,7 @@ export default function LocationDetailsScreen() {
                         className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
                         disabled={isDeletingLocation}
                       >
-                        <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                        <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
                       </Pressable>
                       <Pressable
                         onPress={openDeleteModal}
@@ -337,7 +342,7 @@ export default function LocationDetailsScreen() {
                         className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasRooms ? "opacity-40" : ""}`}
                         disabled={isDeletingLocation || hasRooms}
                       >
-                        <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
+                        <Feather name="trash-2" size={18} color={themeColors.crimson} />
                       </Pressable>
                     </View>
                   )}

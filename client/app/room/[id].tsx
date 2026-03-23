@@ -7,6 +7,7 @@ import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { boxService } from "@/lib/box.service";
 import { roomService, type RoomDetails } from "@/lib/room.service";
 import { getLocationIcon } from "@/utils/location-icon";
@@ -18,6 +19,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   Text,
   View,
   useWindowDimensions,
@@ -75,6 +77,8 @@ function normalizeBoxStatus(status: string | null): InventoryBoxStatus {
 
 export default function RoomDetailsScreen() {
   const router = useRouter();
+  const { resolvedTheme } = useThemePreference();
+  const themeColors = Colors[resolvedTheme];
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const isNarrow = width < 360;
@@ -356,7 +360,7 @@ export default function RoomDetailsScreen() {
                 hitSlop={8}
                 className="h-10 w-10 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
               >
-                <Feather name="arrow-left" size={18} color={Colors.dark.textPrimary} />
+                <Feather name="arrow-left" size={18} color={themeColors.textPrimary} />
               </Pressable>
               <Text className="text-base font-semibold text-text-primary">Room Details</Text>
               <View className="h-10 w-10" />
@@ -380,7 +384,7 @@ export default function RoomDetailsScreen() {
                       <MaterialCommunityIcons
                         name={getLocationIcon(room.name)}
                         size={22}
-                        color={Colors.dark.primary}
+                        color={themeColors.primary}
                       />
                     </View>
                     <View className="flex-1">
@@ -433,7 +437,7 @@ export default function RoomDetailsScreen() {
                             className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
                             disabled={isDeletingRoom}
                           >
-                            <Feather name="edit-2" size={18} color={Colors.dark.textPrimary} />
+                            <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
                           </Pressable>
                           <Pressable
                             onPress={openDeleteModal}
@@ -441,7 +445,7 @@ export default function RoomDetailsScreen() {
                             className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasBoxes ? "opacity-40" : ""}`}
                             disabled={isDeletingRoom || hasBoxes}
                           >
-                            <Feather name="trash-2" size={18} color={Colors.dark.crimson} />
+                            <Feather name="trash-2" size={18} color={themeColors.crimson} />
                           </Pressable>
                         </View>
                       )}
@@ -488,6 +492,7 @@ export default function RoomDetailsScreen() {
         }
         contentContainerStyle={{ paddingHorizontal: isCompact ? 16 : 20, paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void loadRoom(true)} />}
       />
 
       <AppModal
