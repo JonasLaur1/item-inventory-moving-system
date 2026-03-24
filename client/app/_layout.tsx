@@ -8,6 +8,7 @@ import "react-native-reanimated";
 import "../global.css";
 import { ColorPalettes } from "@/constants/theme";
 import { ThemePreferenceProvider, useThemePreference } from "@/hooks/use-theme-preference";
+import { MovingModeProvider } from "@/hooks/use-moving-mode";
 import { authService } from "@/lib/auth.service";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
@@ -46,7 +47,9 @@ const themeVars = {
 export default function RootLayout() {
   return (
     <ThemePreferenceProvider>
-      <RootLayoutContent />
+      <MovingModeProvider>
+        <RootLayoutContent />
+      </MovingModeProvider>
     </ThemePreferenceProvider>
   );
 }

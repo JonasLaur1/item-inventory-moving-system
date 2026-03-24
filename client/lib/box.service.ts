@@ -1,7 +1,7 @@
 import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
 
-type BoxStatus = "packed" | "unpacked";
+type BoxStatus = "packed" | "unpacked" | "delivered" | "unpacked_at_destination";
 
 type BoxRow = {
   id: string;
@@ -100,14 +100,24 @@ async function getCurrentUserId(): Promise<string> {
 }
 
 function normalizeStatus(status: string | null): BoxStatus {
-  return status?.toLowerCase() === "packed" ? "packed" : "unpacked";
+  switch (status?.toLowerCase()) {
+    case "packed":
+      return "packed";
+    case "delivered":
+      return "delivered";
+    case "unpacked_at_destination":
+      return "unpacked_at_destination";
+    default:
+      return "unpacked";
+  }
 }
 
 function normalizeInputStatus(status: string): BoxStatus {
-  const normalizedStatus = status.trim().toLowerCase();
+  const normalizedStatus = status.trim().toLowerCase() as BoxStatus;
+  const valid: BoxStatus[] = ["packed", "unpacked", "delivered", "unpacked_at_destination"];
 
-  if (normalizedStatus !== "packed" && normalizedStatus !== "unpacked") {
-    throw new Error("Box status must be Packed or Unpacked.");
+  if (!valid.includes(normalizedStatus)) {
+    throw new Error("Invalid box status.");
   }
 
   return normalizedStatus;
@@ -613,10 +623,55 @@ async function deleteBox(boxId: string): Promise<void> {
   });
 }
 
+async function markBoxDelivered(boxId: string): Promise<void> {
+  const normalizedBoxId = boxId.trim();
+  if (!normalizedBoxId) {
+    throw new Error("Box id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: box, error: fetchError } = await supabase
+    .from("boxes")
+    .select("id,name,room_id")
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  const { error } = await supabase
+    .from("boxes")
+    .update({ status: "delivered" })
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+
+  const roomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
+  const roomContext = box.room_id ? roomContextMap.get(box.room_id) : undefined;
+
+  await activityService.writeActivitySafely({
+    type: "Delivered",
+    entityType: "box",
+    entityId: normalizedBoxId,
+    title: "Box delivered",
+    description: `Marked box "${box.name}" as delivered.`,
+    locationName: roomContext?.parentLocationName ?? null,
+    roomName: roomContext?.roomName ?? null,
+    boxName: box.name,
+    next: { status: "delivered" },
+  });
+}
+
 export const boxService = {
   listBoxes,
   getBoxDetails,
   createBox,
   updateBox,
   deleteBox,
+  markBoxDelivered,
 };

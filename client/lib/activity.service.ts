@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-export type ActivityType = "Created" | "Updated" | "Moved" | "Deleted" | "Packed";
+export type ActivityType = "Created" | "Updated" | "Moved" | "Deleted" | "Packed" | "Delivered";
 export type ActivityEntityType = "location" | "room" | "box" | "item";
 
 export type ActivityPreviousNext = Record<string, unknown>;

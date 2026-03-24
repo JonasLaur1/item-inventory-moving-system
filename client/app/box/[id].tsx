@@ -69,8 +69,21 @@ function formatUpdatedAt(isoDate: string | null): string {
   return formatRelativeTime(getMinutesAgo(isoDate, Date.now()));
 }
 
-function formatStatusLabel(status: EditableStatus): "Packed" | "Unpacked" {
-  return status === "packed" ? "Packed" : "Unpacked";
+function formatStatusLabel(status: string): string {
+  switch (status) {
+    case "packed":
+      return "Packed";
+    case "delivered":
+      return "Delivered";
+    case "unpacked_at_destination":
+      return "At Destination";
+    default:
+      return "Unpacked";
+  }
+}
+
+function clampToEditableStatus(status: string): EditableStatus {
+  return status === "packed" ? "packed" : "unpacked";
 }
 
 function parseQuantity(value: string): number | null {
@@ -100,7 +113,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
 
 export default function BoxDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string | string[]; edit?: string | string[] }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; edit?: string | string[]; delivery?: string | string[] }>();
   const hasFocusedOnceRef = useRef(false);
 
   const boxId = useMemo(() => {
@@ -119,6 +132,12 @@ export default function BoxDetailsScreen() {
     const rawValue = Array.isArray(params.edit) ? params.edit[0] : params.edit;
     return rawValue === "1" || rawValue?.toLowerCase() === "true";
   }, [params.edit]);
+
+  const shouldPromptDelivery = useMemo(() => {
+    if (!params.delivery) return false;
+    const rawValue = Array.isArray(params.delivery) ? params.delivery[0] : params.delivery;
+    return rawValue === "1";
+  }, [params.delivery]);
 
   const [box, setBox] = useState<BoxDetails | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
@@ -159,6 +178,10 @@ export default function BoxDetailsScreen() {
   const [shareQrError, setShareQrError] = useState<string | null>(null);
   const [qrVersion, setQrVersion] = useState(0);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [isMarkingDelivered, setIsMarkingDelivered] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
 
   const loadBox = useCallback(
     async (refresh: boolean) => {
@@ -206,6 +229,12 @@ export default function BoxDetailsScreen() {
     void loadBox(false);
   }, [loadBox]);
 
+  useEffect(() => {
+    if (shouldPromptDelivery && box && !isLoading) {
+      setIsDeliveryModalOpen(true);
+    }
+  }, [shouldPromptDelivery, box, isLoading]);
+
   useFocusEffect(
     useCallback(() => {
       if (!hasFocusedOnceRef.current) {
@@ -228,7 +257,7 @@ export default function BoxDetailsScreen() {
 
     setEditedName(box.name);
     setEditedRoomId(box.roomId);
-    setEditedStatus(box.status);
+    setEditedStatus(clampToEditableStatus(box.status));
   }, [box]);
 
   useEffect(() => {
@@ -357,7 +386,7 @@ export default function BoxDetailsScreen() {
 
     setEditedName(box.name);
     setEditedRoomId(box.roomId);
-    setEditedStatus(box.status);
+    setEditedStatus(clampToEditableStatus(box.status));
     setSaveError(null);
     setIsEditModalOpen(true);
   }, [box]);
@@ -369,7 +398,7 @@ export default function BoxDetailsScreen() {
 
     setEditedName(box.name);
     setEditedRoomId(box.roomId);
-    setEditedStatus(box.status);
+    setEditedStatus(clampToEditableStatus(box.status));
     setSaveError(null);
     setIsEditModalOpen(false);
   }, [box, isSaving]);
@@ -656,6 +685,23 @@ export default function BoxDetailsScreen() {
     setIsQrModalOpen(false);
   }, [isSharingQr]);
 
+  const confirmDelivery = useCallback(async () => {
+    if (!boxId) return;
+
+    setIsMarkingDelivered(true);
+    setDeliveryError(null);
+
+    try {
+      await boxService.markBoxDelivered(boxId);
+      setIsDeliveryModalOpen(false);
+      void loadBox(true);
+    } catch {
+      setDeliveryError("Failed to mark as delivered. Please try again.");
+    } finally {
+      setIsMarkingDelivered(false);
+    }
+  }, [boxId, loadBox]);
+
   if (isLoading && !box) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -746,12 +792,20 @@ export default function BoxDetailsScreen() {
               <View className="mt-4 flex-row flex-wrap gap-2">
                 <View
                   className={`min-h-[24px] items-center justify-center rounded-full px-3 py-1 ${
-                    box.status === "packed" ? "bg-emerald/20" : "bg-crimson/20"
+                    box.status === "packed"
+                      ? "bg-emerald/20"
+                      : box.status === "delivered" || box.status === "unpacked_at_destination"
+                        ? "bg-primary/20"
+                        : "bg-crimson/20"
                   }`}
                 >
                   <Text
                     className={`text-center text-xs font-semibold leading-[14px] ${
-                      box.status === "packed" ? "text-emerald" : "text-crimson"
+                      box.status === "packed"
+                        ? "text-emerald"
+                        : box.status === "delivered" || box.status === "unpacked_at_destination"
+                          ? "text-primary"
+                          : "text-crimson"
                     }`}
                   >
                     {formatStatusLabel(box.status)}
@@ -1150,6 +1204,30 @@ export default function BoxDetailsScreen() {
             disabled={isDeleting}
             className="flex-1 border-crimson/60 bg-crimson/10"
             textClassName="text-crimson"
+          />
+        </View>
+      </AppModal>
+
+      <AppModal
+        visible={isDeliveryModalOpen}
+        title="Box Delivered?"
+        description="Mark this box as delivered to its destination?"
+        onRequestClose={() => setIsDeliveryModalOpen(false)}
+      >
+        {deliveryError ? (
+          <Text className="mb-3 text-sm text-crimson">{deliveryError}</Text>
+        ) : null}
+        <View className="gap-3">
+          <Button
+            label={isMarkingDelivered ? "Marking..." : "Mark as Delivered"}
+            onPress={() => void confirmDelivery()}
+            disabled={isMarkingDelivered}
+          />
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={() => setIsDeliveryModalOpen(false)}
+            disabled={isMarkingDelivered}
           />
         </View>
       </AppModal>

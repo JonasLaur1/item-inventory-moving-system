@@ -1,4 +1,5 @@
 import { Button } from "@/components/button";
+import { useMovingMode } from "@/hooks/use-moving-mode";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
@@ -77,6 +78,7 @@ export default function ScanTabScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanError, setScanError] = useState<string | null>(null);
   const [isHandlingScan, setIsHandlingScan] = useState(false);
+  const { isMovingActive } = useMovingMode();
 
   useFocusEffect(
     useCallback(() => {
@@ -103,9 +105,12 @@ export default function ScanTabScreen() {
       }
 
       setScanError(null);
-      router.push({ pathname: "/box/[id]", params: { id: boxId } });
+      router.push({
+        pathname: "/box/[id]",
+        params: { id: boxId, ...(isMovingActive ? { delivery: "1" } : {}) },
+      });
     },
-    [isHandlingScan, router],
+    [isHandlingScan, isMovingActive, router],
   );
 
   const onPressAllowCamera = useCallback(async () => {
@@ -185,6 +190,7 @@ export default function ScanTabScreen() {
           <Text className="text-center text-sm text-crimson">{scanError}</Text>
         </View>
       ) : null}
+
     </View>
   );
 }

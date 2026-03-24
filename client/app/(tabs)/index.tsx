@@ -7,14 +7,19 @@ import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { Button } from "@/components/button";
 import { useActivityHistory } from "@/hooks/use-activity-history";
 import { useLocations } from "@/hooks/use-locations";
+import { useMovingMode } from "@/hooks/use-moving-mode";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { RefreshControl, Text, View, useWindowDimensions } from "react-native";
+import Svg, { Circle } from "react-native-svg";
+import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type LocationCard = {
   id: string;
@@ -66,9 +71,53 @@ function getActivityIcon(type: string): keyof typeof Feather.glyphMap {
       return "trash-2";
     case "Packed":
       return "archive";
+    case "Delivered":
+      return "truck";
     default:
       return "clock";
   }
+}
+
+const RING_SIZE = 160;
+const STROKE_WIDTH = 12;
+const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+type DeliveryRingProps = {
+  delivered: number;
+  total: number;
+  progress: number;
+  primary: string;
+  track: string;
+};
+
+function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRingProps) {
+  const dashOffset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, progress)) / 100);
+  return (
+    <View className="mt-8 items-center">
+      <View style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <Svg width={RING_SIZE} height={RING_SIZE}>
+          <Circle
+            cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
+            stroke={track} strokeWidth={STROKE_WIDTH} fill="none"
+          />
+          <Circle
+            cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
+            stroke={primary} strokeWidth={STROKE_WIDTH} fill="none"
+            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            rotation="-90"
+            origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
+          />
+        </Svg>
+        <View className="absolute inset-0 items-center justify-center">
+          <Text className="text-3xl font-bold text-text-primary">{Math.round(progress)}%</Text>
+          <Text className="mt-0.5 text-xs text-text-tertiary">{delivered} / {total} boxes</Text>
+        </View>
+      </View>
+    </View>
+  );
 }
 
 export default function HomeTabScreen() {
@@ -77,6 +126,9 @@ export default function HomeTabScreen() {
   const isCompact = width < 400;
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
+  const { isMovingActive, startMoving, stopMoving } = useMovingMode();
+  const { resolvedTheme } = useThemePreference();
+  const themeColors = Colors[resolvedTheme];
   const {
     locations,
     isLoading,
@@ -118,6 +170,14 @@ export default function HomeTabScreen() {
   );
 
   const visibleLocations = showAllLocations ? locationsForCards : locationsForCards.slice(0, 2);
+  const hasMultipleLocations = locations.length >= 2;
+
+  const deliveryStats = useMemo(() => {
+    const totalBoxes = locations.reduce((sum, loc) => sum + loc.boxes, 0);
+    const totalDelivered = locations.reduce((sum, loc) => sum + loc.deliveredBoxes, 0);
+    const progress = totalBoxes > 0 ? (totalDelivered / totalBoxes) * 100 : 0;
+    return { totalBoxes, totalDelivered, progress };
+  }, [locations]);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
       const nowMs = Date.now();
@@ -146,7 +206,17 @@ export default function HomeTabScreen() {
         />
       }
     >
-      <View className="mt-8 flex-row gap-3">
+      {isMovingActive && hasMultipleLocations ? (
+        <DeliveryRing
+          delivered={deliveryStats.totalDelivered}
+          total={deliveryStats.totalBoxes}
+          progress={deliveryStats.progress}
+          primary={themeColors.primary}
+          track={themeColors.borderDefault}
+        />
+      ) : null}
+
+      <View className={isMovingActive && hasMultipleLocations ? "mt-4 flex-row gap-3" : "mt-8 flex-row gap-3"}>
         <QuickActionCard
           title="Add Location"
           subtitle="Create New Location"
@@ -177,6 +247,16 @@ export default function HomeTabScreen() {
           onPress={() => router.push("/(tabs)/scan")}
         />
       </View>
+
+      {hasMultipleLocations ? (
+        <View className="mt-3">
+          <Button
+            label={isMovingActive ? "Stop Moving" : "Start Moving"}
+            variant={isMovingActive ? "secondary" : "primary"}
+            onPress={() => void (isMovingActive ? stopMoving() : startMoving())}
+          />
+        </View>
+      ) : null}
 
       <View className="mt-10">
         {errorMessage ? (

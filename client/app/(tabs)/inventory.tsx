@@ -69,8 +69,17 @@ function formatUpdatedAt(isoDate: string | null): string {
   return formatRelativeTime(getMinutesAgo(isoDate, Date.now()));
 }
 
-function mapBoxStatus(status: "packed" | "unpacked"): InventoryBoxStatus {
-  return status === "packed" ? "Packed" : "Unpacked";
+function mapBoxStatus(status: "packed" | "unpacked" | "delivered" | "unpacked_at_destination"): InventoryBoxStatus {
+  switch (status) {
+    case "packed":
+      return "Packed";
+    case "delivered":
+      return "Delivered";
+    case "unpacked_at_destination":
+      return "At Destination";
+    default:
+      return "Unpacked";
+  }
 }
 
 function parseQuantity(value: string): number | null {

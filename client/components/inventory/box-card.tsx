@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { Colors } from "@/constants/theme";
 
-export type InventoryBoxStatus = "Packed" | "Unpacked";
+export type InventoryBoxStatus = "Packed" | "Unpacked" | "Delivered" | "At Destination";
 
 export type InventoryBox = {
   id: string;
@@ -22,8 +22,20 @@ type BoxCardProps = {
   onPressEdit?: (box: InventoryBox) => void;
 };
 
+function getStatusPillStyle(status: InventoryBoxStatus): { bg: string; text: string } {
+  switch (status) {
+    case "Packed":
+      return { bg: "bg-emerald/20", text: "text-emerald" };
+    case "Delivered":
+    case "At Destination":
+      return { bg: "bg-primary/20", text: "text-primary" };
+    default:
+      return { bg: "bg-crimson/20", text: "text-crimson" };
+  }
+}
+
 export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxCardProps) {
-  const isPacked = box.status === "Packed";
+  const statusStyle = getStatusPillStyle(box.status);
   const fragilePillClassName = box.isFragile ? "bg-amber-500/20" : "bg-slate-500/20";
   const fragileTextClassName = box.isFragile ? "text-amber-300" : "text-slate-300";
 
@@ -35,12 +47,8 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
           <Text className="mt-1 text-xs text-text-tertiary">{box.room}</Text>
         </View>
         <View className="flex-row flex-wrap justify-end gap-2">
-          <View
-            className={`rounded-full px-3 py-1 ${
-              isPacked ? "bg-emerald/20" : "bg-crimson/20"
-            }`}
-          >
-            <Text className={`text-xs font-semibold ${isPacked ? "text-emerald" : "text-crimson"}`}>
+          <View className={`rounded-full px-3 py-1 ${statusStyle.bg}`}>
+            <Text className={`text-xs font-semibold ${statusStyle.text}`}>
               {box.status}
             </Text>
           </View>
