@@ -367,16 +367,28 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 - `activity_type` enum includes `Delivered`
 - `boxService.markBoxDelivered()` — sets status to `delivered`, logs activity
 - `LocationSummary.deliveredBoxes` — aggregated count in location service
-- Box card status pill: Delivered/At Destination = primary, Packed = emerald, Unpacked = crimson
+- Box card status pill: Delivered/Unpacked (at destination) = primary, Packed = emerald, Not packed = crimson
 - QR scan during moving mode: navigates to `/box/[id]?delivery=1` → delivery confirmation modal auto-opens on box detail screen
+
+### `unpacked_at_destination` flow ✅
+- `boxService.markBoxUnpackedAtDestination()` — sets status to `unpacked_at_destination`, logs `Updated` activity
+- Box detail screen: "Mark as Unpacked" button appears when `box.status === "delivered"` (not gated on moving mode)
+- Confirmation modal follows the same pattern as the delivery modal
+
+### Status display labels
+| DB value | Display label | Pill color |
+|----------|--------------|------------|
+| `unpacked` | Not packed | crimson |
+| `packed` | Packed | emerald |
+| `delivered` | Delivered | primary |
+| `unpacked_at_destination` | Unpacked | primary |
+
+Full lifecycle: **Not packed → Packed → Delivered → Unpacked**
 
 ### Fragile display ✅
 - All screens show "Fragile" / "Not fragile" labels (no numeric counts)
 
 ## Planned features (not yet built)
-
-### 1. `unpacked_at_destination` flow
-- No UI yet for transitioning a box to `unpacked_at_destination`. Currently only `delivered` is set via QR scan.
 
 ### Not building
 - Priority rooms — explicitly excluded from scope.
