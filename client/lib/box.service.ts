@@ -667,6 +667,50 @@ async function markBoxDelivered(boxId: string): Promise<void> {
   });
 }
 
+async function markBoxUnpackedAtDestination(boxId: string): Promise<void> {
+  const normalizedBoxId = boxId.trim();
+  if (!normalizedBoxId) {
+    throw new Error("Box id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: box, error: fetchError } = await supabase
+    .from("boxes")
+    .select("id,name,room_id")
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  const { error } = await supabase
+    .from("boxes")
+    .update({ status: "unpacked_at_destination" })
+    .eq("id", normalizedBoxId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+
+  const roomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
+  const roomContext = box.room_id ? roomContextMap.get(box.room_id) : undefined;
+
+  await activityService.writeActivitySafely({
+    type: "Updated",
+    entityType: "box",
+    entityId: normalizedBoxId,
+    title: "Box unpacked at destination",
+    description: `Marked box "${box.name}" as unpacked at destination.`,
+    locationName: roomContext?.parentLocationName ?? null,
+    roomName: roomContext?.roomName ?? null,
+    boxName: box.name,
+    next: { status: "unpacked_at_destination" },
+  });
+}
+
 export const boxService = {
   listBoxes,
   getBoxDetails,
@@ -674,4 +718,5 @@ export const boxService = {
   updateBox,
   deleteBox,
   markBoxDelivered,
+  markBoxUnpackedAtDestination,
 };

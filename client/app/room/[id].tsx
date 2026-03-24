@@ -30,7 +30,7 @@ type EditableStatus = "packed" | "unpacked";
 
 const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
-  { label: "Unpacked", value: "unpacked" },
+  { label: "Not packed", value: "unpacked" },
 ];
 
 function getMinutesAgo(occurredAt: string, nowMs: number): number {
@@ -72,7 +72,7 @@ function formatUpdatedAt(isoDate: string | null): string {
 }
 
 function normalizeBoxStatus(status: string | null): InventoryBoxStatus {
-  return status?.toLowerCase() === "packed" ? "Packed" : "Unpacked";
+  return status?.toLowerCase() === "packed" ? "Packed" : "Not packed";
 }
 
 export default function RoomDetailsScreen() {

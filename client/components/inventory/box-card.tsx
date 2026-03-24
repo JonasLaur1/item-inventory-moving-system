@@ -3,7 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { Colors } from "@/constants/theme";
 
-export type InventoryBoxStatus = "Packed" | "Unpacked" | "Delivered" | "At Destination";
+export type InventoryBoxStatus = "Packed" | "Not packed" | "Delivered" | "Unpacked";
 
 export type InventoryBox = {
   id: string;
@@ -27,7 +27,7 @@ function getStatusPillStyle(status: InventoryBoxStatus): { bg: string; text: str
     case "Packed":
       return { bg: "bg-emerald/20", text: "text-emerald" };
     case "Delivered":
-    case "At Destination":
+    case "Unpacked":
       return { bg: "bg-primary/20", text: "text-primary" };
     default:
       return { bg: "bg-crimson/20", text: "text-crimson" };

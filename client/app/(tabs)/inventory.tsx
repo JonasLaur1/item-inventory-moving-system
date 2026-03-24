@@ -25,10 +25,10 @@ import { Pressable, Text, View, useWindowDimensions } from "react-native";
 type StatusFilter = "All" | InventoryBoxStatus | "Fragile";
 type EditableStatus = "packed" | "unpacked";
 
-const statusFilters: StatusFilter[] = ["All", "Packed", "Unpacked", "Fragile"];
+const statusFilters: StatusFilter[] = ["All", "Packed", "Not packed", "Fragile"];
 const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
-  { label: "Unpacked", value: "unpacked" },
+  { label: "Not packed", value: "unpacked" },
 ];
 
 function getMinutesAgo(occurredAt: string, nowMs: number): number {
@@ -76,9 +76,9 @@ function mapBoxStatus(status: "packed" | "unpacked" | "delivered" | "unpacked_at
     case "delivered":
       return "Delivered";
     case "unpacked_at_destination":
-      return "At Destination";
-    default:
       return "Unpacked";
+    default:
+      return "Not packed";
   }
 }
 
@@ -491,7 +491,7 @@ export default function InventoryTabScreen() {
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
         <MetricCard
-          label="Unpacked"
+          label="Not packed"
           value={String(unpackedCount)}
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />

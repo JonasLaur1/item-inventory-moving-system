@@ -26,7 +26,7 @@ type ItemModalMode = "create" | "edit";
 
 const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
-  { label: "Unpacked", value: "unpacked" },
+  { label: "Not packed", value: "unpacked" },
 ];
 const QR_DISPLAY_SIZE = 196;
 const QR_QUIET_ZONE_MODULES = 4;
@@ -76,9 +76,9 @@ function formatStatusLabel(status: string): string {
     case "delivered":
       return "Delivered";
     case "unpacked_at_destination":
-      return "At Destination";
-    default:
       return "Unpacked";
+    default:
+      return "Not packed";
   }
 }
 
@@ -182,6 +182,10 @@ export default function BoxDetailsScreen() {
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
   const [isMarkingDelivered, setIsMarkingDelivered] = useState(false);
   const [deliveryError, setDeliveryError] = useState<string | null>(null);
+
+  const [isUnpackModalOpen, setIsUnpackModalOpen] = useState(false);
+  const [isMarkingUnpacked, setIsMarkingUnpacked] = useState(false);
+  const [unpackError, setUnpackError] = useState<string | null>(null);
 
   const loadBox = useCallback(
     async (refresh: boolean) => {
@@ -702,6 +706,23 @@ export default function BoxDetailsScreen() {
     }
   }, [boxId, loadBox]);
 
+  const confirmUnpackAtDestination = useCallback(async () => {
+    if (!boxId) return;
+
+    setIsMarkingUnpacked(true);
+    setUnpackError(null);
+
+    try {
+      await boxService.markBoxUnpackedAtDestination(boxId);
+      setIsUnpackModalOpen(false);
+      void loadBox(true);
+    } catch {
+      setUnpackError("Failed to update box status. Please try again.");
+    } finally {
+      setIsMarkingUnpacked(false);
+    }
+  }, [boxId, loadBox]);
+
   if (isLoading && !box) {
     return (
       <SafeAreaView className="flex-1 bg-bg-base">
@@ -826,6 +847,16 @@ export default function BoxDetailsScreen() {
                 </View>
                 <MetaPill icon="clock" text={`Updated ${formatUpdatedAt(box.updatedAt)}`} />
               </View>
+
+              {box.status === "delivered" ? (
+                <View className="mt-4">
+                  <Button
+                    label="Mark as Unpacked"
+                    variant="secondary"
+                    onPress={() => setIsUnpackModalOpen(true)}
+                  />
+                </View>
+              ) : null}
             </View>
 
             <View className="mt-6">
@@ -1228,6 +1259,30 @@ export default function BoxDetailsScreen() {
             variant="secondary"
             onPress={() => setIsDeliveryModalOpen(false)}
             disabled={isMarkingDelivered}
+          />
+        </View>
+      </AppModal>
+
+      <AppModal
+        visible={isUnpackModalOpen}
+        title="Mark as Unpacked?"
+        description="Mark this box as unpacked at its destination? This completes the delivery lifecycle for this box."
+        onRequestClose={() => setIsUnpackModalOpen(false)}
+      >
+        {unpackError ? (
+          <Text className="mb-3 text-sm text-crimson">{unpackError}</Text>
+        ) : null}
+        <View className="gap-3">
+          <Button
+            label={isMarkingUnpacked ? "Updating..." : "Confirm"}
+            onPress={() => void confirmUnpackAtDestination()}
+            disabled={isMarkingUnpacked}
+          />
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={() => setIsUnpackModalOpen(false)}
+            disabled={isMarkingUnpacked}
           />
         </View>
       </AppModal>
