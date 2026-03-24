@@ -159,6 +159,7 @@ Before writing a new hook, check `hooks/` — the following already exist:
 - `useLocations` — location list + CRUD
 - `useActivityHistory(limit?)` — activity feed
 - `useThemePreference` — theme context (system/light/dark)
+- `useMovingMode` — moving mode active state (AsyncStorage-backed context)
 
 ---
 
@@ -186,7 +187,7 @@ components/
   form-input.tsx      -> FormInput (with icon support)
   app-header.tsx      -> AppHeader
 
-hooks/                -> custom hooks (use-boxes, use-rooms, use-locations, use-activity-history, use-theme-preference)
+hooks/                -> custom hooks (use-boxes, use-rooms, use-locations, use-activity-history, use-theme-preference, use-moving-mode)
 lib/                  -> Supabase service layer (auth, box, room, location, item, activity services)
 utils/                -> utilities (box-qr.ts, location-icon.ts)
 constants/            -> design-tokens.json, theme.ts
@@ -296,7 +297,7 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 | `name` | text | |
 | `description` | text | nullable |
 | `weight_kg` | numeric | nullable, check: >= 0 |
-| `status` | enum `box_status` | `unpacked`, `packed` (default: `unpacked`) |
+| `status` | enum `box_status` | `unpacked`, `packed`, `delivered`, `unpacked_at_destination` (default: `unpacked`) |
 | `fragility` | enum `fragility_level` | `normal`, `fragile` (default: `normal`) |
 | `qr_payload` | text | default: `''` |
 | `photo_url` | text | nullable |
@@ -328,7 +329,7 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 | `meta` | jsonb | default: `{}` |
 | `created_at` | timestamptz | |
 
-`activity_type` enum values: `location_created`, `location_updated`, `location_deleted`, `box_created`, `box_updated`, `box_deleted`, `box_scanned`, `item_added`, `item_deleted`, `ai_scan_completed`, `Created`, `Updated`, `Moved`, `Deleted`, `Packed`
+`activity_type` enum values: `location_created`, `location_updated`, `location_deleted`, `box_created`, `box_updated`, `box_deleted`, `box_scanned`, `item_added`, `item_deleted`, `ai_scan_completed`, `Created`, `Updated`, `Moved`, `Deleted`, `Packed`, `Delivered`
 
 > Note: the enum has mixed casing (snake_case and PascalCase) — this is an existing inconsistency in the DB. Use the exact values already used in `activity.service.ts`; do not invent new ones.
 
@@ -357,35 +358,25 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 
 ---
 
+## Implemented features
+
+### Moving mode ✅
+- `useMovingMode` context (AsyncStorage-backed) — wrap with `MovingModeProvider` already at root
+- Home screen: circular SVG delivery progress ring (top, visible when moving active + ≥2 locations) + Start/Stop Moving button
+- `box_status` enum: `unpacked`, `packed`, `delivered`, `unpacked_at_destination`
+- `activity_type` enum includes `Delivered`
+- `boxService.markBoxDelivered()` — sets status to `delivered`, logs activity
+- `LocationSummary.deliveredBoxes` — aggregated count in location service
+- Box card status pill: Delivered/At Destination = primary, Packed = emerald, Unpacked = crimson
+- QR scan during moving mode: navigates to `/box/[id]?delivery=1` → delivery confirmation modal auto-opens on box detail screen
+
+### Fragile display ✅
+- All screens show "Fragile" / "Not fragile" labels (no numeric counts)
+
 ## Planned features (not yet built)
 
-These are confirmed requirements. When implementing them, follow all existing patterns.
-
-### 1. Box status — 4 stages instead of 2
-The `box_status` enum needs to be extended from 2 to 4 values:
-- `unpacked` — not yet packed
-- `packed` — packed and ready
-- `delivered` — physically moved to destination (was "pervezta")
-- `unpacked_at_destination` — unpacked at the new location
-
-> The DB enum must be updated before implementing this. Flag it when working on this feature.
-
-### 2. Moving mode
-- A **"Start Moving"** button is available somewhere in the app.
-- It is only active when the user has **at least 2 locations**.
-- With only 1 location, the app behaves as a simple inventory/list maker — no moving-related UI is shown.
-- When moving mode is active, a **progress bar** appears on the home screen showing overall delivery progress.
-- Moving mode affects QR scan behavior (see below).
-
-### 3. QR scan — delivery confirmation modal
-- The QR scanner tab stays in the bottom navigation.
-- When a box QR code is scanned **during moving mode**, a modal appears asking: "Was this box delivered correctly?"
-- Confirming changes the box status to `delivered`.
-- Outside of moving mode, scanning a QR code just navigates to the box detail screen as before.
-
-### 4. Fragile display
-- Instead of showing a numeric count (e.g. "0 fragile"), show a label: **"Fragile"** or **"Not fragile"**.
-- Already partially implemented — verify consistency across all screens.
+### 1. `unpacked_at_destination` flow
+- No UI yet for transitioning a box to `unpacked_at_destination`. Currently only `delivered` is set via QR scan.
 
 ### Not building
 - Priority rooms — explicitly excluded from scope.
