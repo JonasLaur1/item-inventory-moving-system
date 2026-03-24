@@ -112,6 +112,17 @@ export default function ProfileScreen() {
           <Text className="mt-3 text-xs text-text-tertiary">
             Active mode: {themePreference === "system" ? "Device" : themePreference === "dark" ? "Dark" : "Light"}
           </Text>
+
+          <Pressable
+            onPress={() => router.push("/location-config")}
+            className="mt-5 flex-row items-center justify-between border-t border-border-default pt-4"
+          >
+            <View>
+              <Text className="text-sm font-semibold text-text-primary">Location Configuration</Text>
+              <Text className="mt-0.5 text-xs text-text-tertiary">Add or remove rooms from your locations.</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={palette.textTertiary} />
+          </Pressable>
         </View>
 
         {themeErrorMessage ? (

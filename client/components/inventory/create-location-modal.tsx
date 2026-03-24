@@ -2,6 +2,7 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { AppModal } from "@/components/ui/app-modal";
 import { Colors } from "@/constants/theme";
+import { ROOM_SUGGESTIONS } from "@/constants/room-suggestions";
 import { locationService } from "@/lib/location.service";
 import { roomService } from "@/lib/room.service";
 import { useThemePreference } from "@/hooks/use-theme-preference";
@@ -15,17 +16,6 @@ type Props = {
   onClose: () => void;
   onCreated?: (locationId: string) => void;
 };
-
-const ROOM_SUGGESTIONS = [
-  "Bedroom",
-  "Kitchen",
-  "Bathroom",
-  "Living Room",
-  "Garage",
-  "Storage",
-  "Office",
-  "Dining Room",
-];
 
 export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
   const { resolvedTheme } = useThemePreference();

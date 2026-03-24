@@ -370,28 +370,20 @@ The `box_status` enum needs to be extended from 2 to 4 values:
 
 > The DB enum must be updated before implementing this. Flag it when working on this feature.
 
-### 2. Location creation flow with room setup
-When a user creates a new location:
-1. They are prompted to add rooms to that location immediately (not later).
-2. Generic room name **suggestions** are offered: Bedroom, Kitchen, Bathroom, Living Room, Garage, Storage, etc.
-3. After the location is created, rooms **cannot be added or removed from the locations screen**.
-4. Room management is only accessible through **Settings → Location Configuration**.
-5. The Rooms tab must **not** have an "Add Room" button.
-
-### 3. Moving mode
+### 2. Moving mode
 - A **"Start Moving"** button is available somewhere in the app.
 - It is only active when the user has **at least 2 locations**.
 - With only 1 location, the app behaves as a simple inventory/list maker — no moving-related UI is shown.
 - When moving mode is active, a **progress bar** appears on the home screen showing overall delivery progress.
 - Moving mode affects QR scan behavior (see below).
 
-### 4. QR scan — delivery confirmation modal
+### 3. QR scan — delivery confirmation modal
 - The QR scanner tab stays in the bottom navigation.
 - When a box QR code is scanned **during moving mode**, a modal appears asking: "Was this box delivered correctly?"
 - Confirming changes the box status to `delivered`.
 - Outside of moving mode, scanning a QR code just navigates to the box detail screen as before.
 
-### 5. Fragile display
+### 4. Fragile display
 - Instead of showing a numeric count (e.g. "0 fragile"), show a label: **"Fragile"** or **"Not fragile"**.
 - Already partially implemented — verify consistency across all screens.
 
