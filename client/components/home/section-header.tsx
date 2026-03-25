@@ -14,7 +14,7 @@ export function SectionHeader({ title, actionLabel, onPressAction }: SectionHead
       <Text className="text-xl font-bold text-text-primary">{title}</Text>
       {actionLabel ? (
         onPressAction ? (
-          <Pressable onPress={onPressAction} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 2, opacity: pressed ? 0.6 : 1 }]}>
+          <Pressable onPress={onPressAction} className="flex-row items-center gap-0.5" style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
             <Text className="text-sm font-semibold text-text-link">{actionLabel}</Text>
             <Feather name="chevron-right" size={14} color={Colors.dark.textLink} />
           </Pressable>

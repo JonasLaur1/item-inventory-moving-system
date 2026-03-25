@@ -42,6 +42,11 @@ export default function ProfileScreen() {
   const [themeErrorMessage, setThemeErrorMessage] = useState<string | null>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editName, setEditName] = useState("");
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
 
   const handleThemeChange = async (preference: ThemePreference) => {
     if (preference === themePreference) return;
@@ -82,6 +87,41 @@ export default function ProfileScreen() {
     if (!trimmed) return;
     const success = await updateDisplayName(trimmed);
     if (success) closeEditModal();
+  };
+
+  const openPasswordModal = () => {
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordErrorMessage(null);
+    setIsPasswordModalVisible(true);
+  };
+
+  const closePasswordModal = () => {
+    setIsPasswordModalVisible(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (isChangingPassword) return;
+
+    if (newPassword.length < 6) {
+      setPasswordErrorMessage("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordErrorMessage("Passwords do not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordErrorMessage(null);
+    try {
+      await authService.updatePassword(newPassword);
+      closePasswordModal();
+    } catch (error) {
+      setPasswordErrorMessage(error instanceof Error ? error.message : "Failed to update password");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -142,6 +182,19 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
           )}
+
+          {!isLoading && !errorMessage ? (
+            <Pressable
+              onPress={openPasswordModal}
+              className="mt-4 flex-row items-center justify-between border-t border-border-default pt-4"
+            >
+              <View>
+                <Text className="text-sm font-semibold text-text-primary">Change Password</Text>
+                <Text className="mt-0.5 text-xs text-text-tertiary">Update your account password.</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={palette.textTertiary} />
+            </Pressable>
+          ) : null}
         </View>
 
         {/* Preferences section */}
@@ -197,19 +250,67 @@ export default function ProfileScreen() {
         {themeErrorMessage ? (
           <Text className="mt-4 text-sm text-red-400">{themeErrorMessage}</Text>
         ) : null}
+      </ScrollView>
 
+      <View className="px-6 pb-6 pt-3">
         {logoutErrorMessage ? (
-          <Text className="mt-4 text-sm text-red-400">{logoutErrorMessage}</Text>
+          <Text className="mb-3 text-sm text-red-400">{logoutErrorMessage}</Text>
         ) : null}
-
         <Button
           label={isLoggingOut ? "Signing out..." : "Log Out"}
-          className="mt-8"
           onPress={onLogout}
           disabled={isLoggingOut}
           rightIcon={<Feather name="log-out" size={16} color={palette.bgBase} />}
         />
-      </ScrollView>
+      </View>
+
+      {/* Change password modal */}
+      <AppModal
+        visible={isPasswordModalVisible}
+        title="Change Password"
+        description="Enter a new password for your account."
+        onRequestClose={closePasswordModal}
+        closeOnBackdropPress
+        showCornerClose
+      >
+        <FormInput
+          label="New password"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          placeholder="At least 6 characters"
+          secureTextEntry
+          autoFocus
+          returnKeyType="next"
+        />
+        <FormInput
+          label="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder="Repeat new password"
+          secureTextEntry
+          containerClassName="mt-4"
+          returnKeyType="done"
+          onSubmitEditing={() => void handleChangePassword()}
+        />
+        {passwordErrorMessage ? (
+          <Text className="mt-3 text-sm text-red-400">{passwordErrorMessage}</Text>
+        ) : null}
+        <View className="mt-4 flex-row gap-3">
+          <Button
+            label="Cancel"
+            variant="secondary"
+            className="flex-1"
+            onPress={closePasswordModal}
+            disabled={isChangingPassword}
+          />
+          <Button
+            label={isChangingPassword ? "Saving..." : "Save"}
+            className="flex-1"
+            onPress={() => void handleChangePassword()}
+            disabled={isChangingPassword || newPassword.length === 0}
+          />
+        </View>
+      </AppModal>
 
       {/* Edit display name modal */}
       <AppModal

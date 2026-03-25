@@ -19,7 +19,7 @@ import * as Print from "expo-print";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Rect } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -116,6 +116,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
 
 export default function BoxDetailsScreen() {
   const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ id?: string | string[]; edit?: string | string[]; delivery?: string | string[] }>();
   const hasFocusedOnceRef = useRef(false);
 
@@ -178,6 +179,7 @@ export default function BoxDetailsScreen() {
 
   const [isDeleteItemModalOpen, setIsDeleteItemModalOpen] = useState(false);
   const [itemPendingDelete, setItemPendingDelete] = useState<BoxDetailsItem | null>(null);
+  const [isBoxPickerOpen, setIsBoxPickerOpen] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [deleteItemError, setDeleteItemError] = useState<string | null>(null);
   const [qrAppLinkUrl, setQrAppLinkUrl] = useState<string | null>(null);
@@ -322,6 +324,11 @@ export default function BoxDetailsScreen() {
       isActive = false;
     };
   }, [box, isQrModalOpen, qrVersion]);
+
+  const selectedBoxForDisplay = useMemo(
+    () => availableBoxes.find((b) => b.id === editedItemBoxId) ?? null,
+    [availableBoxes, editedItemBoxId],
+  );
 
   const qrDarkCells = useMemo(() => {
     if (!qrMatrix) {
@@ -1043,6 +1050,11 @@ export default function BoxDetailsScreen() {
         onRequestClose={closeItemModal}
         maxWidth={420}
       >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={{ maxHeight: windowHeight * 0.62 }}
+        >
         {itemCapturedPhotoUri ? (
           <View className="mb-4 flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3">
             <Image
@@ -1177,7 +1189,7 @@ export default function BoxDetailsScreen() {
 
         <View className="mt-4">
           <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
-          <View className="mt-2 gap-2">
+          <View className="mt-2">
             {itemModalMode === "create" && box ? (
               <View className="rounded-control border border-primary bg-primary/15 px-3 py-2.5">
                 <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
@@ -1185,32 +1197,32 @@ export default function BoxDetailsScreen() {
                   {box.parentLocationName} / {box.roomName}
                 </Text>
               </View>
-            ) : availableBoxes.length > 0 ? (
-              availableBoxes.map((availableBox) => {
-                const isActive = availableBox.id === editedItemBoxId;
-                return (
-                  <Pressable
-                    key={availableBox.id}
-                    onPress={() => setEditedItemBoxId(availableBox.id)}
-                    disabled={isSavingItem}
-                    className={`rounded-control border px-3 py-2.5 ${
-                      isActive
-                        ? "border-primary bg-primary/15"
-                        : "border-border-default bg-bg-input/60"
-                    }`}
-                  >
-                    <Text className="text-sm font-semibold text-text-primary">{availableBox.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">
-                      {availableBox.parentLocationName} / {availableBox.roomName}
-                    </Text>
-                  </Pressable>
-                );
-              })
             ) : (
-              <Text className="text-xs text-text-tertiary">No boxes available.</Text>
+              <Pressable
+                onPress={() => setIsBoxPickerOpen(true)}
+                disabled={isSavingItem}
+                className="flex-row items-center justify-between rounded-control border border-border-default bg-bg-input/60 px-3 py-2.5"
+              >
+                <View className="flex-1">
+                  {selectedBoxForDisplay ? (
+                    <>
+                      <Text className="text-sm font-semibold text-text-primary">
+                        {selectedBoxForDisplay.name}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-text-tertiary">
+                        {selectedBoxForDisplay.parentLocationName} / {selectedBoxForDisplay.roomName}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text className="text-sm text-text-tertiary">Select a box...</Text>
+                  )}
+                </View>
+                <Feather name="chevron-down" size={16} color={Colors.dark.textTertiary} />
+              </Pressable>
             )}
           </View>
         </View>
+        </ScrollView>
 
         {itemModalError ? (
           <Text className="mt-3 text-xs text-crimson">{itemModalError}</Text>
@@ -1231,6 +1243,44 @@ export default function BoxDetailsScreen() {
             className="flex-1"
           />
         </View>
+      </AppModal>
+
+      <AppModal
+        visible={isBoxPickerOpen}
+        title="Select Box"
+        onRequestClose={() => setIsBoxPickerOpen(false)}
+        closeOnBackdropPress
+        showCornerClose
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: windowHeight * 0.5 }}
+        >
+          {availableBoxes.length > 0 ? (
+            availableBoxes.map((availableBox, index) => {
+              const isActive = availableBox.id === editedItemBoxId;
+              return (
+                <Pressable
+                  key={availableBox.id}
+                  onPress={() => {
+                    setEditedItemBoxId(availableBox.id);
+                    setIsBoxPickerOpen(false);
+                  }}
+                  className={`rounded-control border px-3 py-2.5 ${index > 0 ? "mt-2" : ""} ${
+                    isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
+                  }`}
+                >
+                  <Text className="text-sm font-semibold text-text-primary">{availableBox.name}</Text>
+                  <Text className="mt-0.5 text-xs text-text-tertiary">
+                    {availableBox.parentLocationName} / {availableBox.roomName}
+                  </Text>
+                </Pressable>
+              );
+            })
+          ) : (
+            <Text className="text-sm text-text-tertiary">No boxes available.</Text>
+          )}
+        </ScrollView>
       </AppModal>
 
       <AppModal
