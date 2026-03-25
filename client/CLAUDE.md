@@ -415,9 +415,6 @@ Full lifecycle: **Not packed → Packed → Delivered → Unpacked**
 - Always deploy Edge Functions with `verify_jwt: false` and verify the user inside the function using `supabase.auth.getUser(token)` with the admin client (uses `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL`, both auto-provided).
 - `SUPABASE_ANON_KEY` env var is NOT reliably available inside edge functions deployed via MCP — do not use it for auth checks.
 
-## Not building
-- Priority rooms — explicitly excluded from scope.
-
 ---
 
 ## Code quality standards

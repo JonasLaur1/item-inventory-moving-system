@@ -1,9 +1,7 @@
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
-import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/home/section-header";
-import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
@@ -11,23 +9,14 @@ import { Button } from "@/components/button";
 import { useActivityHistory } from "@/hooks/use-activity-history";
 import { useLocations } from "@/hooks/use-locations";
 import { useMovingMode } from "@/hooks/use-moving-mode";
-import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { RefreshControl, Text, View, useWindowDimensions } from "react-native";
+import { RefreshControl, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
-
-type LocationCard = {
-  id: string;
-  name: string;
-  packed: number;
-  total: number;
-  icon: RoomCardProps["icon"];
-};
 
 function getMinutesAgo(occurredAt: string, nowMs: number): number {
   const timestamp = new Date(occurredAt).getTime();
@@ -122,18 +111,13 @@ function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRi
 
 export default function HomeTabScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isCompact = width < 400;
-  const [showAllLocations, setShowAllLocations] = useState(false);
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
   const { isMovingActive, startMoving, stopMoving } = useMovingMode();
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
   const {
     locations,
-    isLoading,
     isRefreshing,
-    errorMessage,
     refreshLocations,
   } = useLocations();
   const {
@@ -157,19 +141,6 @@ export default function HomeTabScreen() {
     }, [refreshActivity, refreshLocations]),
   );
 
-  const locationsForCards: LocationCard[] = useMemo(
-    () =>
-      locations.map((location) => ({
-        id: location.id,
-        name: location.name,
-        packed: location.packedBoxes,
-        total: location.boxes,
-        icon: getLocationIcon(location.name),
-      })),
-    [locations],
-  );
-
-  const visibleLocations = showAllLocations ? locationsForCards : locationsForCards.slice(0, 2);
   const hasMultipleLocations = locations.length >= 2;
 
   const deliveryStats = useMemo(() => {
@@ -259,57 +230,6 @@ export default function HomeTabScreen() {
       ) : null}
 
       <View className="mt-10">
-        {errorMessage ? (
-          <RetryErrorCard
-            message={errorMessage}
-            isRetrying={isRefreshing}
-            retryingLabel="Refreshing..."
-            onRetry={() => void refreshLocations()}
-          />
-        ) : null}
-
-        <SectionHeader
-          title="Priority Locations"
-          actionLabel={locationsForCards.length > 2 ? (showAllLocations ? "Show Less" : "Show All") : undefined}
-          onPressAction={
-            locationsForCards.length > 2 ? () => setShowAllLocations((prev) => !prev) : undefined
-          }
-        />
-
-        <CardGrid
-          items={visibleLocations}
-          compact={isCompact}
-          className="mt-4"
-          keyExtractor={(location) => location.id}
-          renderItem={(location) => (
-            <RoomCard
-              name={location.name}
-              packed={location.packed}
-              total={location.total}
-              icon={location.icon}
-              onPress={() => router.push({ pathname: "/location/[id]", params: { id: location.id } })}
-            />
-          )}
-        />
-
-        {isLoading && locationsForCards.length === 0 ? (
-          <EmptyStateCard
-            title="Loading locations..."
-            description="Fetching your locations and progress."
-            containerClassName="mt-4"
-          />
-        ) : null}
-
-        {!isLoading && !errorMessage && locationsForCards.length === 0 ? (
-          <EmptyStateCard
-            title="No locations yet"
-            description="Create a location from the Locations tab to see progress here."
-            containerClassName="mt-4"
-          />
-        ) : null}
-      </View>
-
-      <View className="mt-4">
         <SectionHeader title="Recent Activity" />
         {activityErrorMessage ? (
           <RetryErrorCard

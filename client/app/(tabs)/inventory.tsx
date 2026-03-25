@@ -127,9 +127,6 @@ export default function InventoryTabScreen() {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
   const [activeRoom, setActiveRoom] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState("");
-  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
-
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -158,51 +155,13 @@ export default function InventoryTabScreen() {
     }, [refreshBoxes, refreshLocations, refreshRooms]),
   );
 
-  useEffect(() => {
-    if (locations.length === 0) {
-      setSelectedLocationId("");
-      setIsLocationDropdownOpen(false);
-      return;
-    }
+  const availableRoomsForBox = useMemo(() => rooms, [rooms]);
 
-    const currentExists = locations.some((location) => location.id === selectedLocationId);
-    if (!currentExists) {
-      setSelectedLocationId(locations[0].id);
-      setIsLocationDropdownOpen(false);
-    }
-  }, [locations, selectedLocationId]);
-
-  const selectedLocationName = useMemo(() => {
-    const selected = locations.find((location) => location.id === selectedLocationId);
-    return selected?.name ?? "Select location";
-  }, [locations, selectedLocationId]);
-
-  const locationScopedSummaryBoxes = useMemo(() => {
-    if (!selectedLocationId) {
-      return summaryBoxes;
-    }
-
-    return summaryBoxes.filter((box) => box.parentLocationId === selectedLocationId);
-  }, [selectedLocationId, summaryBoxes]);
-
-  const availableRoomsForBox = useMemo(() => {
-    if (locations.length === 0) {
-      return [];
-    }
-
-    const targetLocationId = selectedLocationId || locations[0]?.id;
-    if (!targetLocationId) {
-      return [];
-    }
-
-    return rooms.filter((room) => room.locationId === targetLocationId);
-  }, [locations, rooms, selectedLocationId]);
-
-  const availableBoxesForItem = useMemo(() => locationScopedSummaryBoxes, [locationScopedSummaryBoxes]);
+  const availableBoxesForItem = useMemo(() => summaryBoxes, [summaryBoxes]);
 
   const boxes: InventoryBox[] = useMemo(
     () =>
-      locationScopedSummaryBoxes.map((box) => ({
+      summaryBoxes.map((box) => ({
         id: box.id,
         label: box.name,
         room: `${box.parentLocationName} / ${box.roomName}`,
@@ -211,7 +170,7 @@ export default function InventoryTabScreen() {
         status: mapBoxStatus(box.status),
         updatedAt: formatUpdatedAt(box.updatedAt),
       })),
-    [locationScopedSummaryBoxes],
+    [summaryBoxes],
   );
 
   useEffect(() => {
@@ -248,17 +207,16 @@ export default function InventoryTabScreen() {
 
   const packedCount = boxes.filter((box) => box.status === "Packed").length;
   const unpackedCount = boxes.length - packedCount;
-  const totalItemsCount = locationScopedSummaryBoxes.reduce((total, box) => total + box.itemsCount, 0);
+  const totalItemsCount = summaryBoxes.reduce((total, box) => total + box.itemsCount, 0);
   const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
   const roomFilters = useMemo(
     () => [
       "All",
       ...rooms
-        .filter((r) => r.locationId === selectedLocationId)
         .map((r) => `${r.locationName} / ${r.name}`)
         .sort((a, b) => a.localeCompare(b)),
     ],
-    [rooms, selectedLocationId],
+    [rooms],
   );
 
   useEffect(() => {
@@ -521,49 +479,6 @@ export default function InventoryTabScreen() {
         />
       </View>
 
-      <View className="mt-6 rounded-card border border-border-default bg-bg-elevated/75 p-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Location</Text>
-          <Pressable onPress={() => setIsCreateLocationModalOpen(true)}>
-            <Text className="text-xs font-semibold text-text-link">Add Location</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => setIsLocationDropdownOpen((prev) => !prev)}
-          className="mt-3 flex-row items-center justify-between rounded-control border border-border-default bg-bg-input/60 px-3 py-2.5"
-        >
-          <Text className="text-sm font-semibold text-text-primary">{selectedLocationName}</Text>
-          <Feather
-            name={isLocationDropdownOpen ? "chevron-up" : "chevron-down"}
-            size={16}
-            color={Colors.dark.textSecondary}
-          />
-        </Pressable>
-
-        {isLocationDropdownOpen ? (
-          <View className="mt-2 gap-2">
-            {locations.map((location) => {
-              const isActive = location.id === selectedLocationId;
-              return (
-                <Pressable
-                  key={location.id}
-                  onPress={() => {
-                    setSelectedLocationId(location.id);
-                    setIsLocationDropdownOpen(false);
-                  }}
-                  className={`rounded-control border px-3 py-2.5 ${
-                    isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
-                  }`}
-                >
-                  <Text className="text-sm font-semibold text-text-primary">{location.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-      </View>
-
       <View className="mt-6 flex-row gap-3">
         <SearchBar
           value={search}
@@ -660,14 +575,6 @@ export default function InventoryTabScreen() {
           )}
         </View>
       </View>
-
-      <CreateLocationModal
-        visible={isCreateLocationModalOpen}
-        onClose={() => {
-          setIsCreateLocationModalOpen(false);
-          void Promise.all([refreshLocations(), refreshRooms()]);
-        }}
-      />
 
       <AppModal
         visible={isCreateItemModalOpen}

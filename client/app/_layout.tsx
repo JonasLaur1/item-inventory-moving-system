@@ -131,6 +131,8 @@ function RootLayoutContent() {
           <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="box/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="location-config/index" options={{ headerShown: false }} />
+          <Stack.Screen name="location-config/[id]" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       </View>
