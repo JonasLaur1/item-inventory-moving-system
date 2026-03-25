@@ -209,6 +209,7 @@ constants/            -> design-tokens.json, theme.ts
 | `MetricCard` | Metric/statistic display card |
 | `CardGrid` | Grid layout wrapper |
 | `FilterGroup` | Filter option container |
+| `CameraCaptureModal` | Full-screen camera modal with AI recognition flow — `onConfirm(result: CaptureResult)` |
 
 ### Feature components
 | Component | Path |
@@ -343,6 +344,7 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 
 ### Key schema facts to remember
 - `items.box_id` is **nullable** — an item can exist outside a box.
+- `items.photo_url` is populated by `itemService.uploadItemPhoto()` after item creation — not set during `createItem()`.
 - `boxes.fragility` is stored directly on the box (not derived at query time). Update it when item fragility changes.
 - `locations.kind` distinguishes origin (`start`), destination (`destination`), and generic (`other`) locations.
 - Never invent column or table names — use exactly what's listed above.
@@ -355,6 +357,16 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 - Env vars are `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` — never hardcode or expose these.
 - Prefer typed models (`BoxSummary`, `RoomDetails`, etc.) — check existing types in service files before defining new ones.
 - When writing a new service method, use exact column names from the schema above — do not guess.
+
+### Supabase Storage
+- Bucket: `item-images` (public) — stores item photos at path `{userId}/{itemId}.jpg`
+- Use `supabase.storage.from("item-images").getPublicUrl(path)` for display URLs (no auth needed for reads on public buckets)
+- Upload via `fetch(localUri)` → blob → `supabase.storage.upload()`
+
+### Supabase Edge Functions
+- Edge Functions live in the Supabase project (deployed via MCP or CLI), not in this repo
+- Always deploy with `verify_jwt: false` — see Edge Function auth pattern in Implemented Features
+- Call from the client via `supabase.functions.invoke("function-name", { body: {...} })` — the SDK automatically includes `apikey` and `Authorization` headers
 
 ---
 
@@ -388,22 +400,23 @@ Full lifecycle: **Not packed → Packed → Delivered → Unpacked**
 ### Fragile display ✅
 - All screens show "Fragile" / "Not fragile" labels (no numeric counts)
 
-## Planned features (not yet built)
+### AI photo recognition + item photos ✅
+- Supabase Edge Function `recognize-item` — calls Claude Haiku (`claude-haiku-4-5-20251001`) vision API, returns `{ name, notes }`
+- `itemService.uploadItemPhoto(itemId, localUri)` — uploads to `item-images` Supabase Storage bucket at `{userId}/{itemId}.jpg`, then updates `items.photo_url`
+- `CameraCaptureModal` (`components/ui/camera-capture-modal.tsx`) — full-screen camera modal: capture → AI recognition → suggestion shown → user confirms or retakes
+- `add-item.tsx` — "Take Photo" button opens the modal; on confirm, name/notes pre-filled with "AI suggested" badge; photo uploaded on submit (non-fatal if upload fails)
+- `ItemRow` — shows `expo-image` thumbnail when `photoUrl` is set, falls back to icon
+- `ItemSummary.photoUrl` and `BoxDetailsItem.photoUrl` — included in all item queries
+- Camera capture quality: `0.2` (keeps base64 payload small for fast edge function calls)
+- AI suggestion is best-effort — UI always allows manual edit; badge clears when user edits the name
 
-### Not building
+### Edge Function auth pattern ✅
+- This project uses **ES256 asymmetric JWTs** for user sessions. Supabase's built-in `verify_jwt: true` only validates HS256 — never use it.
+- Always deploy Edge Functions with `verify_jwt: false` and verify the user inside the function using `supabase.auth.getUser(token)` with the admin client (uses `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL`, both auto-provided).
+- `SUPABASE_ANON_KEY` env var is NOT reliably available inside edge functions deployed via MCP — do not use it for auth checks.
+
+## Not building
 - Priority rooms — explicitly excluded from scope.
-
----
-
-## AI / Vision item recognition constraints
-
-- Treat AI recognition as **best-effort suggestions**, not authoritative truth.
-- UI should support:
-  - User edits/confirmation of suggested item name(s)
-  - Retry / error handling
-  - Clear indication that the name is AI-suggested
-
-(Ask before locking in a specific provider or API shape.)
 
 ---
 

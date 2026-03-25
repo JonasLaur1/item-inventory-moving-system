@@ -3,11 +3,13 @@ import { FormInput } from "@/components/form-input";
 import { SectionHeader } from "@/components/home/section-header";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { AppModal } from "@/components/ui/app-modal";
+import { CameraCaptureModal, type CaptureResult } from "@/components/ui/camera-capture-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetaPill } from "@/components/ui/meta-pill";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
+import { Image } from "expo-image";
 import { boxService, type BoxDetails, type BoxDetailsItem, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
 import { roomService, type RoomSummary } from "@/lib/room.service";
@@ -108,6 +110,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
     quantity: item.quantity,
     badgeText: item.isFragile ? "Fragile" : "Not fragile",
     icon: "package",
+    photoUrl: item.photoUrl,
   };
 }
 
@@ -165,6 +168,13 @@ export default function BoxDetailsScreen() {
   const [editedItemBoxId, setEditedItemBoxId] = useState("");
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [itemModalError, setItemModalError] = useState<string | null>(null);
+
+  const [isItemCameraOpen, setIsItemCameraOpen] = useState(false);
+  const [itemCapturedPhotoUri, setItemCapturedPhotoUri] = useState<string | null>(null);
+  const [itemCapturedPhotoBase64, setItemCapturedPhotoBase64] = useState<string | null>(null);
+  const [itemExistingPhotoUrl, setItemExistingPhotoUrl] = useState<string | null>(null);
+  const [itemPhotoMarkedForRemoval, setItemPhotoMarkedForRemoval] = useState(false);
+  const [isItemNameAiSuggested, setIsItemNameAiSuggested] = useState(false);
 
   const [isDeleteItemModalOpen, setIsDeleteItemModalOpen] = useState(false);
   const [itemPendingDelete, setItemPendingDelete] = useState<BoxDetailsItem | null>(null);
@@ -461,6 +471,11 @@ export default function BoxDetailsScreen() {
     setItemNotes("");
     setEditedItemBoxId(box.id);
     setItemModalError(null);
+    setItemCapturedPhotoUri(null);
+    setItemCapturedPhotoBase64(null);
+    setItemExistingPhotoUrl(null);
+    setItemPhotoMarkedForRemoval(false);
+    setIsItemNameAiSuggested(false);
     setIsItemModalOpen(true);
   }, [box]);
 
@@ -478,6 +493,11 @@ export default function BoxDetailsScreen() {
       setItemNotes(item.notes ?? "");
       setEditedItemBoxId(box.id);
       setItemModalError(null);
+      setItemCapturedPhotoUri(null);
+      setItemCapturedPhotoBase64(null);
+      setItemExistingPhotoUrl(item.photoUrl);
+      setItemPhotoMarkedForRemoval(false);
+      setIsItemNameAiSuggested(false);
       setIsItemModalOpen(true);
     },
     [box],
@@ -490,7 +510,40 @@ export default function BoxDetailsScreen() {
 
     setIsItemModalOpen(false);
     setItemModalError(null);
+    setItemCapturedPhotoUri(null);
+    setItemCapturedPhotoBase64(null);
+    setItemExistingPhotoUrl(null);
+    setItemPhotoMarkedForRemoval(false);
+    setIsItemNameAiSuggested(false);
   }, [isSavingItem]);
+
+  const handleItemCaptureResult = useCallback(
+    (result: CaptureResult) => {
+      setIsItemCameraOpen(false);
+      setItemCapturedPhotoUri(result.uri);
+      setItemCapturedPhotoBase64(result.base64);
+      setItemPhotoMarkedForRemoval(false);
+      if (result.suggestedName) {
+        setItemName(result.suggestedName);
+        setIsItemNameAiSuggested(true);
+        if (!itemNotes.trim() && result.suggestedNotes) {
+          setItemNotes(result.suggestedNotes);
+        }
+      }
+    },
+    [itemNotes],
+  );
+
+  const handleItemRemovePhoto = useCallback(() => {
+    setItemCapturedPhotoUri(null);
+    setItemCapturedPhotoBase64(null);
+    setIsItemNameAiSuggested(false);
+  }, []);
+
+  const handleItemNameChange = useCallback((text: string) => {
+    setItemName(text);
+    setIsItemNameAiSuggested(false);
+  }, []);
 
   const saveItem = useCallback(async () => {
     if (!box) {
@@ -519,13 +572,21 @@ export default function BoxDetailsScreen() {
 
     try {
       if (itemModalMode === "create") {
-        await itemService.createItem({
+        const itemId = await itemService.createItem({
           name: normalizedName,
           quantity: parsedQuantity,
           isFragile: itemIsFragile,
           notes: itemNotes,
           boxId: box.id,
         });
+
+        if (itemCapturedPhotoBase64) {
+          try {
+            await itemService.uploadItemPhoto(itemId, itemCapturedPhotoBase64);
+          } catch (photoErr) {
+            console.warn("Photo upload failed:", photoErr);
+          }
+        }
       } else {
         if (!activeItemId) {
           throw new Error("Item id is missing.");
@@ -538,6 +599,20 @@ export default function BoxDetailsScreen() {
           notes: itemNotes,
           boxId: editedItemBoxId,
         });
+
+        if (itemCapturedPhotoBase64) {
+          try {
+            await itemService.uploadItemPhoto(activeItemId, itemCapturedPhotoBase64);
+          } catch (photoErr) {
+            console.warn("Photo upload failed:", photoErr);
+          }
+        } else if (itemPhotoMarkedForRemoval) {
+          try {
+            await itemService.removeItemPhoto(activeItemId);
+          } catch (photoErr) {
+            console.warn("Photo removal failed:", photoErr);
+          }
+        }
       }
 
       setIsItemModalOpen(false);
@@ -552,10 +627,12 @@ export default function BoxDetailsScreen() {
     activeItemId,
     box,
     editedItemBoxId,
+    itemCapturedPhotoBase64,
     itemIsFragile,
     itemModalMode,
     itemName,
     itemNotes,
+    itemPhotoMarkedForRemoval,
     itemQuantity,
     loadBox,
   ]);
@@ -966,15 +1043,83 @@ export default function BoxDetailsScreen() {
         onRequestClose={closeItemModal}
         maxWidth={420}
       >
+        {itemCapturedPhotoUri ? (
+          <View className="mb-4 flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3">
+            <Image
+              source={{ uri: itemCapturedPhotoUri }}
+              style={{ width: 56, height: 56, borderRadius: 8 }}
+              contentFit="cover"
+            />
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+              {isItemNameAiSuggested ? (
+                <Text className="mt-0.5 text-xs text-primary">AI suggestion applied</Text>
+              ) : (
+                <Text className="mt-0.5 text-xs text-text-tertiary">Will be saved with item</Text>
+              )}
+            </View>
+            <Pressable
+              onPress={handleItemRemovePhoto}
+              disabled={isSavingItem}
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-input"
+            >
+              <Feather name="x" size={14} color={Colors.dark.textTertiary} />
+            </Pressable>
+          </View>
+        ) : itemExistingPhotoUrl && !itemPhotoMarkedForRemoval ? (
+          <View className="mb-4 flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3">
+            <Image
+              source={{ uri: itemExistingPhotoUrl }}
+              style={{ width: 56, height: 56, borderRadius: 8 }}
+              contentFit="cover"
+            />
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+              <Pressable hitSlop={8} onPress={() => setIsItemCameraOpen(true)} disabled={isSavingItem}>
+                <Text className="mt-0.5 text-xs text-primary">Tap to replace</Text>
+              </Pressable>
+            </View>
+            <Pressable
+              onPress={() => setItemPhotoMarkedForRemoval(true)}
+              disabled={isSavingItem}
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-input"
+            >
+              <Feather name="x" size={14} color={Colors.dark.textTertiary} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setIsItemCameraOpen(true)}
+            disabled={isSavingItem}
+            className="mb-4 flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+              <Feather name="camera" size={16} color={Colors.dark.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">Take Photo</Text>
+              <Text className="mt-0.5 text-xs text-text-tertiary">
+                {itemModalMode === "create" ? "AI will identify the item for you" : "Add a photo to this item"}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={Colors.dark.textTertiary} />
+          </Pressable>
+        )}
+
         <FormInput
           value={itemName}
-          onChangeText={setItemName}
+          onChangeText={itemModalMode === "create" ? handleItemNameChange : setItemName}
           placeholder="Item name"
           autoCapitalize="sentences"
           autoCorrect={false}
           editable={!isSavingItem}
           maxLength={120}
         />
+        {isItemNameAiSuggested ? (
+          <Text className="mt-1 text-xs text-primary">AI suggested</Text>
+        ) : null}
 
         <View className="mt-4">
           <FormInput
@@ -1286,6 +1431,12 @@ export default function BoxDetailsScreen() {
           />
         </View>
       </AppModal>
+
+      <CameraCaptureModal
+        visible={isItemCameraOpen}
+        onClose={() => setIsItemCameraOpen(false)}
+        onConfirm={handleItemCaptureResult}
+      />
     </SafeAreaView>
   );
 }

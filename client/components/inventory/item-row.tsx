@@ -1,5 +1,7 @@
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 
 export type InventoryItemRowData = {
@@ -9,6 +11,7 @@ export type InventoryItemRowData = {
   quantity?: number;
   badgeText?: string;
   icon?: keyof typeof Feather.glyphMap;
+  photoUrl?: string | null;
 };
 
 type ItemRowProps = {
@@ -18,6 +21,9 @@ type ItemRowProps = {
 };
 
 export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
+  const { resolvedTheme } = useThemePreference();
+  const palette = Colors[resolvedTheme];
+
   const hasActions = Boolean(onPressEdit || onPressDelete);
   const hasQuantity = typeof item.quantity === "number";
   const hasInlineBadge = hasQuantity && Boolean(item.badgeText);
@@ -27,9 +33,17 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
 
   return (
     <View className="flex-row items-center rounded-card border border-border-default bg-bg-elevated/70 p-4">
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-        <Feather name={item.icon ?? "tag"} size={16} color={Colors.dark.primary} />
-      </View>
+      {item.photoUrl ? (
+        <Image
+          source={{ uri: item.photoUrl }}
+          style={{ width: 40, height: 40, borderRadius: 20 }}
+          contentFit="cover"
+        />
+      ) : (
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+          <Feather name={item.icon ?? "tag"} size={16} color={palette.primary} />
+        </View>
+      )}
       <View className="ml-3 flex-1">
         <View className="flex-row items-center gap-2">
           <Text className="text-sm font-semibold text-text-primary">{item.title}</Text>
@@ -78,7 +92,7 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
                 hitSlop={6}
                 className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
               >
-                <Feather name="edit-2" size={14} color={Colors.dark.textPrimary} />
+                <Feather name="edit-2" size={14} color={palette.textPrimary} />
               </Pressable>
             ) : null}
             {onPressDelete ? (
@@ -87,7 +101,7 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
                 hitSlop={6}
                 className="h-8 w-8 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
               >
-                <Feather name="trash-2" size={14} color={Colors.dark.crimson} />
+                <Feather name="trash-2" size={14} color={palette.crimson} />
               </Pressable>
             ) : null}
           </View>

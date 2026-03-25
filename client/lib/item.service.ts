@@ -7,6 +7,7 @@ type ItemRow = {
   notes: string | null;
   quantity: number | null;
   is_fragile: boolean | null;
+  photo_url: string | null;
   box_id: string;
   created_at: string | null;
   updated_at: string | null;
@@ -39,6 +40,7 @@ export type ItemSummary = {
   notes: string | null;
   quantity: number;
   isFragile: boolean;
+  photoUrl: string | null;
   boxId: string;
   createdAt: string | null;
   updatedAt: string | null;
@@ -132,6 +134,7 @@ function mapItem(item: ItemRow): ItemSummary {
     notes: item.notes,
     quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
     isFragile: item.is_fragile === true,
+    photoUrl: item.photo_url ?? null,
     boxId: item.box_id,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
@@ -246,7 +249,7 @@ async function listItemsByBox(boxId: string): Promise<ItemSummary[]> {
 
   const { data, error } = await supabase
     .from("items")
-    .select("id,name,notes,quantity,is_fragile,box_id,created_at,updated_at")
+    .select("id,name,notes,quantity,is_fragile,photo_url,box_id,created_at,updated_at")
     .eq("user_id", userId)
     .eq("box_id", normalizedBoxId)
     .order("created_at", { ascending: true });
@@ -527,9 +530,58 @@ async function deleteItem(itemId: string): Promise<void> {
   });
 }
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function uploadItemPhoto(itemId: string, base64: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  const path = `${userId}/${itemId}.jpg`;
+
+  const arrayBuffer = base64ToArrayBuffer(base64);
+
+  const { error: uploadError } = await supabase.storage
+    .from("item-images")
+    .upload(path, arrayBuffer, { contentType: "image/jpeg", upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  const { data: urlData } = supabase.storage.from("item-images").getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("items")
+    .update({ photo_url: urlData.publicUrl })
+    .eq("id", itemId)
+    .eq("user_id", userId);
+
+  if (updateError) throw updateError;
+}
+
+async function removeItemPhoto(itemId: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  const path = `${userId}/${itemId}.jpg`;
+
+  await supabase.storage.from("item-images").remove([path]);
+
+  const { error } = await supabase
+    .from("items")
+    .update({ photo_url: null })
+    .eq("id", itemId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+}
+
 export const itemService = {
   listItemsByBox,
   createItem,
   updateItem,
   deleteItem,
+  uploadItemPhoto,
+  removeItemPhoto,
 };

@@ -1,12 +1,14 @@
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
+import { CameraCaptureModal, type CaptureResult } from "@/components/ui/camera-capture-modal";
 import { ColorPalettes } from "@/constants/theme";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { itemService } from "@/lib/item.service";
 import { type BoxSummary } from "@/lib/box.service";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -63,6 +65,59 @@ export default function AddItemScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
+  const [isAiSuggested, setIsAiSuggested] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setQuantity("1");
+    setIsFragile(false);
+    setNotes("");
+    setSelectedBoxId("");
+    setError(null);
+    setIsSubmitting(false);
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+    setIsAiSuggested(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetForm();
+      };
+    }, [resetForm]),
+  );
+
+  const handleCaptureResult = useCallback(
+    (result: CaptureResult) => {
+      setIsCameraOpen(false);
+      setCapturedPhotoUri(result.uri);
+      setCapturedPhotoBase64(result.base64);
+      if (result.suggestedName) {
+        setName(result.suggestedName);
+        setIsAiSuggested(true);
+        if (!notes.trim() && result.suggestedNotes) {
+          setNotes(result.suggestedNotes);
+        }
+      }
+    },
+    [notes],
+  );
+
+  const handleRemovePhoto = useCallback(() => {
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+    setIsAiSuggested(false);
+  }, []);
+
+  const handleNameChange = useCallback((text: string) => {
+    setName(text);
+    setIsAiSuggested(false);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     const normalizedName = name.trim();
     if (!normalizedName) {
@@ -85,7 +140,7 @@ export default function AddItemScreen() {
     setError(null);
 
     try {
-      await itemService.createItem({
+      const itemId = await itemService.createItem({
         name: normalizedName,
         quantity: parsedQuantity,
         isFragile,
@@ -93,13 +148,21 @@ export default function AddItemScreen() {
         boxId: selectedBoxId,
       });
 
+      if (capturedPhotoBase64) {
+        try {
+          await itemService.uploadItemPhoto(itemId, capturedPhotoBase64);
+        } catch (photoErr) {
+          console.warn("Photo upload failed:", photoErr);
+        }
+      }
+
       router.replace("/(tabs)/inventory");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create item.";
       setError(message);
       setIsSubmitting(false);
     }
-  }, [name, quantity, isFragile, notes, selectedBoxId]);
+  }, [name, quantity, isFragile, notes, selectedBoxId, capturedPhotoBase64]);
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-bg-base">
@@ -119,15 +182,65 @@ export default function AddItemScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <FormInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Item name"
-          autoCapitalize="sentences"
-          autoCorrect={false}
-          editable={!isSubmitting}
-          maxLength={120}
-        />
+        {capturedPhotoUri ? (
+          <View className="flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3">
+            <Image
+              source={{ uri: capturedPhotoUri }}
+              style={{ width: 56, height: 56, borderRadius: 8 }}
+              contentFit="cover"
+            />
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+              {isAiSuggested ? (
+                <Text className="mt-0.5 text-xs text-primary">AI suggestion applied</Text>
+              ) : (
+                <Text className="mt-0.5 text-xs text-text-tertiary">
+                  Will be saved with item
+                </Text>
+              )}
+            </View>
+            <Pressable
+              onPress={handleRemovePhoto}
+              disabled={isSubmitting}
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-input"
+            >
+              <Feather name="x" size={14} color={palette.textTertiary} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setIsCameraOpen(true)}
+            disabled={isSubmitting}
+            className="flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+              <Feather name="camera" size={16} color={palette.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">Take Photo</Text>
+              <Text className="mt-0.5 text-xs text-text-tertiary">
+                AI will identify the item for you
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={palette.textTertiary} />
+          </Pressable>
+        )}
+
+        <View className="mt-4">
+          <FormInput
+            value={name}
+            onChangeText={handleNameChange}
+            placeholder="Item name"
+            autoCapitalize="sentences"
+            autoCorrect={false}
+            editable={!isSubmitting}
+            maxLength={120}
+          />
+          {isAiSuggested ? (
+            <Text className="mt-1 text-xs text-primary">AI suggested</Text>
+          ) : null}
+        </View>
 
         <View className="mt-4">
           <FormInput
@@ -252,6 +365,12 @@ export default function AddItemScreen() {
           />
         </View>
       </ScrollView>
+
+      <CameraCaptureModal
+        visible={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onConfirm={handleCaptureResult}
+      />
     </SafeAreaView>
   );
 }
