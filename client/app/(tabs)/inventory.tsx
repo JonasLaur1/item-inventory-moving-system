@@ -20,7 +20,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 type StatusFilter = "All" | InventoryBoxStatus | "Fragile";
 type EditableStatus = "packed" | "unpacked";
@@ -649,34 +649,36 @@ export default function InventoryTabScreen() {
 
         <View className="mt-4">
           <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
-          <View className="mt-2 gap-2">
-            {availableBoxesForItem.length === 0 ? (
-              <Text className="text-xs text-text-tertiary">
-                No boxes found in this location. Create a box first before adding items.
-              </Text>
-            ) : (
-              availableBoxesForItem.map((box) => {
-                const isActive = box.id === newItemBoxId;
-                return (
-                  <Pressable
-                    key={box.id}
-                    onPress={() => setNewItemBoxId(box.id)}
-                    disabled={isCreatingItem}
-                    className={`rounded-control border px-3 py-2.5 ${
-                      isActive
-                        ? "border-primary bg-primary/15"
-                        : "border-border-default bg-bg-input/60"
-                    }`}
-                  >
-                    <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">
-                      {box.parentLocationName} / {box.roomName}
-                    </Text>
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
+          <ScrollView className="mt-2" style={{ maxHeight: 200 }} showsVerticalScrollIndicator>
+            <View className="gap-2">
+              {availableBoxesForItem.length === 0 ? (
+                <Text className="text-xs text-text-tertiary">
+                  No boxes found in this location. Create a box first before adding items.
+                </Text>
+              ) : (
+                availableBoxesForItem.map((box) => {
+                  const isActive = box.id === newItemBoxId;
+                  return (
+                    <Pressable
+                      key={box.id}
+                      onPress={() => setNewItemBoxId(box.id)}
+                      disabled={isCreatingItem}
+                      className={`rounded-control border px-3 py-2.5 ${
+                        isActive
+                          ? "border-primary bg-primary/15"
+                          : "border-border-default bg-bg-input/60"
+                      }`}
+                    >
+                      <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
+                      <Text className="mt-1 text-xs text-text-tertiary">
+                        {box.parentLocationName} / {box.roomName}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
         </View>
 
         {createItemError ? (
@@ -719,34 +721,36 @@ export default function InventoryTabScreen() {
 
         <View className="mt-4">
           <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
-          <View className="mt-2 gap-2">
-            {availableRoomsForBox.length === 0 ? (
-              <Text className="text-xs text-text-tertiary">
-                {isRoomsLoading
-                  ? "Loading rooms..."
-                  : "No rooms found in this location. Create a room first."}
-              </Text>
-            ) : (
-              availableRoomsForBox.map((room) => {
-                const isActive = room.id === newBoxRoomId;
-                return (
-                  <Pressable
-                    key={room.id}
-                    onPress={() => setNewBoxRoomId(room.id)}
-                    disabled={isCreating}
-                    className={`rounded-control border px-3 py-2.5 ${
-                      isActive
-                        ? "border-primary bg-primary/15"
-                        : "border-border-default bg-bg-input/60"
-                    }`}
-                  >
-                    <Text className="text-sm font-semibold text-text-primary">{room.name}</Text>
-                    <Text className="mt-1 text-xs text-text-tertiary">{room.locationName}</Text>
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
+          <ScrollView className="mt-2" style={{ maxHeight: 200 }} showsVerticalScrollIndicator>
+            <View className="gap-2">
+              {availableRoomsForBox.length === 0 ? (
+                <Text className="text-xs text-text-tertiary">
+                  {isRoomsLoading
+                    ? "Loading rooms..."
+                    : "No rooms found in this location. Create a room first."}
+                </Text>
+              ) : (
+                availableRoomsForBox.map((room) => {
+                  const isActive = room.id === newBoxRoomId;
+                  return (
+                    <Pressable
+                      key={room.id}
+                      onPress={() => setNewBoxRoomId(room.id)}
+                      disabled={isCreating}
+                      className={`rounded-control border px-3 py-2.5 ${
+                        isActive
+                          ? "border-primary bg-primary/15"
+                          : "border-border-default bg-bg-input/60"
+                      }`}
+                    >
+                      <Text className="text-sm font-semibold text-text-primary">{room.name}</Text>
+                      <Text className="mt-1 text-xs text-text-tertiary">{room.locationName}</Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
         </View>
 
         <View className="mt-4">
