@@ -26,9 +26,14 @@ type ActivityEventCardProps = {
 
 export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) {
   const tone = getEventTone(event.type);
+  const isCollaborator = !event.isOwnEvent;
+  const actorLabel = event.actorName ?? "Collaborator";
 
   return (
-    <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
+    <View
+      className="rounded-card border border-border-default bg-bg-elevated/70 p-4"
+      style={isCollaborator ? { borderLeftColor: Colors.dark.primary, borderLeftWidth: 3 } : undefined}
+    >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-row flex-1 items-start">
           <View className={`h-10 w-10 items-center justify-center rounded-full ${tone.iconBgClassName}`}>
@@ -53,8 +58,11 @@ export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) 
         {event.room ? <MetaPill icon="home" text={event.room} /> : null}
         {event.box ? <MetaPill icon="archive" text={event.box} /> : null}
         <MetaPill icon="clock" text={timeLabel} />
-        {!event.isOwnEvent && event.actorName ? (
-          <MetaPill icon="user" text={event.actorName} />
+        {isCollaborator ? (
+          <View className="flex-row items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5">
+            <Feather name="users" size={12} color={Colors.dark.primary} />
+            <Text className="ml-1.5 text-xs font-medium text-text-link">{actorLabel}</Text>
+          </View>
         ) : null}
       </View>
     </View>

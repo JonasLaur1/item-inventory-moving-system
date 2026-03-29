@@ -12,6 +12,8 @@ export type InventoryItemRowData = {
   badgeText?: string;
   icon?: keyof typeof Feather.glyphMap;
   photoUrl?: string | null;
+  isCollaborator?: boolean;
+  actorName?: string | null;
 };
 
 type ItemRowProps = {
@@ -30,9 +32,14 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
   const normalizedBadgeText = item.badgeText?.trim().toLowerCase();
   const isFragileBadge = normalizedBadgeText === "fragile";
   const isNotFragileBadge = normalizedBadgeText === "not fragile";
+  const isCollaborator = Boolean(item.isCollaborator);
+  const actorLabel = item.actorName ?? "Collaborator";
 
   return (
-    <View className="flex-row items-center rounded-card border border-border-default bg-bg-elevated/70 p-4">
+    <View
+      className="flex-row items-center rounded-card border border-border-default bg-bg-elevated/70 p-4"
+      style={isCollaborator ? { borderLeftColor: palette.primary, borderLeftWidth: 3 } : undefined}
+    >
       {item.photoUrl ? (
         <Image
           source={{ uri: item.photoUrl }}
@@ -79,6 +86,12 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
           ) : null}
         </View>
         {item.subtitle ? <Text className="mt-1 text-xs text-text-tertiary">{item.subtitle}</Text> : null}
+        {isCollaborator ? (
+          <View className="mt-1 flex-row items-center gap-1">
+            <Feather name="users" size={10} color={palette.primary} />
+            <Text className="text-[10px] font-medium text-text-link">{actorLabel}</Text>
+          </View>
+        ) : null}
       </View>
       <View className={`${hasActions ? "items-end gap-2" : ""}`}>
         {!hasInlineBadge && item.badgeText ? (

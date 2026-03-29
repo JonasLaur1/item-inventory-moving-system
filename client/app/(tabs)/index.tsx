@@ -161,6 +161,8 @@ export default function HomeTabScreen() {
           subtitle: event.description,
           badgeText: formatRelativeTime(minutesAgo),
           icon: getActivityIcon(event.type),
+          isCollaborator: !event.isOwnEvent,
+          actorName: event.actorName,
         };
       });
     },
