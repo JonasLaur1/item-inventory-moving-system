@@ -263,6 +263,7 @@ export default function HomeTabScreen() {
       <CreateLocationModal
         visible={isCreateLocationModalOpen}
         onClose={() => setIsCreateLocationModalOpen(false)}
+        onCreated={(id) => router.navigate({ pathname: "/(tabs)/rooms", params: { selectId: id } })}
       />
     </TabScreenLayout>
   );

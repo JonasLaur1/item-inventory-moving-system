@@ -7,7 +7,6 @@ import { locationService } from "@/lib/location.service";
 import { roomService } from "@/lib/room.service";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
@@ -100,7 +99,6 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
         }
 
         onCreated?.(id);
-        router.push({ pathname: "/location/[id]", params: { id } });
         onClose();
       } catch {
         setError("Location created but some rooms could not be saved. You can add rooms from the location page.");

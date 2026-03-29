@@ -15,7 +15,7 @@ import { useThemePreference } from "@/hooks/use-theme-preference";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View, useWindowDimensions } from "react-native";
 
@@ -23,6 +23,7 @@ const ROOM_GRID_CARD_MIN_HEIGHT = 170;
 
 export default function RoomsTabScreen() {
   const router = useRouter();
+  const { selectId } = useLocalSearchParams<{ selectId?: string }>();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const { resolvedTheme } = useThemePreference();
@@ -54,10 +55,14 @@ export default function RoomsTabScreen() {
       setSelectedLocationId("");
       return;
     }
+    if (selectId && locations.some((l) => l.id === selectId)) {
+      setSelectedLocationId(selectId);
+      return;
+    }
     if (!locations.some((l) => l.id === selectedLocationId)) {
       setSelectedLocationId(locations[0].id);
     }
-  }, [locations, selectedLocationId]);
+  }, [locations, selectId, selectedLocationId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -120,6 +125,19 @@ export default function RoomsTabScreen() {
               </Text>
             </Pressable>
           ))}
+          {selectedLocation ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/location-settings/[id]",
+                  params: { id: selectedLocation.id, name: selectedLocation.name },
+                })
+              }
+              className="h-10 w-10 items-center justify-center rounded-control border border-border-default bg-bg-elevated/70"
+            >
+              <Feather name="settings" size={16} color={themeColors.textSecondary} />
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => setIsAddLocationModalOpen(true)}
             className="h-10 w-10 items-center justify-center rounded-control border border-dashed border-border-strong bg-bg-elevated/40"
@@ -143,6 +161,19 @@ export default function RoomsTabScreen() {
                 color={themeColors.textSecondary}
               />
             </Pressable>
+            {selectedLocation ? (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/location-settings/[id]",
+                    params: { id: selectedLocation.id, name: selectedLocation.name },
+                  })
+                }
+                className="h-[42px] w-[42px] items-center justify-center rounded-control border border-border-default bg-bg-elevated/70"
+              >
+                <Feather name="settings" size={16} color={themeColors.textSecondary} />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => setIsAddLocationModalOpen(true)}
               className="h-[42px] w-[42px] items-center justify-center rounded-control border border-dashed border-border-strong bg-bg-elevated/40"
@@ -242,6 +273,9 @@ export default function RoomsTabScreen() {
         onClose={() => {
           setIsAddLocationModalOpen(false);
           void refreshLocations();
+        }}
+        onCreated={(id) => {
+          setSelectedLocationId(id);
         }}
       />
     </TabScreenLayout>
