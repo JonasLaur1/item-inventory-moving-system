@@ -260,7 +260,22 @@ export default function LocationDetailsScreen() {
             <Feather name="arrow-left" size={18} color={themeColors.textPrimary} />
           </Pressable>
           <Text className="text-base font-semibold text-text-primary">Location Details</Text>
-          <View className="h-10 w-10" />
+          {location?.isOwner ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/location-settings/[id]",
+                  params: { id: locationId, name: location.name },
+                })
+              }
+              hitSlop={8}
+              className="h-10 w-10 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
+            >
+              <Feather name="settings" size={18} color={themeColors.textPrimary} />
+            </Pressable>
+          ) : (
+            <View className="h-10 w-10" />
+          )}
         </View>
 
         {errorMessage ? (

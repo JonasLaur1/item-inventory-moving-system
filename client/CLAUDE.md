@@ -160,6 +160,7 @@ Before writing a new hook, check `hooks/` — the following already exist:
 - `useActivityHistory(limit?)` — activity feed
 - `useThemePreference` — theme context (system/light/dark)
 - `useMovingMode` — moving mode active state (AsyncStorage-backed context)
+- `useCollaborators(locationId)` — list/add/remove collaborators for a location (owner-only writes)
 
 ---
 
@@ -176,6 +177,7 @@ app/                  -> screens (Expo Router file-based routes)
   box/[id].tsx        -> box detail (dynamic route)
   room/[id].tsx       -> room detail (dynamic route)
   location/[id].tsx   -> location detail (dynamic route)
+  location-settings/[id].tsx -> location collaborator management (owner-only)
   profile.tsx         -> user profile / theme settings
 
 components/
@@ -187,8 +189,8 @@ components/
   form-input.tsx      -> FormInput (with icon support)
   app-header.tsx      -> AppHeader
 
-hooks/                -> custom hooks (use-boxes, use-rooms, use-locations, use-activity-history, use-theme-preference, use-moving-mode)
-lib/                  -> Supabase service layer (auth, box, room, location, item, activity services)
+hooks/                -> custom hooks (use-boxes, use-rooms, use-locations, use-activity-history, use-theme-preference, use-moving-mode, use-collaborators)
+lib/                  -> Supabase service layer (auth, box, room, location, item, activity, collaborator services)
 utils/                -> utilities (box-qr.ts, location-icon.ts)
 constants/            -> design-tokens.json, theme.ts
 ```
@@ -265,7 +267,9 @@ Claude should:
 
 ## Database schema (Supabase — public schema)
 
-All tables have RLS enabled. Every table has a `user_id uuid` column that must match `auth.users.id` — all queries are automatically user-scoped via RLS, but services also call `getCurrentUserId()` explicitly.
+All tables have RLS enabled. Every table has a `user_id uuid` column that must match `auth.users.id`.
+
+**Important — RLS is the authority for access control.** Service queries do NOT add redundant `.eq("user_id", userId)` filters on SELECT/UPDATE/DELETE. RLS policies handle both owner and collaborator access automatically. The `user_id` is still stamped on INSERT (so every row is owned by its creator). Services call `getCurrentUserId()` for inserts and activity logging, not for filtering selects.
 
 ### `locations`
 | Column | Type | Notes |
@@ -342,11 +346,23 @@ All tables have RLS enabled. Every table has a `user_id uuid` column that must m
 | `avatar_url` | text | nullable |
 | `updated_at` | timestamptz | nullable |
 
+### `location_collaborators`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK |
+| `location_id` | uuid | FK → `locations.id` ON DELETE CASCADE |
+| `owner_id` | uuid | FK → `auth.users.id` — who owns the location |
+| `collaborator_id` | uuid | FK → `auth.users.id` — who was invited |
+| `created_at` | timestamptz | |
+
+Constraints: `UNIQUE(location_id, collaborator_id)`, `CHECK(owner_id <> collaborator_id)`.
+
 ### Key schema facts to remember
 - `items.box_id` is **nullable** — an item can exist outside a box.
 - `items.photo_url` is populated by `itemService.uploadItemPhoto()` after item creation — not set during `createItem()`.
 - `boxes.fragility` is stored directly on the box (not derived at query time). Update it when item fragility changes.
 - `locations.kind` distinguishes origin (`start`), destination (`destination`), and generic (`other`) locations.
+- `LocationDetails.isOwner` — boolean, true when `location.user_id === currentUserId`. Used to gate owner-only UI (e.g. settings icon, delete button).
 - Never invent column or table names — use exactly what's listed above.
 
 ---
@@ -410,6 +426,17 @@ Full lifecycle: **Not packed → Packed → Delivered → Unpacked**
 - Camera capture quality: `0.2` (keeps base64 payload small for fast edge function calls)
 - AI suggestion is best-effort — UI always allows manual edit; badge clears when user edits the name
 
+### Collaboration ✅
+- Per-location sharing: a location owner can invite other BoxIt users by email. Collaborators get full edit access (read + create + update + delete rooms/boxes/items).
+- `location_collaborators` table — `(location_id, owner_id, collaborator_id)`. Deleting a location cascades.
+- RLS policies on `locations`, `rooms`, `boxes`, `items`, `activity_log` all have `_or_collab` variants that let collaborators read and write. Mutating queries in services no longer add `.eq("user_id", userId)` — RLS handles authorization.
+- `collaboratorService` (`lib/collaborator.service.ts`) — `listCollaborators`, `addCollaboratorByEmail`, `removeCollaborator`.
+- `useCollaborators(locationId)` — mirrors the `useRooms` hook pattern.
+- Edge Function `lookup-user-by-email` — resolves email → userId via admin API (needed because `auth.users` is not client-queryable). Returns `{ id, displayName }`.
+- `LocationDetails.isOwner` — `true` when `location.user_id === currentUserId`. Use this to gate owner-only UI.
+- Location detail screen: settings icon in header is only rendered when `location.isOwner`. Navigates to `app/location-settings/[id].tsx`.
+- Activity feed: collaborators see the full activity for shared locations (including owner events). Each event's `user_id` identifies who performed the action.
+
 ### Edge Function auth pattern ✅
 - This project uses **ES256 asymmetric JWTs** for user sessions. Supabase's built-in `verify_jwt: true` only validates HS256 — never use it.
 - Always deploy Edge Functions with `verify_jwt: false` and verify the user inside the function using `supabase.auth.getUser(token)` with the admin client (uses `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL`, both auto-provided).
@@ -461,6 +488,7 @@ Never:
 - Modify backend schema assumptions without asking
 - Skip activity logging on user-initiated CRUD operations
 - Write a service method without scoping it to the current user (`getCurrentUserId()`)
+- Add `.eq("user_id", userId)` to SELECT/UPDATE/DELETE queries — RLS handles access control; adding it breaks collaborator access
 
 ## Quick checklist (before handing off)
 

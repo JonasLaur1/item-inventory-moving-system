@@ -29,6 +29,8 @@ export type ActivityFeedEvent = {
   occurredAt: string;
   entityType: ActivityEntityType;
   entityId: string;
+  actorName: string | null;
+  isOwnEvent: boolean;
 };
 
 type ActivityLogRow = {
@@ -36,6 +38,7 @@ type ActivityLogRow = {
   type: string | null;
   meta: unknown;
   created_at: string | null;
+  user_id: string | null;
 };
 
 const ACTIVITY_TYPES: ActivityType[] = ["Created", "Updated", "Moved", "Deleted", "Packed"];
@@ -127,7 +130,7 @@ function readNestedName(meta: Record<string, unknown>, branch: "previous" | "nex
   return readString(nested[key]);
 }
 
-function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
+function mapActivityRow(row: ActivityLogRow, currentUserId: string, profileNames: Map<string, string>): ActivityFeedEvent {
   const meta = isRecord(row.meta) ? row.meta : {};
   const type = normalizeActivityType(row.type);
   const entityType = normalizeEntityType(meta.entityType);
@@ -147,6 +150,8 @@ function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
     readNestedName(meta, "previous", "roomName") ??
     undefined;
   const box = readString(meta.boxName) ?? undefined;
+  const isOwnEvent = row.user_id === currentUserId;
+  const actorName = isOwnEvent || !row.user_id ? null : (profileNames.get(row.user_id) ?? null);
 
   return {
     id: row.id,
@@ -159,6 +164,8 @@ function mapActivityRow(row: ActivityLogRow): ActivityFeedEvent {
     occurredAt: row.created_at ?? new Date().toISOString(),
     entityType,
     entityId,
+    actorName,
+    isOwnEvent,
   };
 }
 
@@ -209,13 +216,12 @@ async function writeActivitySafely(input: WriteActivityInput): Promise<void> {
 }
 
 async function listRecentActivity(limit = 200): Promise<ActivityFeedEvent[]> {
-  const userId = await getCurrentUserId();
+  const currentUserId = await getCurrentUserId();
   const normalizedLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 200;
 
   const { data, error } = await supabase
     .from("activity_log")
-    .select("id,type,meta,created_at")
-    .eq("user_id", userId)
+    .select("id,type,meta,created_at,user_id")
     .order("created_at", { ascending: false })
     .limit(normalizedLimit);
 
@@ -223,7 +229,26 @@ async function listRecentActivity(limit = 200): Promise<ActivityFeedEvent[]> {
     throw error;
   }
 
-  return (data ?? []).map((row: ActivityLogRow) => mapActivityRow(row));
+  const rows = (data ?? []) as ActivityLogRow[];
+
+  const otherUserIds = Array.from(
+    new Set(rows.map((r) => r.user_id).filter((id): id is string => Boolean(id) && id !== currentUserId)),
+  );
+
+  const profileNames = new Map<string, string>();
+  if (otherUserIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id,display_name")
+      .in("id", otherUserIds);
+    for (const p of profiles ?? []) {
+      if (p.id && p.display_name) {
+        profileNames.set(p.id, p.display_name);
+      }
+    }
+  }
+
+  return rows.map((row) => mapActivityRow(row, currentUserId, profileNames));
 }
 
 export const activityService = {

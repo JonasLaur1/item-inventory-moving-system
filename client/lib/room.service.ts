@@ -117,7 +117,6 @@ async function getLocationNameMap(userId: string, locationIds: string[]): Promis
   const { data, error } = await supabase
     .from("locations")
     .select("id,name")
-    .eq("user_id", userId)
     .in("id", locationIds);
 
   if (error) throw error;
@@ -183,7 +182,6 @@ async function listRoomSummaries(locationId?: string): Promise<RoomSummary[]> {
   let query = supabase
     .from("rooms")
     .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
-    .eq("user_id", userId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -211,12 +209,11 @@ async function listRoomSummaries(locationId?: string): Promise<RoomSummary[]> {
   return mapRoomSummaries(rooms, boxesResult.data ?? [], locationNameMap);
 }
 
-async function assertUserOwnsLocation(locationId: string, userId: string): Promise<string> {
+async function assertUserCanAccessLocation(locationId: string): Promise<string> {
   const { data, error } = await supabase
     .from("locations")
     .select("id,name")
     .eq("id", locationId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -239,7 +236,7 @@ async function createRoom(input: CreateRoomInput): Promise<string> {
   }
 
   const userId = await getCurrentUserId();
-  const locationName = await assertUserOwnsLocation(locationId, userId);
+  const locationName = await assertUserCanAccessLocation(locationId);
 
   const { data, error } = await supabase
     .from("rooms")
@@ -286,7 +283,6 @@ async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     .from("rooms")
     .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
     .eq("id", normalizedRoomId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (roomError) throw roomError;
@@ -357,7 +353,6 @@ async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void>
     .from("rooms")
     .select("id,name,location_id")
     .eq("id", normalizedRoomId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (existingError) throw existingError;
@@ -367,7 +362,7 @@ async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void>
 
   const nextLocationId = locationId ?? existingRoom.location_id;
   const nextName = name ?? existingRoom.name;
-  const nextLocationName = await assertUserOwnsLocation(nextLocationId, userId);
+  const nextLocationName = await assertUserCanAccessLocation(nextLocationId);
 
   const updates: Record<string, string> = {};
   if (name !== undefined) {
@@ -385,7 +380,6 @@ async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void>
     .from("rooms")
     .update(updates)
     .eq("id", normalizedRoomId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -401,7 +395,7 @@ async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<void>
   const previousLocationName =
     existingRoom.location_id === nextLocationId
       ? nextLocationName
-      : await assertUserOwnsLocation(existingRoom.location_id, userId);
+      : await assertUserCanAccessLocation(existingRoom.location_id);
 
   await activityService.writeActivitySafely({
     type: existingRoom.location_id !== nextLocationId ? "Moved" : "Updated",
@@ -443,7 +437,6 @@ async function deleteRoom(roomId: string): Promise<void> {
     .from("rooms")
     .select("id,name,location_id")
     .eq("id", normalizedRoomId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (roomFetchError) throw roomFetchError;
@@ -451,13 +444,12 @@ async function deleteRoom(roomId: string): Promise<void> {
     throw new Error("Room not found.");
   }
 
-  const locationName = await assertUserOwnsLocation(roomBeforeDelete.location_id, userId);
+  const locationName = await assertUserCanAccessLocation(roomBeforeDelete.location_id);
 
   const { data, error } = await supabase
     .from("rooms")
     .delete()
     .eq("id", normalizedRoomId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 

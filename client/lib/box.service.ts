@@ -178,7 +178,6 @@ async function getRoomContextMap(userId: string, roomIds: string[]): Promise<Map
   const { data, error } = await supabase
     .from("rooms")
     .select("id,name,location_id,location:locations(id,name)")
-    .eq("user_id", userId)
     .in("id", roomIds);
 
   if (error) throw error;
@@ -192,12 +191,11 @@ async function getRoomContextMap(userId: string, roomIds: string[]): Promise<Map
   return map;
 }
 
-async function assertUserOwnsRoom(roomId: string, userId: string): Promise<RoomContext> {
+async function assertUserCanAccessRoom(roomId: string): Promise<RoomContext> {
   const { data, error } = await supabase
     .from("rooms")
     .select("id,name,location_id,location:locations(id,name)")
     .eq("id", roomId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -213,7 +211,6 @@ async function getLocationNameById(locationId: string, userId: string): Promise<
     .from("locations")
     .select("id,name")
     .eq("id", locationId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -224,7 +221,6 @@ async function findDefaultRoomInLocation(locationId: string, userId: string): Pr
   const { data, error } = await supabase
     .from("rooms")
     .select("id,name,location_id,location:locations(id,name)")
-    .eq("user_id", userId)
     .eq("location_id", locationId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
@@ -250,7 +246,7 @@ async function resolveRoomFromInput(
   }
 
   try {
-    return await assertUserOwnsRoom(candidateId, userId);
+    return await assertUserCanAccessRoom(candidateId);
   } catch {
     const locationName = await getLocationNameById(candidateId, userId);
     if (!locationName) {
@@ -294,7 +290,6 @@ async function listBoxes(): Promise<BoxSummary[]> {
   const { data: boxes, error: boxesError } = await supabase
     .from("boxes")
     .select("id,name,status,room_id,updated_at,fragility,item_count:items(count)")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
   if (boxesError) throw boxesError;
@@ -322,7 +317,6 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     .from("boxes")
     .select("id,name,status,room_id,updated_at,fragility")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (boxError) throw boxError;
@@ -335,7 +329,6 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     supabase
       .from("items")
       .select("id,name,notes,quantity,is_fragile,photo_url")
-      .eq("user_id", userId)
       .eq("box_id", normalizedBoxId)
       .order("created_at", { ascending: true }),
   ]);
@@ -432,7 +425,6 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
     .from("boxes")
     .select("id,name,status,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (previousBoxError) throw previousBoxError;
@@ -448,7 +440,6 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       status,
     })
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -560,7 +551,6 @@ async function deleteBox(boxId: string): Promise<void> {
     .from("boxes")
     .select("id,name,status,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (boxBeforeDeleteError) throw boxBeforeDeleteError;
@@ -571,7 +561,6 @@ async function deleteBox(boxId: string): Promise<void> {
   const { count, error: countError } = await supabase
     .from("items")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
     .eq("box_id", normalizedBoxId);
 
   if (countError) throw countError;
@@ -583,7 +572,6 @@ async function deleteBox(boxId: string): Promise<void> {
     .from("boxes")
     .delete()
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -638,7 +626,6 @@ async function markBoxDelivered(boxId: string): Promise<void> {
     .from("boxes")
     .select("id,name,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (fetchError) throw fetchError;
@@ -649,8 +636,7 @@ async function markBoxDelivered(boxId: string): Promise<void> {
   const { error } = await supabase
     .from("boxes")
     .update({ status: "delivered" })
-    .eq("id", normalizedBoxId)
-    .eq("user_id", userId);
+    .eq("id", normalizedBoxId);
 
   if (error) throw error;
 
@@ -682,7 +668,6 @@ async function markBoxUnpackedAtDestination(boxId: string): Promise<void> {
     .from("boxes")
     .select("id,name,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (fetchError) throw fetchError;
@@ -693,8 +678,7 @@ async function markBoxUnpackedAtDestination(boxId: string): Promise<void> {
   const { error } = await supabase
     .from("boxes")
     .update({ status: "unpacked_at_destination" })
-    .eq("id", normalizedBoxId)
-    .eq("user_id", userId);
+    .eq("id", normalizedBoxId);
 
   if (error) throw error;
 

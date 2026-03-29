@@ -146,7 +146,6 @@ async function assertUserOwnsBox(boxId: string, userId: string): Promise<BoxCont
     .from("boxes")
     .select("id,name,room_id,fragility,room:rooms(id,name,location_id,location:locations(id,name))")
     .eq("id", boxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -189,7 +188,6 @@ async function getRoomNameByRoomId(roomId: string | null, userId: string): Promi
     .from("rooms")
     .select("name")
     .eq("id", roomId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -235,8 +233,7 @@ async function markBoxFragileIfNeeded(boxContext: { id: string; fragility: strin
   const { error } = await supabase
     .from("boxes")
     .update({ fragility: "fragile" })
-    .eq("id", boxContext.id)
-    .eq("user_id", userId);
+    .eq("id", boxContext.id);
 
   if (error) throw error;
 }
@@ -250,7 +247,6 @@ async function listItemsByBox(boxId: string): Promise<ItemSummary[]> {
   const { data, error } = await supabase
     .from("items")
     .select("id,name,notes,quantity,is_fragile,photo_url,box_id,created_at,updated_at")
-    .eq("user_id", userId)
     .eq("box_id", normalizedBoxId)
     .order("created_at", { ascending: true });
 
@@ -334,7 +330,6 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
     .from("items")
     .select("id,name,notes,quantity,is_fragile,box_id")
     .eq("id", normalizedItemId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (itemBeforeUpdateError) throw itemBeforeUpdateError;
@@ -358,7 +353,6 @@ async function updateItem(itemId: string, input: UpdateItemInput): Promise<void>
       box_id: boxId,
     })
     .eq("id", normalizedItemId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -477,7 +471,6 @@ async function deleteItem(itemId: string): Promise<void> {
     .from("items")
     .select("id,name,notes,quantity,is_fragile,box_id")
     .eq("id", normalizedItemId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (itemBeforeDeleteError) throw itemBeforeDeleteError;
@@ -491,7 +484,6 @@ async function deleteItem(itemId: string): Promise<void> {
     .from("items")
     .delete()
     .eq("id", normalizedItemId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -556,8 +548,7 @@ async function uploadItemPhoto(itemId: string, base64: string): Promise<void> {
   const { error: updateError } = await supabase
     .from("items")
     .update({ photo_url: urlData.publicUrl })
-    .eq("id", itemId)
-    .eq("user_id", userId);
+    .eq("id", itemId);
 
   if (updateError) throw updateError;
 }
@@ -571,8 +562,7 @@ async function removeItemPhoto(itemId: string): Promise<void> {
   const { error } = await supabase
     .from("items")
     .update({ photo_url: null })
-    .eq("id", itemId)
-    .eq("user_id", userId);
+    .eq("id", itemId);
 
   if (error) throw error;
 }

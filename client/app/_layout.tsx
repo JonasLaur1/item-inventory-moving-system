@@ -131,6 +131,7 @@ function RootLayoutContent() {
           <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="box/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="location-settings/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="location-config/index" options={{ headerShown: false }} />
           <Stack.Screen name="location-config/[id]" options={{ headerShown: false }} />
         </Stack>

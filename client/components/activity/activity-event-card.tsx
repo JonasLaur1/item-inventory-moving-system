@@ -15,6 +15,8 @@ export type ActivityEvent = {
   room?: string;
   box?: string;
   occurredAt: string;
+  actorName?: string | null;
+  isOwnEvent?: boolean;
 };
 
 type ActivityEventCardProps = {
@@ -51,6 +53,9 @@ export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) 
         {event.room ? <MetaPill icon="home" text={event.room} /> : null}
         {event.box ? <MetaPill icon="archive" text={event.box} /> : null}
         <MetaPill icon="clock" text={timeLabel} />
+        {!event.isOwnEvent && event.actorName ? (
+          <MetaPill icon="user" text={event.actorName} />
+        ) : null}
       </View>
     </View>
   );

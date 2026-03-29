@@ -5,6 +5,7 @@ export type LocationKind = "start" | "destination" | "other";
 
 type LocationRow = {
   id: string;
+  user_id?: string;
   name: string;
   kind: string | null;
   cover_image_url: string | null;
@@ -73,6 +74,7 @@ export type LocationDetailsBox = {
 };
 
 export type LocationDetails = LocationSummary & {
+  isOwner: boolean;
   roomList: LocationDetailsRoom[];
   boxList: LocationDetailsBox[];
 };
@@ -161,7 +163,6 @@ async function getLocationAggregation(userId: string, locationIds: string[]): Pr
   const { data: rooms, error: roomsError } = await supabase
     .from("rooms")
     .select("id,location_id,name,cover_image_url,sort_order,created_at,updated_at")
-    .eq("user_id", userId)
     .in("location_id", locationIds)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -254,7 +255,6 @@ async function listLocationSummaries(): Promise<LocationSummary[]> {
   const { data: locations, error: locationsError } = await supabase
     .from("locations")
     .select("id,name,kind,cover_image_url,sort_order,created_at,updated_at")
-    .eq("user_id", userId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -475,9 +475,8 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   const { data: location, error: locationError } = await supabase
     .from("locations")
-    .select("id,name,kind,cover_image_url,sort_order,created_at,updated_at")
+    .select("id,user_id,name,kind,cover_image_url,sort_order,created_at,updated_at")
     .eq("id", normalizedLocationId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (locationError) throw locationError;
@@ -485,6 +484,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
     throw new Error("Location not found.");
   }
 
+  const isOwner = location.user_id === userId;
   const aggregation = await getLocationAggregation(userId, [normalizedLocationId]);
   const summary = mapLocationSummaries([location], aggregation)[0];
 
@@ -525,6 +525,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   return {
     ...summary,
+    isOwner,
     roomList,
     boxList,
   };
