@@ -1,7 +1,7 @@
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { QuickActionCard } from "@/components/home/quick-action-card";
-import { SectionHeader } from "@/components/home/section-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { AppModal } from "@/components/ui/app-modal";
@@ -12,6 +12,8 @@ import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
+import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useLocations } from "@/hooks/use-locations";
 import { useRooms } from "@/hooks/use-rooms";
@@ -30,36 +32,6 @@ const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Packed", value: "packed" },
   { label: "Not packed", value: "unpacked" },
 ];
-
-function getMinutesAgo(occurredAt: string, nowMs: number): number {
-  const timestamp = new Date(occurredAt).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
-}
-
-function formatRelativeTime(minutesAgo: number): string {
-  if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
-    return "Unknown";
-  }
-
-  if (minutesAgo < 1) {
-    return "Just now";
-  }
-
-  if (minutesAgo < 60) {
-    return `${minutesAgo}m ago`;
-  }
-
-  if (minutesAgo < 24 * 60) {
-    return `${Math.floor(minutesAgo / 60)}h ago`;
-  }
-
-  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
-}
 
 function formatUpdatedAt(isoDate: string | null): string {
   if (!isoDate) {
@@ -103,6 +75,8 @@ export default function InventoryTabScreen() {
   const isCompact = width < 400;
   const isNarrow = width < 360;
   const hasFocusedOnceRef = useRef(false);
+  const { resolvedTheme } = useThemePreference();
+  const palette = Colors[resolvedTheme];
 
   const {
     boxes: summaryBoxes,
@@ -498,7 +472,7 @@ export default function InventoryTabScreen() {
             name="sliders"
             size={16}
             color={
-              isFilterOpen || activeFilterCount > 0 ? Colors.dark.primary : Colors.dark.textSecondary
+              isFilterOpen || activeFilterCount > 0 ? palette.primary : palette.textSecondary
             }
           />
           {activeFilterCount > 0 ? (

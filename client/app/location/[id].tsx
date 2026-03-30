@@ -1,7 +1,7 @@
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
-import { SectionHeader } from "@/components/home/section-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { AppModal } from "@/components/ui/app-modal";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";

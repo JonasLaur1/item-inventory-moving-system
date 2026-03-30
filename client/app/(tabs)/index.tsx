@@ -1,7 +1,7 @@
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
-import { SectionHeader } from "@/components/home/section-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
@@ -9,7 +9,6 @@ import { Button } from "@/components/button";
 import { useActivityHistory } from "@/hooks/use-activity-history";
 import { useLocations } from "@/hooks/use-locations";
 import { useMovingMode } from "@/hooks/use-moving-mode";
-import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -17,55 +16,9 @@ import { RefreshControl, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
+import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
+import { getEventTone } from "@/utils/activity-tone";
 
-function getMinutesAgo(occurredAt: string, nowMs: number): number {
-  const timestamp = new Date(occurredAt).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
-}
-
-function formatRelativeTime(minutesAgo: number): string {
-  if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
-    return "Unknown";
-  }
-
-  if (minutesAgo < 1) {
-    return "Just now";
-  }
-
-  if (minutesAgo < 60) {
-    return `${minutesAgo}m ago`;
-  }
-
-  if (minutesAgo < 24 * 60) {
-    return `${Math.floor(minutesAgo / 60)}h ago`;
-  }
-
-  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
-}
-
-function getActivityIcon(type: string): keyof typeof Feather.glyphMap {
-  switch (type) {
-    case "Created":
-      return "plus-square";
-    case "Updated":
-      return "edit-3";
-    case "Moved":
-      return "repeat";
-    case "Deleted":
-      return "trash-2";
-    case "Packed":
-      return "archive";
-    case "Delivered":
-      return "truck";
-    default:
-      return "clock";
-  }
-}
 
 const RING_SIZE = 160;
 const STROKE_WIDTH = 12;
@@ -159,8 +112,8 @@ export default function HomeTabScreen() {
           id: event.id,
           title: event.title,
           subtitle: event.description,
-          badgeText: formatRelativeTime(minutesAgo),
-          icon: getActivityIcon(event.type),
+          rightLabel: formatRelativeTime(minutesAgo),
+          icon: getEventTone(event.type).icon,
           isCollaborator: !event.isOwnEvent,
           actorName: event.actorName,
         };
@@ -189,7 +142,7 @@ export default function HomeTabScreen() {
         />
       ) : null}
 
-      <View className={isMovingActive && hasMultipleLocations ? "mt-4 flex-row gap-3" : "mt-8 flex-row gap-3"}>
+      <View className={`${isMovingActive && hasMultipleLocations ? "mt-4" : "mt-8"} flex-row gap-3`}>
         <QuickActionCard
           title="Add Location"
           subtitle="Create New Location"
@@ -217,6 +170,7 @@ export default function HomeTabScreen() {
           subtitle="Scan QR Code"
           icon="camera"
           variant="secondary"
+          style={{ flex: 0, width: "48.5%" }}
           onPress={() => router.push("/(tabs)/scan")}
         />
       </View>
@@ -246,18 +200,19 @@ export default function HomeTabScreen() {
           />
         ) : null}
         <View className="mt-4 gap-3">
-          {recentActivityRows.length > 0 ? (
+          {isActivityLoading ? (
+            <EmptyStateCard
+              title="Loading activity…"
+              description="Fetching your latest activity."
+            />
+          ) : recentActivityRows.length > 0 ? (
             recentActivityRows.map((activity) => (
               <ItemRow key={activity.id} item={activity} />
             ))
           ) : (
             <EmptyStateCard
-              title={isActivityLoading || isActivityRefreshing ? "Loading activity..." : "No activity yet"}
-              description={
-                isActivityLoading || isActivityRefreshing
-                  ? "Fetching your latest activity."
-                  : "Your latest inventory actions will appear here."
-              }
+              title="No activity yet"
+              description="Your latest inventory actions will appear here."
             />
           )}
         </View>

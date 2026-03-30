@@ -1,6 +1,6 @@
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
-import { SectionHeader } from "@/components/home/section-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { AppModal } from "@/components/ui/app-modal";
 import { CameraCaptureModal, type CaptureResult } from "@/components/ui/camera-capture-modal";
@@ -108,7 +108,7 @@ function mapItemToRow(item: BoxDetailsItem): InventoryItemRowData {
     title: item.name,
     subtitle: item.notes?.trim() ? item.notes : undefined,
     quantity: item.quantity,
-    badgeText: item.isFragile ? "Fragile" : "Not fragile",
+    isFragile: item.isFragile,
     icon: "package",
     photoUrl: item.photoUrl,
   };

@@ -3,7 +3,7 @@ import {
   type ActivityEvent,
   type ActivityEventType,
 } from "@/components/activity/activity-event-card";
-import { SectionHeader } from "@/components/home/section-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { FilterGroup } from "@/components/ui/filter-group";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -11,8 +11,10 @@ import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { useActivityHistory } from "@/hooks/use-activity-history";
 import { Feather } from "@expo/vector-icons";
+import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
@@ -52,41 +54,13 @@ function getGroupLabel(minutesAgo: number) {
   return "This Week";
 }
 
-function getMinutesAgo(occurredAt: string, nowMs: number) {
-  const timestamp = new Date(occurredAt).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
-}
-
-function formatRelativeTime(minutesAgo: number) {
-  if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
-    return "Unknown";
-  }
-
-  if (minutesAgo < 1) {
-    return "Just now";
-  }
-
-  if (minutesAgo < 60) {
-    return `${minutesAgo}m ago`;
-  }
-
-  if (minutesAgo < 24 * 60) {
-    return `${Math.floor(minutesAgo / 60)}h ago`;
-  }
-
-  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
-}
-
 export default function ActivityTabScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const isNarrow = width < 360;
   const hasFocusedOnceRef = useRef(false);
+  const { resolvedTheme } = useThemePreference();
+  const palette = Colors[resolvedTheme];
 
   const { events, isLoading, isRefreshing, errorMessage, refreshActivity, clearError } = useActivityHistory();
 
@@ -227,11 +201,7 @@ export default function ActivityTabScreen() {
           <Feather
             name="sliders"
             size={16}
-            color={
-              isFilterOpen || activeFilterCount > 0
-                ? Colors.dark.primary
-                : Colors.dark.textSecondary
-            }
+            color={isFilterOpen || activeFilterCount > 0 ? palette.primary : palette.textSecondary}
           />
           {activeFilterCount > 0 ? (
             <View className="absolute -right-1 -top-1 h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1">

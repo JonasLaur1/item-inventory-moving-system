@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { type PressableProps, View } from "react-native";
 
@@ -12,12 +13,14 @@ export type RoomCardProps = PressableProps & {
 };
 
 export function RoomCard({ name, packed, total, icon, ...props }: RoomCardProps) {
+  const { resolvedTheme } = useThemePreference();
+  const palette = Colors[resolvedTheme];
   const roomProgress = total === 0 ? 0 : Math.round((packed / total) * 100);
   const clampedProgress = Math.max(0, Math.min(100, roomProgress));
 
   return (
     <DashboardCard
-      icon={<MaterialCommunityIcons name={icon} size={24} color={Colors.dark.primary} />}
+      icon={<MaterialCommunityIcons name={icon} size={24} color={palette.primary} />}
       title={name}
       subtitle={`${packed}/${total} boxes`}
       className="border border-border-default bg-bg-elevated/75"

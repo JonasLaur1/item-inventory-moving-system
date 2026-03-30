@@ -24,10 +24,10 @@ export function Button({
 }: ButtonProps) {
   const containerClassName =
     variant === "primary"
-      ? "bg-text-primary"
+      ? "bg-primary shadow-soft"
       : "bg-bg-elevated/80 border border-border-default";
   const textColorClassName =
-    variant === "primary" ? "text-bg-base text-lg" : "text-text-primary";
+    variant === "primary" ? "text-white text-lg" : "text-text-primary";
 
   return (
     <Pressable

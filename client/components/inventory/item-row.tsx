@@ -1,5 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
+import { CollaboratorPill } from "@/components/ui/collaborator-pill";
+import { FragilityBadge } from "@/components/ui/fragility-badge";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
@@ -9,7 +11,8 @@ export type InventoryItemRowData = {
   title: string;
   subtitle?: string;
   quantity?: number;
-  badgeText?: string;
+  isFragile?: boolean;
+  rightLabel?: string;
   icon?: keyof typeof Feather.glyphMap;
   photoUrl?: string | null;
   isCollaborator?: boolean;
@@ -28,12 +31,7 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
 
   const hasActions = Boolean(onPressEdit || onPressDelete);
   const hasQuantity = typeof item.quantity === "number";
-  const hasInlineBadge = hasQuantity && Boolean(item.badgeText);
-  const normalizedBadgeText = item.badgeText?.trim().toLowerCase();
-  const isFragileBadge = normalizedBadgeText === "fragile";
-  const isNotFragileBadge = normalizedBadgeText === "not fragile";
   const isCollaborator = Boolean(item.isCollaborator);
-  const actorLabel = item.actorName ?? "Collaborator";
 
   return (
     <View
@@ -51,8 +49,9 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
           <Feather name={item.icon ?? "tag"} size={16} color={palette.primary} />
         </View>
       )}
+
       <View className="ml-3 flex-1">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-sm font-semibold text-text-primary">{item.title}</Text>
           {hasQuantity ? (
             <View className="rounded-full bg-primary/15 px-2 py-0.5">
@@ -61,65 +60,49 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
               </Text>
             </View>
           ) : null}
-          {hasInlineBadge ? (
-            <View
-              className={`rounded-full px-2 py-0.5 ${
-                isFragileBadge
-                  ? "bg-amber-500/20"
-                  : isNotFragileBadge
-                    ? "bg-slate-500/20"
-                    : "bg-primary/15"
-              }`}
-            >
-              <Text
-                className={`text-[10px] font-semibold uppercase ${
-                  isFragileBadge
-                    ? "text-amber-300"
-                    : isNotFragileBadge
-                      ? "text-slate-300"
-                      : "text-text-link"
-                }`}
-              >
-                {item.badgeText}
-              </Text>
-            </View>
+          {typeof item.isFragile === "boolean" ? (
+            <FragilityBadge isFragile={item.isFragile} />
           ) : null}
         </View>
-        {item.subtitle ? <Text className="mt-1 text-xs text-text-tertiary">{item.subtitle}</Text> : null}
+        {item.subtitle ? (
+          <Text className="mt-1 text-xs text-text-tertiary">{item.subtitle}</Text>
+        ) : null}
         {isCollaborator ? (
-          <View className="mt-1 flex-row items-center gap-1">
-            <Feather name="users" size={10} color={palette.primary} />
-            <Text className="text-[10px] font-medium text-text-link">{actorLabel}</Text>
+          <View className="mt-1">
+            <CollaboratorPill actorName={item.actorName} size="sm" />
           </View>
         ) : null}
       </View>
-      <View className={`${hasActions ? "items-end gap-2" : ""}`}>
-        {!hasInlineBadge && item.badgeText ? (
-          <Text className="text-xs font-semibold text-text-link">{item.badgeText}</Text>
-        ) : null}
-        {hasActions ? (
-          <View className="flex-row gap-2">
-            {onPressEdit ? (
-              <Pressable
-                onPress={() => onPressEdit(item)}
-                hitSlop={6}
-                className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
-              >
-                <Feather name="edit-2" size={14} color={palette.textPrimary} />
-              </Pressable>
-            ) : null}
-            {onPressDelete ? (
-              <Pressable
-                onPress={() => onPressDelete(item)}
-                hitSlop={6}
-                className="h-8 w-8 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
-              >
-                <Feather name="trash-2" size={14} color={palette.crimson} />
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+
+      {!hasActions && item.rightLabel ? (
+        <Text className="text-xs font-semibold text-text-link">{item.rightLabel}</Text>
+      ) : null}
+      {hasActions ? (
+        <View className="flex-row gap-2">
+          {onPressEdit ? (
+            <Pressable
+              onPress={() => onPressEdit(item)}
+              hitSlop={6}
+              accessibilityLabel={`Edit ${item.title}`}
+              accessibilityRole="button"
+              className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+            >
+              <Feather name="edit-2" size={14} color={palette.textPrimary} />
+            </Pressable>
+          ) : null}
+          {onPressDelete ? (
+            <Pressable
+              onPress={() => onPressDelete(item)}
+              hitSlop={6}
+              accessibilityLabel={`Delete ${item.title}`}
+              accessibilityRole="button"
+              className="h-8 w-8 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
+            >
+              <Feather name="trash-2" size={14} color={palette.crimson} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
