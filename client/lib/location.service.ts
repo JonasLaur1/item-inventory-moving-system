@@ -138,6 +138,27 @@ function normalizeLocationKind(value: string | null | undefined): LocationKind {
   return "other";
 }
 
+function resolveUniqueName(baseName: string, existingNames: string[]): string {
+  const lower = baseName.toLowerCase();
+
+  if (!existingNames.some((n) => n.toLowerCase() === lower)) {
+    return baseName;
+  }
+
+  const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped} #(\\d+)$`, "i");
+  let maxN = 1;
+
+  for (const name of existingNames) {
+    const match = name.match(pattern);
+    if (match) {
+      maxN = Math.max(maxN, parseInt(match[1], 10));
+    }
+  }
+
+  return `${baseName} #${maxN + 1}`;
+}
+
 function isForeignKeyViolation(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -282,11 +303,27 @@ async function createLocation(input: string | CreateLocationInput): Promise<{ id
   const kind = normalizeLocationKind(normalizedInput.kind);
   const userId = await getCurrentUserId();
 
+  const { data: siblingData } = await supabase
+    .from("locations")
+    .select("name")
+    .ilike("name", `${trimmedName}%`);
+
+  const siblingNames = (siblingData ?? [])
+    .map((row: { name: string }) => row.name)
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      const base = trimmedName.toLowerCase();
+      const escaped = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return lower === base || new RegExp(`^${escaped} #\\d+$`, "i").test(n);
+    });
+
+  const resolvedName = resolveUniqueName(trimmedName, siblingNames);
+
   const { data, error } = await supabase
     .from("locations")
     .insert({
       user_id: userId,
-      name: trimmedName,
+      name: resolvedName,
       kind,
     })
     .select("id")
@@ -302,9 +339,9 @@ async function createLocation(input: string | CreateLocationInput): Promise<{ id
     entityType: "location",
     entityId: data.id,
     title: "Location created",
-    description: `Created location "${trimmedName}".`,
-    locationName: trimmedName,
-    next: { name: trimmedName, kind },
+    description: `Created location "${resolvedName}".`,
+    locationName: resolvedName,
+    next: { name: resolvedName, kind },
   });
 
   return { id: data.id };

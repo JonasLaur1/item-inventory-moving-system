@@ -100,6 +100,27 @@ function normalizeFragility(value: string | null): boolean {
   return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
 }
 
+function resolveUniqueName(baseName: string, existingNames: string[]): string {
+  const lower = baseName.toLowerCase();
+
+  if (!existingNames.some((n) => n.toLowerCase() === lower)) {
+    return baseName;
+  }
+
+  const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped} #(\\d+)$`, "i");
+  let maxN = 1;
+
+  for (const name of existingNames) {
+    const match = name.match(pattern);
+    if (match) {
+      maxN = Math.max(maxN, parseInt(match[1], 10));
+    }
+  }
+
+  return `${baseName} #${maxN + 1}`;
+}
+
 function isForeignKeyViolation(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -238,12 +259,29 @@ async function createRoom(input: CreateRoomInput): Promise<string> {
   const userId = await getCurrentUserId();
   const locationName = await assertUserCanAccessLocation(locationId);
 
+  const { data: siblingData } = await supabase
+    .from("rooms")
+    .select("name")
+    .eq("location_id", locationId)
+    .ilike("name", `${name}%`);
+
+  const siblingNames = (siblingData ?? [])
+    .map((row: { name: string }) => row.name)
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      const base = name.toLowerCase();
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return lower === base || new RegExp(`^${escaped} #\\d+$`, "i").test(n);
+    });
+
+  const resolvedName = resolveUniqueName(name, siblingNames);
+
   const { data, error } = await supabase
     .from("rooms")
     .insert({
       user_id: userId,
       location_id: locationId,
-      name,
+      name: resolvedName,
     })
     .select("id")
     .maybeSingle();
@@ -258,11 +296,11 @@ async function createRoom(input: CreateRoomInput): Promise<string> {
     entityType: "room",
     entityId: data.id,
     title: "Room created",
-    description: `Created room "${name}" in "${locationName}".`,
+    description: `Created room "${resolvedName}" in "${locationName}".`,
     locationName,
-    roomName: name,
+    roomName: resolvedName,
     next: {
-      name,
+      name: resolvedName,
       locationId,
       locationName,
     },

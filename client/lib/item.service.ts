@@ -74,6 +74,27 @@ async function getCurrentUserId(): Promise<string> {
   return userId;
 }
 
+function resolveUniqueName(baseName: string, existingNames: string[]): string {
+  const lower = baseName.toLowerCase();
+
+  if (!existingNames.some((n) => n.toLowerCase() === lower)) {
+    return baseName;
+  }
+
+  const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped} #(\\d+)$`, "i");
+  let maxN = 1;
+
+  for (const name of existingNames) {
+    const match = name.match(pattern);
+    if (match) {
+      maxN = Math.max(maxN, parseInt(match[1], 10));
+    }
+  }
+
+  return `${baseName} #${maxN + 1}`;
+}
+
 function normalizeName(name: string): string {
   const normalizedName = name.trim();
   if (!normalizedName) {
@@ -265,12 +286,29 @@ async function createItem(input: CreateItemInput): Promise<string> {
 
   const targetBox = await getBoxActivityContext(boxId, userId);
 
+  const { data: siblingData } = await supabase
+    .from("items")
+    .select("name")
+    .eq("box_id", boxId)
+    .ilike("name", `${name}%`);
+
+  const siblingNames = (siblingData ?? [])
+    .map((row: { name: string | null }) => row.name ?? "")
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      const base = name.toLowerCase();
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return lower === base || new RegExp(`^${escaped} #\\d+$`, "i").test(n);
+    });
+
+  const resolvedName = resolveUniqueName(name, siblingNames);
+
   const { data, error } = await supabase
     .from("items")
     .insert({
       user_id: userId,
       box_id: boxId,
-      name,
+      name: resolvedName,
       quantity,
       is_fragile: isFragile,
       notes,
@@ -292,12 +330,12 @@ async function createItem(input: CreateItemInput): Promise<string> {
     entityType: "item",
     entityId: data.id,
     title: "Item created",
-    description: `Added item "${name}" to "${targetBox.name}".`,
+    description: `Added item "${resolvedName}" to "${targetBox.name}".`,
     locationName: targetBox.locationName,
     roomName: targetBox.roomName,
     boxName: targetBox.name,
     next: {
-      name,
+      name: resolvedName,
       quantity,
       isFragile,
       notes,

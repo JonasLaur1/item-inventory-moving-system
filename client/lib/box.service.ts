@@ -161,6 +161,27 @@ function normalizeRoomContextRow(row: RoomContextRow): RoomContext {
   };
 }
 
+function resolveUniqueName(baseName: string, existingNames: string[]): string {
+  const lower = baseName.toLowerCase();
+
+  if (!existingNames.some((n) => n.toLowerCase() === lower)) {
+    return baseName;
+  }
+
+  const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped} #(\\d+)$`, "i");
+  let maxN = 1;
+
+  for (const name of existingNames) {
+    const match = name.match(pattern);
+    if (match) {
+      maxN = Math.max(maxN, parseInt(match[1], 10));
+    }
+  }
+
+  return `${baseName} #${maxN + 1}`;
+}
+
 function isForeignKeyViolation(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -367,12 +388,29 @@ async function createBox(input: CreateBoxInput): Promise<string> {
   const userId = await getCurrentUserId();
   const roomContext = await resolveRoomFromInput(userId, input);
 
+  const { data: siblingData } = await supabase
+    .from("boxes")
+    .select("name")
+    .eq("room_id", roomContext.roomId)
+    .ilike("name", `${name}%`);
+
+  const siblingNames = (siblingData ?? [])
+    .map((row: { name: string }) => row.name)
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      const base = name.toLowerCase();
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return lower === base || new RegExp(`^${escaped} #\\d+$`, "i").test(n);
+    });
+
+  const resolvedName = resolveUniqueName(name, siblingNames);
+
   const { data, error } = await supabase
     .from("boxes")
     .insert({
       user_id: userId,
       room_id: roomContext.roomId,
-      name,
+      name: resolvedName,
       status,
     })
     .select("id")
@@ -388,12 +426,12 @@ async function createBox(input: CreateBoxInput): Promise<string> {
     entityType: "box",
     entityId: data.id,
     title: "Box created",
-    description: `Created box "${name}" in room "${roomContext.roomName}".`,
+    description: `Created box "${resolvedName}" in room "${roomContext.roomName}".`,
     locationName: roomContext.parentLocationName,
     roomName: roomContext.roomName,
-    boxName: name,
+    boxName: resolvedName,
     next: {
-      name,
+      name: resolvedName,
       status,
       roomId: roomContext.roomId,
       roomName: roomContext.roomName,
