@@ -11,7 +11,7 @@ import { useLocations } from "@/hooks/use-locations";
 import { useMovingMode } from "@/hooks/use-moving-mode";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshControl, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Colors } from "@/constants/theme";
@@ -70,6 +70,7 @@ export default function HomeTabScreen() {
   const themeColors = Colors[resolvedTheme];
   const {
     locations,
+    isLoading: isLocationsLoading,
     isRefreshing,
     refreshLocations,
   } = useLocations();
@@ -95,6 +96,12 @@ export default function HomeTabScreen() {
   );
 
   const hasMultipleLocations = locations.length >= 2;
+
+  useEffect(() => {
+    if (!isLocationsLoading && isMovingActive && locations.length < 2) {
+      void stopMoving();
+    }
+  }, [isLocationsLoading, locations.length, isMovingActive, stopMoving]);
 
   const deliveryStats = useMemo(() => {
     const totalBoxes = locations.reduce((sum, loc) => sum + loc.boxes, 0);
