@@ -40,6 +40,12 @@
     "card": "16px",
     "modal": "20px"
   },
+  "spacing": {
+    "18": "4.5rem",
+    "22": "5.5rem",
+    "26": "6.5rem",
+    "30": "7.5rem"
+  },
   "shadow": {
     "card": "0 8px 24px rgba(0, 0, 0, 0.25)",
     "modal": "0 16px 40px rgba(0, 0, 0, 0.35)",
