@@ -457,7 +457,7 @@ export default function InventoryTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search box, room, or ID"
+          placeholder="Search box, room"
           containerClassName="flex-1"
         />
         <Pressable
