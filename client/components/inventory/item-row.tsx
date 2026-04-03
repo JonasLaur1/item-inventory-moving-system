@@ -56,7 +56,7 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
           {hasQuantity ? (
             <View className="rounded-full bg-primary/15 px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase text-text-link">
-                Qty {item.quantity}
+                x{item.quantity}
               </Text>
             </View>
           ) : null}
