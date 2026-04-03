@@ -10,7 +10,7 @@ type BoxRow = {
   room_id: string | null;
   updated_at: string | null;
   fragility: string | null;
-  item_count: Array<{ quantity: number | null }> | null;
+  item_count: number;
 };
 
 type BoxDetailsRow = {
@@ -125,16 +125,6 @@ function normalizeInputStatus(status: string): BoxStatus {
   return normalizedStatus;
 }
 
-function getNestedCount(value: Array<{ quantity: number | null }> | null): number {
-  if (!Array.isArray(value) || value.length === 0) {
-    return 0;
-  }
-
-  return value.reduce((total, entry) => {
-    const qty = entry?.quantity;
-    return total + (typeof qty === "number" ? qty : 0);
-  }, 0);
-}
 
 function normalizeFragility(value: string | null): boolean {
   if (!value) {
@@ -300,7 +290,7 @@ function mapBoxSummary(row: BoxRow, roomContextMap: Map<string, RoomContext>): B
     parentLocationId: roomContext?.parentLocationId ?? "",
     parentLocationName: roomContext?.parentLocationName ?? "Unknown location",
     updatedAt: row.updated_at,
-    itemsCount: getNestedCount(row.item_count),
+    itemsCount: row.item_count,
     isFragile: normalizeFragility(row.fragility),
   };
 }
@@ -308,22 +298,45 @@ function mapBoxSummary(row: BoxRow, roomContextMap: Map<string, RoomContext>): B
 async function listBoxes(): Promise<BoxSummary[]> {
   const userId = await getCurrentUserId();
 
-  const { data: boxes, error: boxesError } = await supabase
+  const { data: rawBoxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,name,status,room_id,updated_at,fragility,item_count:items(quantity)")
+    .select("id,name,status,room_id,updated_at,fragility")
     .order("created_at", { ascending: true });
 
   if (boxesError) throw boxesError;
-  if (!boxes || boxes.length === 0) {
+  if (!rawBoxes || rawBoxes.length === 0) {
     return [];
   }
 
+  const allBoxIds = rawBoxes.map((box) => box.id);
+  const itemCountByBoxId = new Map<string, number>();
+
+  if (allBoxIds.length > 0) {
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("items")
+      .select("box_id,quantity")
+      .in("box_id", allBoxIds);
+
+    if (itemsError) throw itemsError;
+
+    (itemRows ?? []).forEach((item: { box_id: string | null; quantity: number | null }) => {
+      if (!item.box_id) return;
+      const prev = itemCountByBoxId.get(item.box_id) ?? 0;
+      itemCountByBoxId.set(item.box_id, prev + (typeof item.quantity === "number" ? item.quantity : 0));
+    });
+  }
+
+  const boxes: BoxRow[] = rawBoxes.map((box) => ({
+    ...box,
+    item_count: itemCountByBoxId.get(box.id) ?? 0,
+  }));
+
   const roomIds = Array.from(
-    new Set(boxes.map((box: BoxRow) => box.room_id).filter((roomId): roomId is string => Boolean(roomId))),
+    new Set(boxes.map((box) => box.room_id).filter((roomId): roomId is string => Boolean(roomId))),
   );
   const roomContextMap = await getRoomContextMap(userId, roomIds);
 
-  return boxes.map((box: BoxRow) => mapBoxSummary(box, roomContextMap));
+  return boxes.map((box) => mapBoxSummary(box, roomContextMap));
 }
 
 async function getBoxDetails(boxId: string): Promise<BoxDetails> {
@@ -367,7 +380,7 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
 
   const row = {
     ...(box as BoxDetailsRow),
-    item_count: items.map((i) => ({ quantity: i.quantity })),
+    item_count: items.reduce((total, i) => total + i.quantity, 0),
   };
 
   return {

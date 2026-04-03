@@ -18,7 +18,7 @@ type BoxRow = {
   updated_at: string | null;
   fragility: string | null;
   name: string | null;
-  item_count: Array<{ quantity: number | null }> | null;
+  item_count: number;
 };
 
 type LocationRow = {
@@ -75,16 +75,6 @@ async function getCurrentUserId(): Promise<string> {
   return userId;
 }
 
-function getNestedCount(value: BoxRow["item_count"]): number {
-  if (!Array.isArray(value) || value.length === 0) {
-    return 0;
-  }
-
-  return value.reduce((total, entry) => {
-    const qty = entry?.quantity;
-    return total + (typeof qty === "number" ? qty : 0);
-  }, 0);
-}
 
 function normalizeFragility(value: string | null): boolean {
   if (!value) {
@@ -175,7 +165,7 @@ function mapRoomSummaries(
     if (box.status?.toLowerCase() === "packed") {
       current.packedBoxes += 1;
     }
-    current.items += getNestedCount(box.item_count);
+    current.items += box.item_count;
   }
 
   return rooms.map((room) => {
@@ -222,12 +212,36 @@ async function listRoomSummaries(locationId?: string): Promise<RoomSummary[]> {
 
   const [locationNameMap, boxesResult] = await Promise.all([
     getLocationNameMap(userId, locationIds),
-    supabase.from("boxes").select("id,room_id,status,updated_at,fragility,name,item_count:items(quantity)").in("room_id", roomIds),
+    supabase.from("boxes").select("id,room_id,status,updated_at,fragility,name").in("room_id", roomIds),
   ]);
 
   if (boxesResult.error) throw boxesResult.error;
 
-  return mapRoomSummaries(rooms, boxesResult.data ?? [], locationNameMap);
+  const rawBoxes = boxesResult.data ?? [];
+  const allBoxIds = rawBoxes.map((box) => box.id);
+  const itemCountByBoxId = new Map<string, number>();
+
+  if (allBoxIds.length > 0) {
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("items")
+      .select("box_id,quantity")
+      .in("box_id", allBoxIds);
+
+    if (itemsError) throw itemsError;
+
+    (itemRows ?? []).forEach((item: { box_id: string | null; quantity: number | null }) => {
+      if (!item.box_id) return;
+      const prev = itemCountByBoxId.get(item.box_id) ?? 0;
+      itemCountByBoxId.set(item.box_id, prev + (typeof item.quantity === "number" ? item.quantity : 0));
+    });
+  }
+
+  const boxes: BoxRow[] = rawBoxes.map((box) => ({
+    ...box,
+    item_count: itemCountByBoxId.get(box.id) ?? 0,
+  }));
+
+  return mapRoomSummaries(rooms, boxes, locationNameMap);
 }
 
 async function assertUserCanAccessLocation(locationId: string): Promise<string> {
@@ -332,33 +346,45 @@ async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     getLocationNameMap(userId, [room.location_id]),
     supabase
       .from("boxes")
-      .select("id,room_id,name,status,updated_at,fragility,item_count:items(quantity)")
+      .select("id,room_id,name,status,updated_at,fragility")
       .eq("room_id", normalizedRoomId)
       .order("created_at", { ascending: true }),
   ]);
 
   if (boxesResult.error) throw boxesResult.error;
 
-  const summary = mapRoomSummaries(
-    [room],
-    (boxesResult.data ?? []).map((box: BoxRow) => ({
-      id: box.id,
-      room_id: room.id,
-      status: box.status,
-      updated_at: box.updated_at,
-      fragility: box.fragility,
-      name: box.name,
-      item_count: box.item_count,
-    })),
-    locationNameMap,
-  )[0];
+  const rawBoxes = boxesResult.data ?? [];
+  const allBoxIds = rawBoxes.map((box) => box.id);
+  const itemCountByBoxId = new Map<string, number>();
 
-  const boxList: RoomDetailsBox[] = (boxesResult.data ?? []).map((box: BoxRow, index: number) => ({
+  if (allBoxIds.length > 0) {
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("items")
+      .select("box_id,quantity")
+      .in("box_id", allBoxIds);
+
+    if (itemsError) throw itemsError;
+
+    (itemRows ?? []).forEach((item: { box_id: string | null; quantity: number | null }) => {
+      if (!item.box_id) return;
+      const prev = itemCountByBoxId.get(item.box_id) ?? 0;
+      itemCountByBoxId.set(item.box_id, prev + (typeof item.quantity === "number" ? item.quantity : 0));
+    });
+  }
+
+  const typedBoxes: BoxRow[] = rawBoxes.map((box) => ({
+    ...box,
+    item_count: itemCountByBoxId.get(box.id) ?? 0,
+  }));
+
+  const summary = mapRoomSummaries([room], typedBoxes, locationNameMap)[0];
+
+  const boxList: RoomDetailsBox[] = typedBoxes.map((box, index) => ({
     id: box.id,
     name: box.name?.trim() || `Box #${index + 1}`,
     status: box.status,
     updatedAt: box.updated_at,
-    itemsCount: getNestedCount(box.item_count),
+    itemsCount: box.item_count,
     isFragile: normalizeFragility(box.fragility),
   }));
 

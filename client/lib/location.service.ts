@@ -31,7 +31,7 @@ type BoxRow = {
   updated_at: string | null;
   fragility: string | null;
   name: string | null;
-  item_count: Array<{ quantity: number | null }> | null;
+  item_count: number;
 };
 
 export type LocationSummary = {
@@ -103,16 +103,6 @@ async function getCurrentUserId(): Promise<string> {
   return userId;
 }
 
-function getNestedCount(value: BoxRow["item_count"]): number {
-  if (!Array.isArray(value) || value.length === 0) {
-    return 0;
-  }
-
-  return value.reduce((total, entry) => {
-    const qty = entry?.quantity;
-    return total + (typeof qty === "number" ? qty : 0);
-  }, 0);
-}
 
 function normalizeFragility(value: string | null): boolean {
   if (!value) {
@@ -173,7 +163,7 @@ type LocationAggregation = {
   boxesByRoomId: Map<string, BoxRow[]>;
 };
 
-async function getLocationAggregation(userId: string, locationIds: string[]): Promise<LocationAggregation> {
+async function getLocationAggregation(locationIds: string[]): Promise<LocationAggregation> {
   if (locationIds.length === 0) {
     return {
       rooms: [],
@@ -198,19 +188,39 @@ async function getLocationAggregation(userId: string, locationIds: string[]): Pr
     };
   }
 
-  const { data: boxes, error: boxesError } = await supabase
+  const { data: rawBoxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,room_id,status,updated_at,fragility,name,item_count:items(quantity)")
+    .select("id,room_id,status,updated_at,fragility,name")
     .in("room_id", roomIds);
 
   if (boxesError) throw boxesError;
 
-  const boxesByRoomId = new Map<string, BoxRow[]>();
-  (boxes ?? []).forEach((box: BoxRow) => {
-    if (!box.room_id) {
-      return;
-    }
+  const allBoxIds = (rawBoxes ?? []).map((box) => box.id);
+  const itemCountByBoxId = new Map<string, number>();
 
+  if (allBoxIds.length > 0) {
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("items")
+      .select("box_id,quantity")
+      .in("box_id", allBoxIds);
+
+    if (itemsError) throw itemsError;
+
+    (itemRows ?? []).forEach((item: { box_id: string | null; quantity: number | null }) => {
+      if (!item.box_id) return;
+      const prev = itemCountByBoxId.get(item.box_id) ?? 0;
+      itemCountByBoxId.set(item.box_id, prev + (typeof item.quantity === "number" ? item.quantity : 0));
+    });
+  }
+
+  const boxes: BoxRow[] = (rawBoxes ?? []).map((box) => ({
+    ...box,
+    item_count: itemCountByBoxId.get(box.id) ?? 0,
+  }));
+
+  const boxesByRoomId = new Map<string, BoxRow[]>();
+  boxes.forEach((box) => {
+    if (!box.room_id) return;
     const current = boxesByRoomId.get(box.room_id) ?? [];
     current.push(box);
     boxesByRoomId.set(box.room_id, current);
@@ -249,7 +259,7 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
         if (status === "delivered" || status === "unpacked_at_destination") {
           deliveredBoxes += 1;
         }
-        items += getNestedCount(box.item_count);
+        items += box.item_count;
       });
     });
 
@@ -271,7 +281,7 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
 }
 
 async function listLocationSummaries(): Promise<LocationSummary[]> {
-  const userId = await getCurrentUserId();
+  await getCurrentUserId();
 
   const { data: locations, error: locationsError } = await supabase
     .from("locations")
@@ -285,7 +295,6 @@ async function listLocationSummaries(): Promise<LocationSummary[]> {
   }
 
   const aggregation = await getLocationAggregation(
-    userId,
     locations.map((location: LocationRow) => location.id),
   );
 
@@ -522,7 +531,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
   }
 
   const isOwner = location.user_id === userId;
-  const aggregation = await getLocationAggregation(userId, [normalizedLocationId]);
+  const aggregation = await getLocationAggregation([normalizedLocationId]);
   const summary = mapLocationSummaries([location], aggregation)[0];
 
   const roomList: LocationDetailsRoom[] = aggregation.rooms
@@ -531,7 +540,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
       const roomBoxes = aggregation.boxesByRoomId.get(room.id) ?? [];
       const boxes = roomBoxes.length;
       const packedBoxes = roomBoxes.filter((box) => box.status?.toLowerCase() === "packed").length;
-      const items = roomBoxes.reduce((total, box) => total + getNestedCount(box.item_count), 0);
+      const items = roomBoxes.reduce((total, box) => total + box.item_count, 0);
 
       return {
         id: room.id,
@@ -555,7 +564,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
       name: box.name?.trim() || `Box #${index + 1}`,
       status: box.status,
       updatedAt: box.updated_at,
-      itemsCount: getNestedCount(box.item_count),
+      itemsCount: box.item_count,
       isFragile: normalizeFragility(box.fragility),
     })),
   );
