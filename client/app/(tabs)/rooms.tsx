@@ -50,19 +50,26 @@ export default function RoomsTabScreen() {
     refreshRooms,
   } = useRooms(selectedLocationId || undefined);
 
+  const hasAppliedSelectIdRef = useRef(false);
+
   useEffect(() => {
     if (locations.length === 0) {
       setSelectedLocationId("");
       return;
     }
-    if (selectId && locations.some((l) => l.id === selectId)) {
+    if (!hasAppliedSelectIdRef.current && selectId && locations.some((l) => l.id === selectId)) {
+      hasAppliedSelectIdRef.current = true;
       setSelectedLocationId(selectId);
       return;
     }
-    if (!locations.some((l) => l.id === selectedLocationId)) {
-      setSelectedLocationId(locations[0].id);
-    }
-  }, [locations, selectId, selectedLocationId]);
+    hasAppliedSelectIdRef.current = true;
+    setSelectedLocationId((current) => {
+      if (!current || !locations.some((l) => l.id === current)) {
+        return locations[0].id;
+      }
+      return current;
+    });
+  }, [locations, selectId]);
 
   useFocusEffect(
     useCallback(() => {
