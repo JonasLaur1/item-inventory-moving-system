@@ -18,7 +18,7 @@ type BoxRow = {
   updated_at: string | null;
   fragility: string | null;
   name: string | null;
-  item_count: Array<{ count: number | null }> | null;
+  item_count: Array<{ quantity: number | null }> | null;
 };
 
 type LocationRow = {
@@ -81,8 +81,8 @@ function getNestedCount(value: BoxRow["item_count"]): number {
   }
 
   return value.reduce((total, entry) => {
-    const count = entry?.count;
-    return total + (typeof count === "number" ? count : 0);
+    const qty = entry?.quantity;
+    return total + (typeof qty === "number" ? qty : 0);
   }, 0);
 }
 
@@ -222,7 +222,7 @@ async function listRoomSummaries(locationId?: string): Promise<RoomSummary[]> {
 
   const [locationNameMap, boxesResult] = await Promise.all([
     getLocationNameMap(userId, locationIds),
-    supabase.from("boxes").select("id,room_id,status,updated_at,fragility,name,item_count:items(count)").in("room_id", roomIds),
+    supabase.from("boxes").select("id,room_id,status,updated_at,fragility,name,item_count:items(quantity)").in("room_id", roomIds),
   ]);
 
   if (boxesResult.error) throw boxesResult.error;
@@ -332,7 +332,7 @@ async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     getLocationNameMap(userId, [room.location_id]),
     supabase
       .from("boxes")
-      .select("id,room_id,name,status,updated_at,fragility,item_count:items(count)")
+      .select("id,room_id,name,status,updated_at,fragility,item_count:items(quantity)")
       .eq("room_id", normalizedRoomId)
       .order("created_at", { ascending: true }),
   ]);

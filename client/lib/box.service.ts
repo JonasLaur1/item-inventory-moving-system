@@ -10,7 +10,7 @@ type BoxRow = {
   room_id: string | null;
   updated_at: string | null;
   fragility: string | null;
-  item_count: Array<{ count: number | null }> | null;
+  item_count: Array<{ quantity: number | null }> | null;
 };
 
 type BoxDetailsRow = {
@@ -125,14 +125,14 @@ function normalizeInputStatus(status: string): BoxStatus {
   return normalizedStatus;
 }
 
-function getNestedCount(value: Array<{ count: number | null }> | null): number {
+function getNestedCount(value: Array<{ quantity: number | null }> | null): number {
   if (!Array.isArray(value) || value.length === 0) {
     return 0;
   }
 
   return value.reduce((total, entry) => {
-    const count = entry?.count;
-    return total + (typeof count === "number" ? count : 0);
+    const qty = entry?.quantity;
+    return total + (typeof qty === "number" ? qty : 0);
   }, 0);
 }
 
@@ -310,7 +310,7 @@ async function listBoxes(): Promise<BoxSummary[]> {
 
   const { data: boxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,name,status,room_id,updated_at,fragility,item_count:items(count)")
+    .select("id,name,status,room_id,updated_at,fragility,item_count:items(quantity)")
     .order("created_at", { ascending: true });
 
   if (boxesError) throw boxesError;
@@ -365,10 +365,9 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     photoUrl: item.photo_url ?? null,
   }));
 
-  const itemCount = items.length;
   const row = {
     ...(box as BoxDetailsRow),
-    item_count: [{ count: itemCount }],
+    item_count: items.map((i) => ({ quantity: i.quantity })),
   };
 
   return {

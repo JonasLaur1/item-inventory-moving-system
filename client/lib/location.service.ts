@@ -31,7 +31,7 @@ type BoxRow = {
   updated_at: string | null;
   fragility: string | null;
   name: string | null;
-  item_count: Array<{ count: number | null }> | null;
+  item_count: Array<{ quantity: number | null }> | null;
 };
 
 export type LocationSummary = {
@@ -109,8 +109,8 @@ function getNestedCount(value: BoxRow["item_count"]): number {
   }
 
   return value.reduce((total, entry) => {
-    const count = entry?.count;
-    return total + (typeof count === "number" ? count : 0);
+    const qty = entry?.quantity;
+    return total + (typeof qty === "number" ? qty : 0);
   }, 0);
 }
 
@@ -200,7 +200,7 @@ async function getLocationAggregation(userId: string, locationIds: string[]): Pr
 
   const { data: boxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,room_id,status,updated_at,fragility,name,item_count:items(count)")
+    .select("id,room_id,status,updated_at,fragility,name,item_count:items(quantity)")
     .in("room_id", roomIds);
 
   if (boxesError) throw boxesError;
