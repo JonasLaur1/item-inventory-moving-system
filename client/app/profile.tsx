@@ -197,6 +197,23 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
+        {/* Locations section */}
+        <View className="mt-4 rounded-card border border-border-default bg-bg-elevated p-5">
+          <Text className="text-base font-semibold text-text-primary">Locations</Text>
+          <Text className="mt-1 text-sm text-text-tertiary">Manage your locations and rooms.</Text>
+
+          <Pressable
+            onPress={() => router.push("/location-config")}
+            className="mt-4 flex-row items-center justify-between"
+          >
+            <View>
+              <Text className="text-sm font-semibold text-text-primary">Location Configuration</Text>
+              <Text className="mt-0.5 text-xs text-text-tertiary">Add or remove rooms from your locations.</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={palette.textTertiary} />
+          </Pressable>
+        </View>
+
         {/* Preferences section */}
         <View className="mt-4 rounded-card border border-border-default bg-bg-elevated p-5">
           <Text className="text-base font-semibold text-text-primary">Preferences</Text>
@@ -234,17 +251,6 @@ export default function ProfileScreen() {
             Active mode:{" "}
             {themePreference === "system" ? "Device" : themePreference === "dark" ? "Dark" : "Light"}
           </Text>
-
-          <Pressable
-            onPress={() => router.push("/location-config")}
-            className="mt-5 flex-row items-center justify-between border-t border-border-default pt-4"
-          >
-            <View>
-              <Text className="text-sm font-semibold text-text-primary">Location Configuration</Text>
-              <Text className="mt-0.5 text-xs text-text-tertiary">Add or remove rooms from your locations.</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={palette.textTertiary} />
-          </Pressable>
         </View>
 
         {themeErrorMessage ? (
