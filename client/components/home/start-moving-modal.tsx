@@ -1,0 +1,116 @@
+import { AppModal } from "@/components/ui/app-modal";
+import { Button } from "@/components/button";
+import { type LocationSummary } from "@/lib/location.service";
+import { useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
+
+type Props = {
+  visible: boolean;
+  locations: LocationSummary[];
+  onConfirm: (fromLocationId: string, toLocationId: string) => void;
+  onClose: () => void;
+};
+
+type LocationPickerProps = {
+  label: string;
+  selectedId: string | null;
+  locations: LocationSummary[];
+  disabledId: string | null;
+  onSelect: (id: string) => void;
+  iconColor: string;
+};
+
+function LocationPicker({ label, selectedId, locations, disabledId, onSelect, iconColor }: LocationPickerProps) {
+  return (
+    <View>
+      <Text className="mb-2 text-sm font-medium text-text-secondary">{label}</Text>
+      <View className="gap-2">
+        {locations.map((loc) => {
+          const isSelected = loc.id === selectedId;
+          const isDisabled = loc.id === disabledId;
+          return (
+            <Pressable
+              key={loc.id}
+              onPress={() => !isDisabled && onSelect(loc.id)}
+              className={`flex-row items-center rounded-control border px-4 py-3 ${
+                isSelected
+                  ? "border-primary bg-primary/10"
+                  : isDisabled
+                    ? "border-border-default bg-bg-input opacity-40"
+                    : "border-border-default bg-bg-input"
+              }`}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+            >
+              <Text className={`flex-1 text-sm font-medium ${isSelected ? "text-primary" : "text-text-primary"}`}>
+                {loc.name}
+              </Text>
+              {isSelected ? <Feather name="check" size={16} color={iconColor} /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+export function StartMovingModal({ visible, locations, onConfirm, onClose }: Props) {
+  const [fromId, setFromId] = useState<string | null>(null);
+  const [toId, setToId] = useState<string | null>(null);
+  const { resolvedTheme } = useThemePreference();
+  const primaryColor = Colors[resolvedTheme].primary;
+
+  const canConfirm = fromId !== null && toId !== null;
+
+  const handleClose = () => {
+    setFromId(null);
+    setToId(null);
+    onClose();
+  };
+
+  const handleConfirm = () => {
+    if (!fromId || !toId) return;
+    onConfirm(fromId, toId);
+    setFromId(null);
+    setToId(null);
+  };
+
+  return (
+    <AppModal
+      visible={visible}
+      title="Start Moving"
+      description="Select the origin and destination for this move."
+      onRequestClose={handleClose}
+      showCornerClose
+      closeOnBackdropPress
+    >
+      <ScrollView showsVerticalScrollIndicator={false} className="max-h-96">
+        <View className="gap-5">
+          <LocationPicker
+            label="From"
+            selectedId={fromId}
+            locations={locations}
+            disabledId={toId}
+            onSelect={setFromId}
+            iconColor={primaryColor}
+          />
+          <LocationPicker
+            label="To"
+            selectedId={toId}
+            locations={locations}
+            disabledId={fromId}
+            onSelect={setToId}
+            iconColor={primaryColor}
+          />
+        </View>
+      </ScrollView>
+      <View className="mt-5 gap-2">
+        <Button label="Start Moving" variant="primary" onPress={handleConfirm} disabled={!canConfirm} />
+        <Button label="Cancel" variant="secondary" onPress={handleClose} />
+      </View>
+    </AppModal>
+  );
+}

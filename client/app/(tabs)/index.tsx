@@ -1,6 +1,7 @@
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
 import { QuickActionCard } from "@/components/home/quick-action-card";
+import { StartMovingModal } from "@/components/home/start-moving-modal";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
@@ -19,6 +20,17 @@ import { useThemePreference } from "@/hooks/use-theme-preference";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { getEventTone } from "@/utils/activity-tone";
 
+
+function MovingLabel({ fromName, toName }: { fromName: string; toName: string }) {
+  return (
+    <View className="flex-row items-center justify-center gap-1 rounded-control border border-border-default bg-bg-input px-4 py-2">
+      <Text className="text-sm font-medium text-text-secondary">Moving:</Text>
+      <Text className="text-sm font-semibold text-text-primary" numberOfLines={1}>{fromName}</Text>
+      <Text className="text-sm text-text-tertiary">→</Text>
+      <Text className="text-sm font-semibold text-text-primary" numberOfLines={1}>{toName}</Text>
+    </View>
+  );
+}
 
 const RING_SIZE = 160;
 const STROKE_WIDTH = 12;
@@ -65,7 +77,8 @@ function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRi
 export default function HomeTabScreen() {
   const router = useRouter();
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
-  const { isMovingActive, startMoving, stopMoving } = useMovingMode();
+  const [isStartMovingModalOpen, setIsStartMovingModalOpen] = useState(false);
+  const { isMovingActive, fromLocationId, toLocationId, startMoving, stopMoving } = useMovingMode();
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
   const {
@@ -183,11 +196,17 @@ export default function HomeTabScreen() {
       </View>
 
       {hasMultipleLocations ? (
-        <View className="mt-3">
+        <View className="mt-3 gap-2">
+          {isMovingActive ? (
+            <MovingLabel
+              fromName={locations.find((l) => l.id === fromLocationId)?.name ?? "?"}
+              toName={locations.find((l) => l.id === toLocationId)?.name ?? "?"}
+            />
+          ) : null}
           <Button
             label={isMovingActive ? "Stop Moving" : "Start Moving"}
             variant={isMovingActive ? "secondary" : "primary"}
-            onPress={() => void (isMovingActive ? stopMoving() : startMoving())}
+            onPress={() => void (isMovingActive ? stopMoving() : setIsStartMovingModalOpen(true))}
           />
         </View>
       ) : null}
@@ -228,6 +247,15 @@ export default function HomeTabScreen() {
         visible={isCreateLocationModalOpen}
         onClose={() => setIsCreateLocationModalOpen(false)}
         onCreated={(id) => router.navigate({ pathname: "/(tabs)/rooms", params: { selectId: id } })}
+      />
+      <StartMovingModal
+        visible={isStartMovingModalOpen}
+        locations={locations}
+        onConfirm={(from, to) => {
+          void startMoving(from, to);
+          setIsStartMovingModalOpen(false);
+        }}
+        onClose={() => setIsStartMovingModalOpen(false)}
       />
     </TabScreenLayout>
   );
