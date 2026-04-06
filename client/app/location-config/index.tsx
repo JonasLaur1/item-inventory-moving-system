@@ -1,4 +1,5 @@
 import { Button } from "@/components/button";
+import { FormInput } from "@/components/form-input";
 import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
@@ -12,6 +13,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Pressable,
   RefreshControl,
   Text,
@@ -29,6 +31,11 @@ export default function LocationConfigScreen() {
   const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [deleteLocationError, setDeleteLocationError] = useState<string | null>(null);
 
+  const [locationToRename, setLocationToRename] = useState<LocationSummary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenamingLocation, setIsRenamingLocation] = useState(false);
+  const [renameLocationError, setRenameLocationError] = useState<string | null>(null);
+
   const openDeleteModal = useCallback((location: LocationSummary) => {
     setDeleteLocationError(null);
     setPendingDelete(location);
@@ -39,6 +46,45 @@ export default function LocationConfigScreen() {
     setPendingDelete(null);
     setDeleteLocationError(null);
   }, [isDeletingLocation]);
+
+  const openRenameModal = useCallback((location: LocationSummary) => {
+    setRenameValue(location.name);
+    setRenameLocationError(null);
+    setLocationToRename(location);
+  }, []);
+
+  const closeRenameModal = useCallback(() => {
+    if (isRenamingLocation) return;
+    setLocationToRename(null);
+    setRenameValue("");
+    setRenameLocationError(null);
+  }, [isRenamingLocation]);
+
+  const confirmRename = useCallback(async () => {
+    if (!locationToRename) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameLocationError("Location name is required.");
+      return;
+    }
+
+    setRenameLocationError(null);
+    setIsRenamingLocation(true);
+    Keyboard.dismiss();
+
+    try {
+      await locationService.updateLocation(locationToRename.id, { name: trimmed });
+      setLocationToRename(null);
+      setRenameValue("");
+      await refreshLocations();
+    } catch (error) {
+      setRenameLocationError(
+        error instanceof Error ? error.message : "Failed to rename location.",
+      );
+    } finally {
+      setIsRenamingLocation(false);
+    }
+  }, [locationToRename, renameValue, refreshLocations]);
 
   const handleDeleteLocation = useCallback(async () => {
     if (!pendingDelete) return;
@@ -126,6 +172,15 @@ export default function LocationConfigScreen() {
                 </Pressable>
 
                 <Pressable
+                  onPress={() => openRenameModal(location)}
+                  hitSlop={4}
+                  disabled={isRenamingLocation || isDeletingLocation}
+                  className="h-14 w-12 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
+                >
+                  <Feather name="edit-2" size={17} color={themeColors.textSecondary} />
+                </Pressable>
+
+                <Pressable
                   onPress={() => openDeleteModal(location)}
                   disabled={location.rooms > 0}
                   hitSlop={4}
@@ -170,6 +225,46 @@ export default function LocationConfigScreen() {
             disabled={isDeletingLocation}
             className="flex-1 border-crimson/60 bg-crimson/10"
             textClassName="text-crimson"
+          />
+        </View>
+      </AppModal>
+      <AppModal
+        visible={locationToRename !== null}
+        title="Rename Location"
+        description="Enter a new name for this location."
+        onRequestClose={closeRenameModal}
+        maxWidth={420}
+      >
+        <FormInput
+          value={renameValue}
+          onChangeText={(text) => {
+            setRenameValue(text);
+            setRenameLocationError(null);
+          }}
+          placeholder="Location name"
+          autoCapitalize="words"
+          autoCorrect={false}
+          editable={!isRenamingLocation}
+          maxLength={80}
+        />
+
+        {renameLocationError ? (
+          <Text className="mt-2 text-xs text-crimson">{renameLocationError}</Text>
+        ) : null}
+
+        <View className={`${renameLocationError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeRenameModal}
+            disabled={isRenamingLocation}
+            className="flex-1"
+          />
+          <Button
+            label={isRenamingLocation ? "Saving..." : "Save"}
+            onPress={() => void confirmRename()}
+            disabled={isRenamingLocation}
+            className="flex-1"
           />
         </View>
       </AppModal>
