@@ -36,11 +36,15 @@ export default function ManageRoomsScreen() {
     [params.name],
   );
 
-  const { rooms, isLoading, isRefreshing, isCreating, isDeleting, errorMessage, refreshRooms, createRoom, deleteRoom, clearError } =
+  const { rooms, isLoading, isRefreshing, isCreating, isUpdating, isDeleting, errorMessage, refreshRooms, createRoom, updateRoom, deleteRoom, clearError } =
     useRooms(locationId);
 
   const [roomToDelete, setRoomToDelete] = useState<RoomSummary | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [roomToRename, setRoomToRename] = useState<RoomSummary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addRoomName, setAddRoomName] = useState("");
@@ -106,6 +110,39 @@ export default function ManageRoomsScreen() {
     setAddRoomError(null);
   }, []);
 
+  const openRenameModal = useCallback((room: RoomSummary) => {
+    setRenameValue(room.name);
+    setRenameError(null);
+    setRoomToRename(room);
+  }, []);
+
+  const closeRenameModal = useCallback(() => {
+    if (isUpdating) return;
+    setRoomToRename(null);
+    setRenameValue("");
+    setRenameError(null);
+  }, [isUpdating]);
+
+  const confirmRename = useCallback(async () => {
+    if (!roomToRename) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameError("Room name is required.");
+      return;
+    }
+
+    setRenameError(null);
+    Keyboard.dismiss();
+
+    try {
+      await updateRoom(roomToRename.id, { name: trimmed });
+      setRoomToRename(null);
+      setRenameValue("");
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Failed to rename room.");
+    }
+  }, [roomToRename, renameValue, updateRoom]);
+
   const renderRoom = useCallback(
     ({ item: room }: { item: RoomSummary }) => {
       const canDelete = room.boxes === 0;
@@ -118,26 +155,36 @@ export default function ManageRoomsScreen() {
               {room.boxes} {room.boxes === 1 ? "box" : "boxes"}
             </Text>
           </View>
-          <Pressable
-            onPress={() => openDeleteModal(room)}
-            hitSlop={8}
-            disabled={!canDelete || isDeleting}
-            className={`h-9 w-9 items-center justify-center rounded-full border ${
-              canDelete
-                ? "border-crimson/40 bg-crimson/10"
-                : "border-border-default bg-bg-base opacity-30"
-            }`}
-          >
-            <Feather
-              name="trash-2"
-              size={16}
-              color={canDelete ? themeColors.crimson : themeColors.textTertiary}
-            />
-          </Pressable>
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={() => openRenameModal(room)}
+              hitSlop={8}
+              disabled={isUpdating || isDeleting}
+              className="h-9 w-9 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+            >
+              <Feather name="edit-2" size={15} color={themeColors.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => openDeleteModal(room)}
+              hitSlop={8}
+              disabled={!canDelete || isDeleting}
+              className={`h-9 w-9 items-center justify-center rounded-full border ${
+                canDelete
+                  ? "border-crimson/40 bg-crimson/10"
+                  : "border-border-default bg-bg-base opacity-30"
+              }`}
+            >
+              <Feather
+                name="trash-2"
+                size={16}
+                color={canDelete ? themeColors.crimson : themeColors.textTertiary}
+              />
+            </Pressable>
+          </View>
         </View>
       );
     },
-    [isDeleting, openDeleteModal, themeColors],
+    [isDeleting, isUpdating, openDeleteModal, openRenameModal, themeColors],
   );
 
   return (
@@ -301,6 +348,46 @@ export default function ManageRoomsScreen() {
             label={isCreating ? "Adding..." : "Add"}
             onPress={() => void handleAddRoom()}
             disabled={isCreating}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
+      <AppModal
+        visible={roomToRename !== null}
+        title="Rename Room"
+        description="Enter a new name for this room."
+        onRequestClose={closeRenameModal}
+        maxWidth={420}
+      >
+        <FormInput
+          value={renameValue}
+          onChangeText={(text) => {
+            setRenameValue(text);
+            setRenameError(null);
+          }}
+          placeholder="Room name"
+          autoCapitalize="words"
+          autoCorrect={false}
+          editable={!isUpdating}
+          maxLength={60}
+        />
+
+        {renameError ? (
+          <Text className="mt-2 text-xs text-crimson">{renameError}</Text>
+        ) : null}
+
+        <View className={`${renameError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeRenameModal}
+            disabled={isUpdating}
+            className="flex-1"
+          />
+          <Button
+            label={isUpdating ? "Saving..." : "Save"}
+            onPress={() => void confirmRename()}
+            disabled={isUpdating}
             className="flex-1"
           />
         </View>
