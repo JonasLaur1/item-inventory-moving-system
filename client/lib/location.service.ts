@@ -46,6 +46,7 @@ export type LocationSummary = {
   boxes: number;
   packedBoxes: number;
   deliveredBoxes: number;
+  unpackedAtDestinationBoxes: number;
   items: number;
 };
 
@@ -245,6 +246,7 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
     let boxes = 0;
     let packedBoxes = 0;
     let deliveredBoxes = 0;
+    let unpackedAtDestinationBoxes = 0;
     let items = 0;
 
     locationRooms.forEach((room) => {
@@ -258,6 +260,9 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
         }
         if (status === "delivered" || status === "unpacked_at_destination") {
           deliveredBoxes += 1;
+        }
+        if (status === "unpacked_at_destination") {
+          unpackedAtDestinationBoxes += 1;
         }
         items += box.item_count;
       });
@@ -275,6 +280,7 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
       boxes,
       packedBoxes,
       deliveredBoxes,
+      unpackedAtDestinationBoxes,
       items,
     };
   });

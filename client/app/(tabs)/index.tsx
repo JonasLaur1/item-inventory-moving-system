@@ -13,10 +13,7 @@ import { useMovingMode } from "@/hooks/use-moving-mode";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshControl, Text, View } from "react-native";
-import Svg, { Circle } from "react-native-svg";
-import { Colors } from "@/constants/theme";
-import { useThemePreference } from "@/hooks/use-theme-preference";
+import { Pressable, RefreshControl, Text, View } from "react-native";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { getEventTone } from "@/utils/activity-tone";
 
@@ -32,55 +29,12 @@ function MovingLabel({ fromName, toName }: { fromName: string; toName: string })
   );
 }
 
-const RING_SIZE = 160;
-const STROKE_WIDTH = 12;
-const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
-type DeliveryRingProps = {
-  delivered: number;
-  total: number;
-  progress: number;
-  primary: string;
-  track: string;
-};
-
-function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRingProps) {
-  const dashOffset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, progress)) / 100);
-  return (
-    <View className="mt-8 items-center">
-      <View style={{ width: RING_SIZE, height: RING_SIZE }}>
-        <Svg width={RING_SIZE} height={RING_SIZE}>
-          <Circle
-            cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
-            stroke={track} strokeWidth={STROKE_WIDTH} fill="none"
-          />
-          <Circle
-            cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RADIUS}
-            stroke={primary} strokeWidth={STROKE_WIDTH} fill="none"
-            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-            strokeDashoffset={dashOffset}
-            strokeLinecap="round"
-            rotation="-90"
-            origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
-          />
-        </Svg>
-        <View className="absolute inset-0 items-center justify-center">
-          <Text className="text-3xl font-bold text-text-primary">{Math.round(progress)}%</Text>
-          <Text className="mt-0.5 text-xs text-text-tertiary">{delivered} / {total} boxes</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 export default function HomeTabScreen() {
   const router = useRouter();
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
   const [isStartMovingModalOpen, setIsStartMovingModalOpen] = useState(false);
   const { isMovingActive, fromLocationId, toLocationId, startMoving, stopMoving } = useMovingMode();
-  const { resolvedTheme } = useThemePreference();
-  const themeColors = Colors[resolvedTheme];
   const {
     locations,
     isLoading: isLocationsLoading,
@@ -116,12 +70,6 @@ export default function HomeTabScreen() {
     }
   }, [isLocationsLoading, locations.length, isMovingActive, stopMoving]);
 
-  const deliveryStats = useMemo(() => {
-    const totalBoxes = locations.reduce((sum, loc) => sum + loc.boxes, 0);
-    const totalDelivered = locations.reduce((sum, loc) => sum + loc.deliveredBoxes, 0);
-    const progress = totalBoxes > 0 ? (totalDelivered / totalBoxes) * 100 : 0;
-    return { totalBoxes, totalDelivered, progress };
-  }, [locations]);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
       const nowMs = Date.now();
@@ -152,17 +100,7 @@ export default function HomeTabScreen() {
         />
       }
     >
-      {isMovingActive && hasMultipleLocations ? (
-        <DeliveryRing
-          delivered={deliveryStats.totalDelivered}
-          total={deliveryStats.totalBoxes}
-          progress={deliveryStats.progress}
-          primary={themeColors.primary}
-          track={themeColors.borderDefault}
-        />
-      ) : null}
-
-      <View className={`${isMovingActive && hasMultipleLocations ? "mt-4" : "mt-8"} flex-row gap-3`}>
+      <View className="mt-8 flex-row gap-3">
         <QuickActionCard
           title="Add Location"
           subtitle="Create New Location"
@@ -198,10 +136,15 @@ export default function HomeTabScreen() {
       {hasMultipleLocations ? (
         <View className="mt-3 gap-2">
           {isMovingActive ? (
-            <MovingLabel
-              fromName={locations.find((l) => l.id === fromLocationId)?.name ?? "?"}
-              toName={locations.find((l) => l.id === toLocationId)?.name ?? "?"}
-            />
+            <Pressable
+              onPress={() => router.push("/moving-progress")}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              <MovingLabel
+                fromName={locations.find((l) => l.id === fromLocationId)?.name ?? "?"}
+                toName={locations.find((l) => l.id === toLocationId)?.name ?? "?"}
+              />
+            </Pressable>
           ) : null}
           <Button
             label={isMovingActive ? "Stop Moving" : "Start Moving"}

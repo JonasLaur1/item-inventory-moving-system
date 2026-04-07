@@ -134,6 +134,7 @@ function RootLayoutContent() {
           <Stack.Screen name="location-settings/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="location-config/index" options={{ headerShown: false }} />
           <Stack.Screen name="location-config/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="moving-progress" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       </View>
