@@ -376,18 +376,8 @@ export default function LocationDetailsScreen() {
                 style={{ width: isNarrow ? "100%" : "48.5%" }}
               />
               <MetricCard
-                label="Boxes"
-                value={String(location.boxes)}
-                style={{ width: isNarrow ? "100%" : "48.5%" }}
-              />
-              <MetricCard
-                label="Packed"
+                label="Packed boxes"
                 value={String(location.packedBoxes)}
-                style={{ width: isNarrow ? "100%" : "48.5%" }}
-              />
-              <MetricCard
-                label="Items"
-                value={String(location.items)}
                 style={{ width: isNarrow ? "100%" : "48.5%" }}
               />
             </View>
