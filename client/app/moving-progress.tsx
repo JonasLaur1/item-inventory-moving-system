@@ -142,7 +142,7 @@ export default function MovingProgressScreen() {
           >
             <Feather name="chevron-left" size={20} color={themeColors.textPrimary} />
           </Pressable>
-          <Text className="text-2xl font-bold text-text-primary">Moving Progress</Text>
+          <Text className="flex-1 text-2xl font-bold text-text-primary">Moving Progress</Text>
         </View>
 
         {isLoading ? (
@@ -168,7 +168,7 @@ export default function MovingProgressScreen() {
           />
         ) : (
           <>
-            <View className="mt-8">
+            <View className="mt-8 gap-3">
               <DeliveryRing
                 delivered={stats.totalDeliveredCombined}
                 total={stats.total}
@@ -176,6 +176,20 @@ export default function MovingProgressScreen() {
                 primary={themeColors.primary}
                 track={themeColors.borderDefault}
               />
+              <Pressable
+                onPress={() => router.push("/(tabs)/scan?from=moving-progress")}
+                className="flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 px-4 py-3"
+                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+              >
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/20">
+                  <Feather name="camera" size={18} color={themeColors.primary} />
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-text-primary">Scan Box</Text>
+                  <Text className="text-xs text-text-tertiary">Scan QR Code</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={themeColors.textTertiary} style={{ marginLeft: "auto" }} />
+              </Pressable>
             </View>
 
             <View className="mt-8">

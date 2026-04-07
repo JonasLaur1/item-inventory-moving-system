@@ -1,6 +1,5 @@
-import { CreateLocationModal } from "@/components/inventory/create-location-modal";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
-import { QuickActionCard } from "@/components/home/quick-action-card";
+import { ActiveMoveCard } from "@/components/home/active-move-card";
 import { StartMovingModal } from "@/components/home/start-moving-modal";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
@@ -13,26 +12,13 @@ import { useMovingMode } from "@/hooks/use-moving-mode";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, Text, View } from "react-native";
+import { RefreshControl, View } from "react-native";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { getEventTone } from "@/utils/activity-tone";
 
 
-function MovingLabel({ fromName, toName }: { fromName: string; toName: string }) {
-  return (
-    <View className="flex-row items-center justify-center gap-1 rounded-control border border-border-default bg-bg-input px-4 py-2">
-      <Text className="text-sm font-medium text-text-secondary">Moving:</Text>
-      <Text className="text-sm font-semibold text-text-primary" numberOfLines={1}>{fromName}</Text>
-      <Text className="text-sm text-text-tertiary">→</Text>
-      <Text className="text-sm font-semibold text-text-primary" numberOfLines={1}>{toName}</Text>
-    </View>
-  );
-}
-
-
 export default function HomeTabScreen() {
   const router = useRouter();
-  const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
   const [isStartMovingModalOpen, setIsStartMovingModalOpen] = useState(false);
   const { isMovingActive, fromLocationId, toLocationId, startMoving, stopMoving } = useMovingMode();
   const {
@@ -70,6 +56,9 @@ export default function HomeTabScreen() {
     }
   }, [isLocationsLoading, locations.length, isMovingActive, stopMoving]);
 
+  const fromLocation = locations.find((l) => l.id === fromLocationId);
+  const toLocation = locations.find((l) => l.id === toLocationId);
+
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
       const nowMs = Date.now();
@@ -100,59 +89,23 @@ export default function HomeTabScreen() {
         />
       }
     >
-      <View className="mt-8 flex-row gap-3">
-        <QuickActionCard
-          title="Add Location"
-          subtitle="Create New Location"
-          icon="plus"
-          variant="primary"
-          onPress={() => setIsCreateLocationModalOpen(true)}
-        />
-        <QuickActionCard
-          title="Add Box"
-          subtitle="Add New Box"
-          icon="plus"
-          variant="secondary"
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/inventory",
-              params: { create: "1" },
-            })
-          }
-        />
-      </View>
+      <View className="mt-8 gap-3">
+        {isMovingActive && fromLocation && toLocation ? (
+          <ActiveMoveCard
+            fromLocation={fromLocation}
+            toLocation={toLocation}
+            onPress={() => router.push("/moving-progress")}
+          />
+        ) : null}
 
-      <View className="mt-3 flex-row gap-3">
-        <QuickActionCard
-          title="Scan Box"
-          subtitle="Scan QR Code"
-          icon="camera"
-          variant="secondary"
-          style={{ flex: 0, width: "48.5%" }}
-          onPress={() => router.push("/(tabs)/scan")}
-        />
-      </View>
-
-      {hasMultipleLocations ? (
-        <View className="mt-3 gap-2">
-          {isMovingActive ? (
-            <Pressable
-              onPress={() => router.push("/moving-progress")}
-              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-            >
-              <MovingLabel
-                fromName={locations.find((l) => l.id === fromLocationId)?.name ?? "?"}
-                toName={locations.find((l) => l.id === toLocationId)?.name ?? "?"}
-              />
-            </Pressable>
-          ) : null}
+        {hasMultipleLocations ? (
           <Button
             label={isMovingActive ? "Stop Moving" : "Start Moving"}
             variant={isMovingActive ? "secondary" : "primary"}
             onPress={() => void (isMovingActive ? stopMoving() : setIsStartMovingModalOpen(true))}
           />
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
       <View className="mt-10">
         <SectionHeader title="Recent Activity" />
@@ -186,11 +139,7 @@ export default function HomeTabScreen() {
           )}
         </View>
       </View>
-      <CreateLocationModal
-        visible={isCreateLocationModalOpen}
-        onClose={() => setIsCreateLocationModalOpen(false)}
-        onCreated={(id) => router.navigate({ pathname: "/(tabs)/rooms", params: { selectId: id } })}
-      />
+
       <StartMovingModal
         visible={isStartMovingModalOpen}
         locations={locations}
@@ -203,4 +152,3 @@ export default function HomeTabScreen() {
     </TabScreenLayout>
   );
 }
-

@@ -3,7 +3,7 @@ import { useMovingMode } from "@/hooks/use-moving-mode";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,6 +74,7 @@ function parseScannedBoxId(payload: string): string | null {
 
 export default function ScanTabScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanError, setScanError] = useState<string | null>(null);
@@ -127,8 +128,12 @@ export default function ScanTabScreen() {
   }, []);
 
   const onPressClose = useCallback(() => {
-    router.replace("/(tabs)");
-  }, [router]);
+    if (from === "moving-progress") {
+      router.replace("/moving-progress");
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, [from, router]);
 
   const topOffset = insets.top + 12;
   const bottomOffset = insets.bottom + 16;
