@@ -66,6 +66,11 @@ export default function LocationDetailsScreen() {
   const [isSavingName, setIsSavingName] = useState(false);
   const [editNameError, setEditNameError] = useState<string | null>(null);
 
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editedAddress, setEditedAddress] = useState("");
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [editAddressError, setEditAddressError] = useState<string | null>(null);
+
   const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [deleteLocationError, setDeleteLocationError] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -132,8 +137,6 @@ export default function LocationDetailsScreen() {
       (location?.roomList ?? []).map((room) => ({
         id: room.id,
         name: room.name,
-        packed: room.packedBoxes,
-        total: room.boxes,
         icon: getLocationIcon(room.name) as RoomCardProps["icon"],
       })),
     [location?.roomList],
@@ -214,6 +217,38 @@ export default function LocationDetailsScreen() {
       setIsDeletingLocation(false);
     }
   }, [location, router]);
+
+  const openAddressEditor = useCallback(() => {
+    setEditedAddress(location?.address ?? "");
+    setEditAddressError(null);
+    setIsEditingAddress(true);
+  }, [location?.address]);
+
+  const cancelAddressEditor = useCallback(() => {
+    setEditedAddress(location?.address ?? "");
+    setEditAddressError(null);
+    setIsEditingAddress(false);
+  }, [location?.address]);
+
+  const saveLocationAddress = useCallback(async () => {
+    if (!location) return;
+
+    const normalizedAddress = editedAddress.trim() || null;
+
+    setIsSavingAddress(true);
+    setEditAddressError(null);
+
+    try {
+      await locationService.updateLocationAddress(location.id, normalizedAddress);
+      setLocation((prev) => (prev ? { ...prev, address: normalizedAddress } : prev));
+      setIsEditingAddress(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update address.";
+      setEditAddressError(message);
+    } finally {
+      setIsSavingAddress(false);
+    }
+  }, [editedAddress, location]);
 
   const openDeleteModal = useCallback(() => {
     if (!location) {
@@ -342,6 +377,12 @@ export default function LocationDetailsScreen() {
                         <Text className="mt-1 text-xs text-text-tertiary">
                           {getKindLabel(location.kind)} • {location.rooms} rooms • {location.items} items
                         </Text>
+                        <Pressable onPress={openAddressEditor} hitSlop={4} className="mt-1.5 flex-row items-center gap-1">
+                          <Feather name="map-pin" size={11} color={themeColors.textTertiary} />
+                          <Text className="text-xs text-text-tertiary" numberOfLines={1}>
+                            {location.address ?? "Add address"}
+                          </Text>
+                        </Pressable>
                       </View>
                       <Pressable
                         onPress={openNameEditor}
@@ -393,8 +434,6 @@ export default function LocationDetailsScreen() {
                   renderItem={(room, contentStyle) => (
                     <RoomCard
                       name={room.name}
-                      packed={room.packed}
-                      total={room.total}
                       icon={room.icon}
                       style={contentStyle}
                       onPress={() =>
@@ -417,6 +456,42 @@ export default function LocationDetailsScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <AppModal
+        visible={isEditingAddress}
+        title="Location Address"
+        description="Enter the physical address for this location."
+        onRequestClose={cancelAddressEditor}
+        maxWidth={420}
+      >
+        <FormInput
+          value={editedAddress}
+          onChangeText={setEditedAddress}
+          placeholder="Address (optional)"
+          autoCapitalize="words"
+          autoCorrect={false}
+          maxLength={120}
+          editable={!isSavingAddress}
+        />
+        {editAddressError ? (
+          <Text className="mt-2 text-xs text-crimson">{editAddressError}</Text>
+        ) : null}
+        <View className={`${editAddressError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={cancelAddressEditor}
+            disabled={isSavingAddress}
+            className="flex-1"
+          />
+          <Button
+            label={isSavingAddress ? "Saving..." : "Save"}
+            onPress={() => void saveLocationAddress()}
+            disabled={isSavingAddress}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
 
       <AppModal
         visible={isDeleteModalOpen}

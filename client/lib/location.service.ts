@@ -12,6 +12,7 @@ type LocationRow = {
   sort_order: number | null;
   created_at: string | null;
   updated_at: string | null;
+  address: string | null;
 };
 
 type RoomRow = {
@@ -37,6 +38,7 @@ type BoxRow = {
 export type LocationSummary = {
   id: string;
   name: string;
+  address: string | null;
   kind: LocationKind;
   coverImageUrl: string | null;
   sortOrder: number;
@@ -83,6 +85,7 @@ export type LocationDetails = LocationSummary & {
 export type CreateLocationInput = {
   name: string;
   kind?: LocationKind;
+  address?: string;
 };
 
 export type UpdateLocationInput = {
@@ -90,6 +93,7 @@ export type UpdateLocationInput = {
   kind?: LocationKind;
   sortOrder?: number;
   coverImageUrl?: string | null;
+  address?: string | null;
 };
 
 async function getCurrentUserId(): Promise<string> {
@@ -271,6 +275,7 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
     return {
       id: location.id,
       name: location.name,
+      address: location.address,
       kind: normalizeLocationKind(location.kind),
       coverImageUrl: location.cover_image_url,
       sortOrder: location.sort_order ?? 0,
@@ -291,7 +296,7 @@ async function listLocationSummaries(): Promise<LocationSummary[]> {
 
   const { data: locations, error: locationsError } = await supabase
     .from("locations")
-    .select("id,name,kind,cover_image_url,sort_order,created_at,updated_at")
+    .select("id,name,address,kind,cover_image_url,sort_order,created_at,updated_at")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -334,12 +339,15 @@ async function createLocation(input: string | CreateLocationInput): Promise<{ id
 
   const resolvedName = resolveUniqueName(trimmedName, siblingNames);
 
+  const trimmedAddress = normalizedInput.address?.trim() || undefined;
+
   const { data, error } = await supabase
     .from("locations")
     .insert({
       user_id: userId,
       name: resolvedName,
       kind,
+      ...(trimmedAddress !== undefined && { address: trimmedAddress }),
     })
     .select("id")
     .maybeSingle();
@@ -372,7 +380,7 @@ async function updateLocation(locationId: string, input: UpdateLocationInput): P
 
   const { data: existingLocation, error: existingError } = await supabase
     .from("locations")
-    .select("id,name,kind,sort_order,cover_image_url")
+    .select("id,name,kind,sort_order,cover_image_url,address")
     .eq("id", normalizedLocationId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -392,11 +400,15 @@ async function updateLocation(locationId: string, input: UpdateLocationInput): P
   const nextCoverImageUrl =
     input.coverImageUrl !== undefined ? input.coverImageUrl : existingLocation.cover_image_url;
 
+  const nextAddress =
+    input.address !== undefined ? input.address : existingLocation.address ?? null;
+
   const updates: {
     name?: string;
     kind?: LocationKind;
     sort_order?: number;
     cover_image_url?: string | null;
+    address?: string | null;
   } = {};
 
   if (input.name !== undefined) {
@@ -410,6 +422,9 @@ async function updateLocation(locationId: string, input: UpdateLocationInput): P
   }
   if (input.coverImageUrl !== undefined) {
     updates.cover_image_url = nextCoverImageUrl;
+  }
+  if (input.address !== undefined) {
+    updates.address = nextAddress;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -463,6 +478,10 @@ async function updateLocation(locationId: string, input: UpdateLocationInput): P
 
 async function updateLocationName(locationId: string, name: string): Promise<void> {
   await updateLocation(locationId, { name });
+}
+
+async function updateLocationAddress(locationId: string, address: string | null): Promise<void> {
+  await updateLocation(locationId, { address });
 }
 
 async function deleteLocation(locationId: string): Promise<void> {
@@ -527,7 +546,7 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   const { data: location, error: locationError } = await supabase
     .from("locations")
-    .select("id,user_id,name,kind,cover_image_url,sort_order,created_at,updated_at")
+    .select("id,user_id,name,address,kind,cover_image_url,sort_order,created_at,updated_at")
     .eq("id", normalizedLocationId)
     .maybeSingle();
 
@@ -588,6 +607,7 @@ export const locationService = {
   createLocation,
   updateLocation,
   updateLocationName,
+  updateLocationAddress,
   deleteLocation,
   getLocationDetails,
 };

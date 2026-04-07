@@ -26,7 +26,7 @@ export default function ManageRoomsScreen() {
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
 
-  const params = useLocalSearchParams<{ id: string; name?: string }>();
+  const params = useLocalSearchParams<{ id: string; name?: string; address?: string }>();
   const locationId = useMemo(
     () => (Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "")),
     [params.id],
@@ -34,6 +34,10 @@ export default function ManageRoomsScreen() {
   const locationName = useMemo(
     () => (Array.isArray(params.name) ? (params.name[0] ?? "") : (params.name ?? "")),
     [params.name],
+  );
+  const locationAddress = useMemo(
+    () => (Array.isArray(params.address) ? (params.address[0] ?? "") : (params.address ?? "")),
+    [params.address],
   );
 
   const { rooms, isLoading, isRefreshing, isCreating, isUpdating, isDeleting, errorMessage, refreshRooms, createRoom, updateRoom, deleteRoom, clearError } =
@@ -202,6 +206,9 @@ export default function ManageRoomsScreen() {
             <Text className="text-base font-semibold text-text-primary">Manage Rooms</Text>
             {locationName ? (
               <Text className="text-xs text-text-tertiary">{locationName}</Text>
+            ) : null}
+            {locationAddress ? (
+              <Text className="text-xs text-text-tertiary">{locationAddress}</Text>
             ) : null}
           </View>
           <View className="h-10 w-10" />

@@ -157,7 +157,7 @@ export default function LocationConfigScreen() {
                   onPress={() =>
                     router.push({
                       pathname: "/location-config/[id]",
-                      params: { id: location.id, name: location.name },
+                      params: { id: location.id, name: location.name, address: location.address ?? "" },
                     })
                   }
                   className="flex-1 flex-row items-center justify-between rounded-card border border-border-default bg-bg-elevated px-4 py-4"

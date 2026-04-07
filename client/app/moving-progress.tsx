@@ -81,10 +81,17 @@ function LocationProgressCard({ location, isFrom, isTo }: LocationProgressCardPr
 
   return (
     <View className="rounded-card border border-border-default bg-bg-elevated p-4">
-      <View className="flex-row items-center justify-between">
-        <Text className="mr-2 flex-1 text-base font-semibold text-text-primary" numberOfLines={1}>
-          {location.name}
-        </Text>
+      <View className="flex-row items-start justify-between">
+        <View className="mr-2 flex-1">
+          <Text className="text-base font-semibold text-text-primary" numberOfLines={1}>
+            {location.name}
+          </Text>
+          {location.address ? (
+            <Text className="mt-0.5 text-xs text-text-tertiary" numberOfLines={1}>
+              {location.address}
+            </Text>
+          ) : null}
+        </View>
         {isFrom || isTo ? (
           <View className="rounded-control bg-primary/15 px-2.5 py-0.5">
             <Text className="text-xs font-semibold text-primary">{isFrom ? "From" : "To"}</Text>

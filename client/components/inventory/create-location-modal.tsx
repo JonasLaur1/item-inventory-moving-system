@@ -22,6 +22,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [locationName, setLocationName] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
   const [locationId, setLocationId] = useState("");
   const [pendingRooms, setPendingRooms] = useState<string[]>([]);
   const [customRoomInput, setCustomRoomInput] = useState("");
@@ -32,6 +33,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
     if (!visible) {
       setStep(1);
       setLocationName("");
+      setLocationAddress("");
       setLocationId("");
       setPendingRooms([]);
       setCustomRoomInput("");
@@ -52,7 +54,8 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
     setIsSubmitting(true);
 
     try {
-      const { id } = await locationService.createLocation(trimmed);
+      const trimmedAddress = locationAddress.trim() || undefined;
+      const { id } = await locationService.createLocation({ name: trimmed, address: trimmedAddress });
       setLocationId(id);
       setStep(2);
     } catch (err) {
@@ -60,7 +63,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [locationName]);
+  }, [locationAddress, locationName]);
 
   const toggleSuggestion = useCallback((suggestion: string) => {
     setPendingRooms((prev) => {
@@ -146,6 +149,18 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
             editable={!isSubmitting}
             maxLength={60}
           />
+
+          <View className="mt-3">
+            <FormInput
+              value={locationAddress}
+              onChangeText={setLocationAddress}
+              placeholder="Address (optional)"
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              maxLength={120}
+            />
+          </View>
 
           {error ? <Text className="mt-3 text-xs text-crimson">{error}</Text> : null}
 
