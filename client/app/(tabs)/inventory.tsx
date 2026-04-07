@@ -70,7 +70,7 @@ function parseQuantity(value: string): number | null {
 
 export default function InventoryTabScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ create?: string | string[] }>();
+  const params = useLocalSearchParams<{ create?: string | string[]; locationName?: string; roomName?: string }>();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const isNarrow = width < 360;
@@ -179,9 +179,6 @@ export default function InventoryTabScreen() {
     }
   }, [availableBoxesForItem, isCreateItemModalOpen, newItemBoxId]);
 
-  const packedCount = boxes.filter((box) => box.status === "Packed").length;
-  const unpackedCount = boxes.length - packedCount;
-  const totalItemsCount = summaryBoxes.reduce((total, box) => total + box.itemsCount, 0);
   const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
   const roomFilters = useMemo(
     () => [
@@ -202,8 +199,12 @@ export default function InventoryTabScreen() {
       return;
     }
 
+    if (isRoomsLoading) {
+      return;
+    }
+
     setActiveRoom("All");
-  }, [activeRoom, roomFilters]);
+  }, [activeRoom, isRoomsLoading, roomFilters]);
 
   const filteredBoxes = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -224,6 +225,10 @@ export default function InventoryTabScreen() {
       return matchesSearch && matchesStatus && matchesRoom;
     });
   }, [activeRoom, activeStatus, boxes, search]);
+
+  const packedCount = filteredBoxes.filter((box) => box.status === "Packed").length;
+  const unpackedCount = filteredBoxes.length - packedCount;
+  const totalItemsCount = filteredBoxes.reduce((total, box) => total + box.itemsCount, 0);
 
   const openCreateModal = useCallback(() => {
     clearError();
@@ -279,6 +284,16 @@ export default function InventoryTabScreen() {
     openCreateModal();
     router.setParams({ create: undefined });
   }, [openCreateModal, router, shouldOpenCreateModal]);
+
+  useEffect(() => {
+    if (!params.locationName || !params.roomName) {
+      return;
+    }
+
+    setActiveRoom(`${params.locationName} / ${params.roomName}`);
+    router.setParams({ locationName: undefined, roomName: undefined });
+  }, [params.locationName, params.roomName, router]);
+
 
   const handleCreateBox = async () => {
     const normalizedName = newBoxName.trim();
@@ -414,7 +429,7 @@ export default function InventoryTabScreen() {
       <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
         <MetricCard
           label="Total Boxes"
-          value={String(boxes.length)}
+          value={String(filteredBoxes.length)}
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
         <MetricCard

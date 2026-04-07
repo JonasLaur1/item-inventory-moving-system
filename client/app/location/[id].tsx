@@ -407,7 +407,12 @@ export default function LocationDetailsScreen() {
                       total={room.total}
                       icon={room.icon}
                       style={contentStyle}
-                      onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/inventory",
+                          params: { locationName: location.name, roomName: room.name },
+                        })
+                      }
                     />
                   )}
                 />
