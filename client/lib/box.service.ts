@@ -228,6 +228,28 @@ async function getLocationNameById(locationId: string, userId: string): Promise<
   return data?.name ?? null;
 }
 
+async function resolveDestinationRoom(
+  destinationLocationId: string,
+  originRoomName: string | null,
+  userId: string,
+): Promise<RoomContext | null> {
+  if (originRoomName) {
+    const { data: matchedRoom, error } = await supabase
+      .from("rooms")
+      .select("id,name,location_id,location:locations(id,name)")
+      .eq("location_id", destinationLocationId)
+      .ilike("name", originRoomName)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && matchedRoom) {
+      return normalizeRoomContextRow(matchedRoom as RoomContextRow);
+    }
+  }
+
+  return findDefaultRoomInLocation(destinationLocationId, userId);
+}
+
 async function findDefaultRoomInLocation(locationId: string, userId: string): Promise<RoomContext | null> {
   const { data, error } = await supabase
     .from("rooms")
@@ -664,7 +686,7 @@ async function deleteBox(boxId: string): Promise<void> {
   });
 }
 
-async function markBoxDelivered(boxId: string): Promise<void> {
+async function markBoxDelivered(boxId: string, destinationLocationId?: string | null): Promise<void> {
   const normalizedBoxId = boxId.trim();
   if (!normalizedBoxId) {
     throw new Error("Box id is required.");
@@ -683,24 +705,53 @@ async function markBoxDelivered(boxId: string): Promise<void> {
     throw new Error("Box not found.");
   }
 
+  const originRoomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
+  const originRoomContext = box.room_id ? originRoomContextMap.get(box.room_id) : undefined;
+
+  let destinationRoom: RoomContext | null = null;
+  if (destinationLocationId) {
+    try {
+      destinationRoom = await resolveDestinationRoom(
+        destinationLocationId,
+        originRoomContext?.roomName ?? null,
+        userId,
+      );
+      console.log("[markBoxDelivered] destinationRoom resolved:", destinationRoom);
+    } catch (err) {
+      console.error("[markBoxDelivered] Failed to resolve destination room:", err);
+    }
+  } else {
+    console.log("[markBoxDelivered] No destinationLocationId provided, toLocationId was:", destinationLocationId);
+  }
+
+  const updatePayload: { status: string; room_id?: string } = { status: "delivered" };
+  if (destinationRoom) {
+    updatePayload.room_id = destinationRoom.roomId;
+  }
+
+  console.log("[markBoxDelivered] Updating box with payload:", updatePayload);
+
   const { error } = await supabase
     .from("boxes")
-    .update({ status: "delivered" })
+    .update(updatePayload)
     .eq("id", normalizedBoxId);
+
+  console.log("[markBoxDelivered] Update result error:", error);
 
   if (error) throw error;
 
-  const roomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
-  const roomContext = box.room_id ? roomContextMap.get(box.room_id) : undefined;
+  const activityRoomContext = destinationRoom ?? originRoomContext;
 
   await activityService.writeActivitySafely({
     type: "Delivered",
     entityType: "box",
     entityId: normalizedBoxId,
     title: "Box delivered",
-    description: `Marked box "${box.name}" as delivered.`,
-    locationName: roomContext?.parentLocationName ?? null,
-    roomName: roomContext?.roomName ?? null,
+    description: destinationRoom
+      ? `Marked box "${box.name}" as delivered to "${destinationRoom.parentLocationName}" (${destinationRoom.roomName}).`
+      : `Marked box "${box.name}" as delivered.`,
+    locationName: activityRoomContext?.parentLocationName ?? null,
+    roomName: activityRoomContext?.roomName ?? null,
     boxName: box.name,
     next: { status: "delivered" },
   });

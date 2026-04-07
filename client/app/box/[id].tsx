@@ -16,6 +16,7 @@ import { Colors } from "@/constants/theme";
 import { useBoxModal } from "@/hooks/use-box-modal";
 import { useBoxQr } from "@/hooks/use-box-qr";
 import { useItemModal } from "@/hooks/use-item-modal";
+import { useMovingMode } from "@/hooks/use-moving-mode";
 import { boxService, type BoxDetails, type BoxSummary } from "@/lib/box.service";
 import { roomService, type RoomSummary } from "@/lib/room.service";
 import { formatStatusLabel, formatUpdatedAt, mapItemToRow } from "@/utils/box-detail-utils";
@@ -131,6 +132,7 @@ export default function BoxDetailsScreen() {
     }, [loadBox]),
   );
 
+  const { toLocationId } = useMovingMode();
   const boxModal = useBoxModal({ box, onRefresh: refresh });
   const itemModal = useItemModal({ box, availableBoxes, onRefresh: refresh });
   const qr = useBoxQr(box);
@@ -154,7 +156,7 @@ export default function BoxDetailsScreen() {
     setDeliveryError(null);
 
     try {
-      await boxService.markBoxDelivered(boxId);
+      await boxService.markBoxDelivered(boxId, toLocationId);
       setIsDeliveryModalOpen(false);
       void refresh();
     } catch {
@@ -162,7 +164,7 @@ export default function BoxDetailsScreen() {
     } finally {
       setIsMarkingDelivered(false);
     }
-  }, [boxId, refresh]);
+  }, [boxId, toLocationId, refresh]);
 
   const confirmUnpackAtDestination = useCallback(async () => {
     if (!boxId) {
