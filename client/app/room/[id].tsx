@@ -439,14 +439,16 @@ export default function RoomDetailsScreen() {
                           >
                             <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
                           </Pressable>
-                          <Pressable
-                            onPress={openDeleteModal}
-                            hitSlop={8}
-                            className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasBoxes ? "opacity-40" : ""}`}
-                            disabled={isDeletingRoom || hasBoxes}
-                          >
-                            <Feather name="trash-2" size={18} color={themeColors.crimson} />
-                          </Pressable>
+                          {room.isOwner ? (
+                            <Pressable
+                              onPress={openDeleteModal}
+                              hitSlop={8}
+                              className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasBoxes ? "opacity-40" : ""}`}
+                              disabled={isDeletingRoom || hasBoxes}
+                            >
+                              <Feather name="trash-2" size={18} color={themeColors.crimson} />
+                            </Pressable>
+                          ) : null}
                         </View>
                       )}
                     </View>

@@ -50,6 +50,7 @@ export type RoomDetailsBox = {
 };
 
 export type RoomDetails = RoomSummary & {
+  isOwner: boolean;
   boxList: RoomDetailsBox[];
 };
 
@@ -342,14 +343,21 @@ async function getRoomDetails(roomId: string): Promise<RoomDetails> {
     throw new Error("Room not found.");
   }
 
-  const [locationNameMap, boxesResult] = await Promise.all([
+  const [locationNameMap, boxesResult, locationResult] = await Promise.all([
     getLocationNameMap(userId, [room.location_id]),
     supabase
       .from("boxes")
       .select("id,room_id,name,status,updated_at,fragility")
       .eq("room_id", normalizedRoomId)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("locations")
+      .select("user_id")
+      .eq("id", room.location_id)
+      .maybeSingle(),
   ]);
+
+  const isOwner = locationResult.data?.user_id === userId;
 
   if (boxesResult.error) throw boxesResult.error;
 
@@ -390,6 +398,7 @@ async function getRoomDetails(roomId: string): Promise<RoomDetails> {
 
   return {
     ...summary,
+    isOwner,
     boxList,
   };
 }

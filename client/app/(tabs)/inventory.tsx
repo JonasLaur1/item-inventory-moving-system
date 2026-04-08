@@ -17,7 +17,6 @@ import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useLocations } from "@/hooks/use-locations";
 import { useRooms } from "@/hooks/use-rooms";
-import { itemService } from "@/lib/item.service";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -52,20 +51,6 @@ function mapBoxStatus(status: "packed" | "unpacked" | "delivered" | "unpacked_at
     default:
       return "Not packed";
   }
-}
-
-function parseQuantity(value: string): number | null {
-  const normalizedValue = value.trim();
-  if (!normalizedValue) {
-    return null;
-  }
-
-  const parsedValue = Number(normalizedValue);
-  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
-    return null;
-  }
-
-  return parsedValue;
 }
 
 export default function InventoryTabScreen() {
@@ -109,15 +94,6 @@ export default function InventoryTabScreen() {
   const [newBoxStatus, setNewBoxStatus] = useState<EditableStatus>("unpacked");
   const [createBoxError, setCreateBoxError] = useState<string | null>(null);
 
-  const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemQuantity, setNewItemQuantity] = useState("1");
-  const [newItemIsFragile, setNewItemIsFragile] = useState(false);
-  const [newItemNotes, setNewItemNotes] = useState("");
-  const [newItemBoxId, setNewItemBoxId] = useState("");
-  const [createItemError, setCreateItemError] = useState<string | null>(null);
-  const [isCreatingItem, setIsCreatingItem] = useState(false);
-
   useFocusEffect(
     useCallback(() => {
       if (!hasFocusedOnceRef.current) {
@@ -130,8 +106,6 @@ export default function InventoryTabScreen() {
   );
 
   const availableRoomsForBox = useMemo(() => rooms, [rooms]);
-
-  const availableBoxesForItem = useMemo(() => summaryBoxes, [summaryBoxes]);
 
   const boxes: InventoryBox[] = useMemo(
     () =>
@@ -168,16 +142,6 @@ export default function InventoryTabScreen() {
 
     setNewBoxRoomId(availableRoomsForBox[0]?.id ?? "");
   }, [availableRoomsForBox, isCreateModalOpen, newBoxRoomId]);
-
-  useEffect(() => {
-    if (!isCreateItemModalOpen) {
-      return;
-    }
-
-    if (!newItemBoxId && availableBoxesForItem.length > 0) {
-      setNewItemBoxId(availableBoxesForItem[0].id);
-    }
-  }, [availableBoxesForItem, isCreateItemModalOpen, newItemBoxId]);
 
   const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
   const roomFilters = useMemo(
@@ -248,25 +212,6 @@ export default function InventoryTabScreen() {
     setCreateBoxError(null);
   };
 
-  const openCreateItemModal = useCallback(() => {
-    setCreateItemError(null);
-    setNewItemName("");
-    setNewItemQuantity("1");
-    setNewItemIsFragile(false);
-    setNewItemNotes("");
-    setNewItemBoxId(availableBoxesForItem[0]?.id ?? "");
-    setIsCreateItemModalOpen(true);
-  }, [availableBoxesForItem]);
-
-  const closeCreateItemModal = useCallback(() => {
-    if (isCreatingItem) {
-      return;
-    }
-
-    setIsCreateItemModalOpen(false);
-    setCreateItemError(null);
-  }, [isCreatingItem]);
-
   const shouldOpenCreateModal = useMemo(() => {
     if (!params.create) {
       return false;
@@ -293,7 +238,6 @@ export default function InventoryTabScreen() {
     setActiveRoom(`${params.locationName} / ${params.roomName}`);
     router.setParams({ locationName: undefined, roomName: undefined });
   }, [params.locationName, params.roomName, router]);
-
 
   const handleCreateBox = async () => {
     const normalizedName = newBoxName.trim();
@@ -329,55 +273,6 @@ export default function InventoryTabScreen() {
       setCreateBoxError("Failed to create box.");
     }
   };
-
-  const handleCreateItem = useCallback(async () => {
-    const normalizedName = newItemName.trim();
-    if (!normalizedName) {
-      setCreateItemError("Item name is required.");
-      return;
-    }
-
-    const parsedQuantity = parseQuantity(newItemQuantity);
-    if (!parsedQuantity) {
-      setCreateItemError("Quantity must be a whole number greater than 0.");
-      return;
-    }
-
-    if (!newItemBoxId) {
-      setCreateItemError("Box is required.");
-      return;
-    }
-
-    setIsCreatingItem(true);
-    setCreateItemError(null);
-
-    try {
-      await itemService.createItem({
-        name: normalizedName,
-        quantity: parsedQuantity,
-        isFragile: newItemIsFragile,
-        notes: newItemNotes,
-        boxId: newItemBoxId,
-      });
-
-      setIsCreateItemModalOpen(false);
-      await Promise.all([refreshBoxes(), refreshRooms(), refreshLocations()]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create item.";
-      setCreateItemError(message);
-    } finally {
-      setIsCreatingItem(false);
-    }
-  }, [
-    newItemBoxId,
-    newItemIsFragile,
-    newItemName,
-    newItemNotes,
-    newItemQuantity,
-    refreshBoxes,
-    refreshLocations,
-    refreshRooms,
-  ]);
 
   if (!isLocationsLoading && locations.length === 0) {
     return (
@@ -449,15 +344,7 @@ export default function InventoryTabScreen() {
         />
       </View>
 
-      <View className={`mt-6 gap-3 ${isCompact ? "" : "flex-row"}`}>
-        <QuickActionCard
-          title="Add Item"
-          subtitle="Create and assign to box"
-          icon="plus"
-          variant="primary"
-          onPress={openCreateItemModal}
-          disabled={availableBoxesForItem.length === 0}
-        />
+      <View className="mt-6">
         <QuickActionCard
           title="Add Box"
           subtitle="Create new box"
@@ -564,132 +451,6 @@ export default function InventoryTabScreen() {
           )}
         </View>
       </View>
-
-      <AppModal
-        visible={isCreateItemModalOpen}
-        title="Create item"
-        description="Set item details and select a box."
-        onRequestClose={closeCreateItemModal}
-        maxWidth={420}
-      >
-        <FormInput
-          value={newItemName}
-          onChangeText={setNewItemName}
-          placeholder="Item name"
-          autoCapitalize="sentences"
-          autoCorrect={false}
-          editable={!isCreatingItem}
-          maxLength={120}
-        />
-
-        <View className="mt-4">
-          <FormInput
-            value={newItemQuantity}
-            onChangeText={setNewItemQuantity}
-            placeholder="Quantity"
-            keyboardType="number-pad"
-            editable={!isCreatingItem}
-            maxLength={4}
-          />
-        </View>
-
-        <View className="mt-4">
-          <FormInput
-            value={newItemNotes}
-            onChangeText={setNewItemNotes}
-            placeholder="Notes (optional)"
-            autoCapitalize="sentences"
-            editable={!isCreatingItem}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-            style={{ minHeight: 84, paddingTop: 12 }}
-            maxLength={300}
-          />
-        </View>
-
-        <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Fragility</Text>
-          <View className="mt-2 flex-row gap-2">
-            <Pressable
-              onPress={() => setNewItemIsFragile(false)}
-              disabled={isCreatingItem}
-              className={`flex-1 items-center rounded-control border py-2.5 ${
-                !newItemIsFragile
-                  ? "border-primary bg-primary/15"
-                  : "border-border-default bg-bg-input/60"
-              }`}
-            >
-              <Text className="text-sm font-semibold text-text-primary">Not fragile</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setNewItemIsFragile(true)}
-              disabled={isCreatingItem}
-              className={`flex-1 items-center rounded-control border py-2.5 ${
-                newItemIsFragile
-                  ? "border-primary bg-primary/15"
-                  : "border-border-default bg-bg-input/60"
-              }`}
-            >
-              <Text className="text-sm font-semibold text-text-primary">Fragile</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
-          <ScrollView className="mt-2" style={{ maxHeight: 200 }} showsVerticalScrollIndicator>
-            <View className="gap-2">
-              {availableBoxesForItem.length === 0 ? (
-                <Text className="text-xs text-text-tertiary">
-                  No boxes found in this location. Create a box first before adding items.
-                </Text>
-              ) : (
-                availableBoxesForItem.map((box) => {
-                  const isActive = box.id === newItemBoxId;
-                  return (
-                    <Pressable
-                      key={box.id}
-                      onPress={() => setNewItemBoxId(box.id)}
-                      disabled={isCreatingItem}
-                      className={`rounded-control border px-3 py-2.5 ${
-                        isActive
-                          ? "border-primary bg-primary/15"
-                          : "border-border-default bg-bg-input/60"
-                      }`}
-                    >
-                      <Text className="text-sm font-semibold text-text-primary">{box.name}</Text>
-                      <Text className="mt-1 text-xs text-text-tertiary">
-                        {box.parentLocationName} / {box.roomName}
-                      </Text>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-          </ScrollView>
-        </View>
-
-        {createItemError ? (
-          <Text className="mt-3 text-xs text-crimson">{createItemError}</Text>
-        ) : null}
-
-        <View className={`${createItemError ? "mt-4" : "mt-5"} flex-row gap-3`}>
-          <Button
-            label="Cancel"
-            variant="secondary"
-            onPress={closeCreateItemModal}
-            disabled={isCreatingItem}
-            className="flex-1"
-          />
-          <Button
-            label={isCreatingItem ? "Creating..." : "Create"}
-            onPress={() => void handleCreateItem()}
-            disabled={isCreatingItem || availableBoxesForItem.length === 0}
-            className="flex-1"
-          />
-        </View>
-      </AppModal>
 
       <AppModal
         visible={isCreateModalOpen}

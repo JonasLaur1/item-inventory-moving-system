@@ -26,7 +26,7 @@ export default function ManageRoomsScreen() {
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
 
-  const params = useLocalSearchParams<{ id: string; name?: string; address?: string }>();
+  const params = useLocalSearchParams<{ id: string; name?: string; address?: string; isOwner?: string }>();
   const locationId = useMemo(
     () => (Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "")),
     [params.id],
@@ -38,6 +38,10 @@ export default function ManageRoomsScreen() {
   const locationAddress = useMemo(
     () => (Array.isArray(params.address) ? (params.address[0] ?? "") : (params.address ?? "")),
     [params.address],
+  );
+  const isOwner = useMemo(
+    () => (Array.isArray(params.isOwner) ? params.isOwner[0] : params.isOwner) === "1",
+    [params.isOwner],
   );
 
   const { rooms, isLoading, isRefreshing, isCreating, isUpdating, isDeleting, errorMessage, refreshRooms, createRoom, updateRoom, deleteRoom, clearError } =
@@ -168,22 +172,24 @@ export default function ManageRoomsScreen() {
             >
               <Feather name="edit-2" size={15} color={themeColors.textSecondary} />
             </Pressable>
-            <Pressable
-              onPress={() => openDeleteModal(room)}
-              hitSlop={8}
-              disabled={!canDelete || isDeleting}
-              className={`h-9 w-9 items-center justify-center rounded-full border ${
-                canDelete
-                  ? "border-crimson/40 bg-crimson/10"
-                  : "border-border-default bg-bg-base opacity-30"
-              }`}
-            >
-              <Feather
-                name="trash-2"
-                size={16}
-                color={canDelete ? themeColors.crimson : themeColors.textTertiary}
-              />
-            </Pressable>
+            {isOwner ? (
+              <Pressable
+                onPress={() => openDeleteModal(room)}
+                hitSlop={8}
+                disabled={!canDelete || isDeleting}
+                className={`h-9 w-9 items-center justify-center rounded-full border ${
+                  canDelete
+                    ? "border-crimson/40 bg-crimson/10"
+                    : "border-border-default bg-bg-base opacity-30"
+                }`}
+              >
+                <Feather
+                  name="trash-2"
+                  size={16}
+                  color={canDelete ? themeColors.crimson : themeColors.textTertiary}
+                />
+              </Pressable>
+            ) : null}
           </View>
         </View>
       );
@@ -247,13 +253,15 @@ export default function ManageRoomsScreen() {
                 <Text className="text-sm font-semibold text-text-secondary">
                   {rooms.length} {rooms.length === 1 ? "room" : "rooms"}
                 </Text>
-                <Pressable
-                  onPress={openAddModal}
-                  className="flex-row items-center gap-1.5 rounded-control border border-border-default bg-bg-elevated px-3 py-2"
-                >
-                  <Feather name="plus" size={14} color={themeColors.primary} />
-                  <Text className="text-xs font-semibold text-primary">Add Room</Text>
-                </Pressable>
+                {isOwner ? (
+                  <Pressable
+                    onPress={openAddModal}
+                    className="flex-row items-center gap-1.5 rounded-control border border-border-default bg-bg-elevated px-3 py-2"
+                  >
+                    <Feather name="plus" size={14} color={themeColors.primary} />
+                    <Text className="text-xs font-semibold text-primary">Add Room</Text>
+                  </Pressable>
+                ) : null}
               </View>
             }
             ListEmptyComponent={

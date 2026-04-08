@@ -157,7 +157,7 @@ export default function LocationConfigScreen() {
                   onPress={() =>
                     router.push({
                       pathname: "/location-config/[id]",
-                      params: { id: location.id, name: location.name, address: location.address ?? "" },
+                      params: { id: location.id, name: location.name, address: location.address ?? "", isOwner: location.isOwner ? "1" : "0" },
                     })
                   }
                   className="flex-1 flex-row items-center justify-between rounded-card border border-border-default bg-bg-elevated px-4 py-4"
@@ -171,25 +171,29 @@ export default function LocationConfigScreen() {
                   <Feather name="chevron-right" size={18} color={themeColors.textTertiary} />
                 </Pressable>
 
-                <Pressable
-                  onPress={() => openRenameModal(location)}
-                  hitSlop={4}
-                  disabled={isRenamingLocation || isDeletingLocation}
-                  className="h-14 w-12 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
-                >
-                  <Feather name="edit-2" size={17} color={themeColors.textSecondary} />
-                </Pressable>
+                {location.isOwner ? (
+                  <>
+                    <Pressable
+                      onPress={() => openRenameModal(location)}
+                      hitSlop={4}
+                      disabled={isRenamingLocation || isDeletingLocation}
+                      className="h-14 w-12 items-center justify-center rounded-card border border-border-default bg-bg-elevated"
+                    >
+                      <Feather name="edit-2" size={17} color={themeColors.textSecondary} />
+                    </Pressable>
 
-                <Pressable
-                  onPress={() => openDeleteModal(location)}
-                  disabled={location.rooms > 0}
-                  hitSlop={4}
-                  className={`h-14 w-12 items-center justify-center rounded-card border border-crimson/40 bg-crimson/10 ${
-                    location.rooms > 0 ? "opacity-40" : ""
-                  }`}
-                >
-                  <Feather name="trash-2" size={18} color={themeColors.crimson} />
-                </Pressable>
+                    <Pressable
+                      onPress={() => openDeleteModal(location)}
+                      disabled={location.rooms > 0}
+                      hitSlop={4}
+                      className={`h-14 w-12 items-center justify-center rounded-card border border-crimson/40 bg-crimson/10 ${
+                        location.rooms > 0 ? "opacity-40" : ""
+                      }`}
+                    >
+                      <Feather name="trash-2" size={18} color={themeColors.crimson} />
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             )}
           />

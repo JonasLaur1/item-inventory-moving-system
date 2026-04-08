@@ -5,7 +5,7 @@ export type LocationKind = "start" | "destination" | "other";
 
 type LocationRow = {
   id: string;
-  user_id?: string;
+  user_id: string;
   name: string;
   kind: string | null;
   cover_image_url: string | null;
@@ -50,6 +50,7 @@ export type LocationSummary = {
   deliveredBoxes: number;
   unpackedAtDestinationBoxes: number;
   items: number;
+  isOwner: boolean;
 };
 
 export type LocationDetailsRoom = {
@@ -77,7 +78,6 @@ export type LocationDetailsBox = {
 };
 
 export type LocationDetails = LocationSummary & {
-  isOwner: boolean;
   roomList: LocationDetailsRoom[];
   boxList: LocationDetailsBox[];
 };
@@ -237,7 +237,7 @@ async function getLocationAggregation(locationIds: string[]): Promise<LocationAg
   };
 }
 
-function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAggregation): LocationSummary[] {
+function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAggregation, userId: string): LocationSummary[] {
   const roomsByLocationId = new Map<string, RoomRow[]>();
   aggregation.rooms.forEach((room) => {
     const current = roomsByLocationId.get(room.location_id) ?? [];
@@ -287,16 +287,17 @@ function mapLocationSummaries(locations: LocationRow[], aggregation: LocationAgg
       deliveredBoxes,
       unpackedAtDestinationBoxes,
       items,
+      isOwner: location.user_id === userId,
     };
   });
 }
 
 async function listLocationSummaries(): Promise<LocationSummary[]> {
-  await getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const { data: locations, error: locationsError } = await supabase
     .from("locations")
-    .select("id,name,address,kind,cover_image_url,sort_order,created_at,updated_at")
+    .select("id,user_id,name,address,kind,cover_image_url,sort_order,created_at,updated_at")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -309,7 +310,7 @@ async function listLocationSummaries(): Promise<LocationSummary[]> {
     locations.map((location: LocationRow) => location.id),
   );
 
-  return mapLocationSummaries(locations, aggregation);
+  return mapLocationSummaries(locations, aggregation, userId);
 }
 
 async function createLocation(input: string | CreateLocationInput): Promise<{ id: string }> {
@@ -555,9 +556,8 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
     throw new Error("Location not found.");
   }
 
-  const isOwner = location.user_id === userId;
   const aggregation = await getLocationAggregation([normalizedLocationId]);
-  const summary = mapLocationSummaries([location], aggregation)[0];
+  const summary = mapLocationSummaries([location], aggregation, userId)[0];
 
   const roomList: LocationDetailsRoom[] = aggregation.rooms
     .filter((room) => room.location_id === normalizedLocationId)
@@ -596,7 +596,6 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
 
   return {
     ...summary,
-    isOwner,
     roomList,
     boxList,
   };

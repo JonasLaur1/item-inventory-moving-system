@@ -377,29 +377,42 @@ export default function LocationDetailsScreen() {
                         <Text className="mt-1 text-xs text-text-tertiary">
                           {getKindLabel(location.kind)} • {location.rooms} rooms • {location.items} items
                         </Text>
-                        <Pressable onPress={openAddressEditor} hitSlop={4} className="mt-1.5 flex-row items-center gap-1">
-                          <Feather name="map-pin" size={11} color={themeColors.textTertiary} />
-                          <Text className="text-xs text-text-tertiary" numberOfLines={1}>
-                            {location.address ?? "Add address"}
-                          </Text>
-                        </Pressable>
+                        {location.isOwner ? (
+                          <Pressable onPress={openAddressEditor} hitSlop={4} className="mt-1.5 flex-row items-center gap-1">
+                            <Feather name="map-pin" size={11} color={themeColors.textTertiary} />
+                            <Text className="text-xs text-text-tertiary" numberOfLines={1}>
+                              {location.address ?? "Add address"}
+                            </Text>
+                          </Pressable>
+                        ) : location.address ? (
+                          <View className="mt-1.5 flex-row items-center gap-1">
+                            <Feather name="map-pin" size={11} color={themeColors.textTertiary} />
+                            <Text className="text-xs text-text-tertiary" numberOfLines={1}>
+                              {location.address}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
-                      <Pressable
-                        onPress={openNameEditor}
-                        hitSlop={8}
-                        className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
-                        disabled={isDeletingLocation}
-                      >
-                        <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
-                      </Pressable>
-                      <Pressable
-                        onPress={openDeleteModal}
-                        hitSlop={8}
-                        className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasRooms ? "opacity-40" : ""}`}
-                        disabled={isDeletingLocation || hasRooms}
-                      >
-                        <Feather name="trash-2" size={18} color={themeColors.crimson} />
-                      </Pressable>
+                      {location.isOwner ? (
+                        <>
+                          <Pressable
+                            onPress={openNameEditor}
+                            hitSlop={8}
+                            className="h-10 w-10 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                            disabled={isDeletingLocation}
+                          >
+                            <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
+                          </Pressable>
+                          <Pressable
+                            onPress={openDeleteModal}
+                            hitSlop={8}
+                            className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasRooms ? "opacity-40" : ""}`}
+                            disabled={isDeletingLocation || hasRooms}
+                          >
+                            <Feather name="trash-2" size={18} color={themeColors.crimson} />
+                          </Pressable>
+                        </>
+                      ) : null}
                     </View>
                   )}
                 </View>
