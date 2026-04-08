@@ -41,7 +41,7 @@ type ActivityLogRow = {
   user_id: string | null;
 };
 
-const ACTIVITY_TYPES: ActivityType[] = ["Created", "Updated", "Moved", "Deleted", "Packed"];
+const ACTIVITY_TYPES: ActivityType[] = ["Created", "Updated", "Deleted", "Packed", "Delivered"];
 
 async function getCurrentUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
