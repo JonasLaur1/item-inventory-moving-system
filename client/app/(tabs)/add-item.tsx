@@ -320,18 +320,26 @@ export default function AddItemScreen() {
           <View className="mb-2 flex-row items-center justify-between">
             <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
             {hasLocationContext && !showAllBoxes && (
-              <Pressable onPress={() => setShowAllBoxes(true)} hitSlop={8}>
-                <Text className="text-xs text-primary">
-                  {hasRoomContext
-                    ? roomFilter.split(" / ")[1]
-                    : locationFilter}{" "}
-                  · Show all
+              <View className="flex-row items-center gap-2">
+                <Text className="text-xs text-text-tertiary">
+                  {hasRoomContext ? roomFilter.split(" / ")[1] : locationFilter}
                 </Text>
-              </Pressable>
+                <Pressable
+                  onPress={() => setShowAllBoxes(true)}
+                  className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1"
+                >
+                  <Text className="text-xs font-semibold text-primary">Show more</Text>
+                  <Feather name="chevron-down" size={11} color={palette.primary} />
+                </Pressable>
+              </View>
             )}
             {showAllBoxes && hasLocationContext && (
-              <Pressable onPress={() => setShowAllBoxes(false)} hitSlop={8}>
-                <Text className="text-xs text-primary">Show less</Text>
+              <Pressable
+                onPress={() => setShowAllBoxes(false)}
+                className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-3 py-1"
+              >
+                <Text className="text-xs font-semibold text-text-secondary">Show less</Text>
+                <Feather name="chevron-up" size={11} color={palette.textSecondary} />
               </Pressable>
             )}
           </View>
