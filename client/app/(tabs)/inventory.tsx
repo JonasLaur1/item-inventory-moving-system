@@ -84,7 +84,8 @@ export default function InventoryTabScreen() {
 
   const [search, setSearch] = useState("");
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
-  const [activeRoom, setActiveRoom] = useState("All");
+  const [activeLocationFilter, setActiveLocationFilter] = useState("All");
+  const [activeRoomFilter, setActiveRoomFilter] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCreateLocationModalOpen, setIsCreateLocationModalOpen] = useState(false);
 
@@ -143,32 +144,47 @@ export default function InventoryTabScreen() {
     setNewBoxRoomId(availableRoomsForBox[0]?.id ?? "");
   }, [availableRoomsForBox, isCreateModalOpen, newBoxRoomId]);
 
-  const activeFilterCount = Number(activeStatus !== "All") + Number(activeRoom !== "All");
-  const roomFilters = useMemo(
+  const activeFilterCount =
+    Number(activeStatus !== "All") +
+    Number(activeLocationFilter !== "All" || activeRoomFilter !== "All");
+
+  const locationFilters = useMemo(
     () => [
       "All",
-      ...rooms
-        .map((r) => `${r.locationName} / ${r.name}`)
-        .sort((a, b) => a.localeCompare(b)),
+      ...Array.from(new Set(rooms.map((r) => r.locationName))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
     ],
     [rooms],
   );
 
+  const roomFiltersForLocation = useMemo(
+    () => [
+      "All",
+      ...rooms
+        .filter((r) =>
+          activeLocationFilter === "All" ? true : r.locationName === activeLocationFilter,
+        )
+        .map((r) => `${r.locationName} / ${r.name}`)
+        .sort((a, b) => a.localeCompare(b)),
+    ],
+    [activeLocationFilter, rooms],
+  );
+
   useEffect(() => {
-    if (activeRoom === "All") {
-      return;
-    }
+    if (activeRoomFilter === "All") return;
+    if (roomFiltersForLocation.includes(activeRoomFilter)) return;
+    if (isRoomsLoading) return;
+    setActiveRoomFilter("All");
+  }, [activeRoomFilter, isRoomsLoading, roomFiltersForLocation]);
 
-    if (roomFilters.includes(activeRoom)) {
-      return;
-    }
-
-    if (isRoomsLoading) {
-      return;
-    }
-
-    setActiveRoom("All");
-  }, [activeRoom, isRoomsLoading, roomFilters]);
+  useEffect(() => {
+    if (activeLocationFilter === "All") return;
+    if (locationFilters.includes(activeLocationFilter)) return;
+    if (isRoomsLoading) return;
+    setActiveLocationFilter("All");
+    setActiveRoomFilter("All");
+  }, [activeLocationFilter, isRoomsLoading, locationFilters]);
 
   const filteredBoxes = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -184,11 +200,16 @@ export default function InventoryTabScreen() {
         activeStatus === "All" ||
         (activeStatus === "Fragile" ? box.isFragile : box.status === activeStatus);
 
-      const matchesRoom = activeRoom === "All" || box.room === activeRoom;
+      const matchesRoom =
+        activeRoomFilter !== "All"
+          ? box.room === activeRoomFilter
+          : activeLocationFilter !== "All"
+            ? box.room.startsWith(`${activeLocationFilter} / `)
+            : true;
 
       return matchesSearch && matchesStatus && matchesRoom;
     });
-  }, [activeRoom, activeStatus, boxes, search]);
+  }, [activeLocationFilter, activeRoomFilter, activeStatus, boxes, search]);
 
   const packedCount = filteredBoxes.filter((box) => box.status === "Packed").length;
   const unpackedCount = filteredBoxes.length - packedCount;
@@ -235,7 +256,8 @@ export default function InventoryTabScreen() {
       return;
     }
 
-    setActiveRoom(`${params.locationName} / ${params.roomName}`);
+    setActiveLocationFilter(params.locationName);
+    setActiveRoomFilter(`${params.locationName} / ${params.roomName}`);
     router.setParams({ locationName: undefined, roomName: undefined });
   }, [params.locationName, params.roomName, router]);
 
@@ -392,7 +414,8 @@ export default function InventoryTabScreen() {
             <Pressable
               onPress={() => {
                 setActiveStatus("All");
-                setActiveRoom("All");
+                setActiveLocationFilter("All");
+                setActiveRoomFilter("All");
               }}
             >
               <Text className="text-xs font-semibold text-text-link">Clear</Text>
@@ -408,10 +431,21 @@ export default function InventoryTabScreen() {
           />
 
           <FilterGroup
+            label="Location"
+            options={locationFilters}
+            activeValue={activeLocationFilter}
+            onSelect={(loc) => {
+              setActiveLocationFilter(loc);
+              setActiveRoomFilter("All");
+            }}
+            className="mt-4"
+          />
+
+          <FilterGroup
             label="Room"
-            options={roomFilters}
-            activeValue={activeRoom}
-            onSelect={setActiveRoom}
+            options={roomFiltersForLocation}
+            activeValue={activeRoomFilter}
+            onSelect={setActiveRoomFilter}
             className="mt-4"
           />
         </View>
