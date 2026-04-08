@@ -1,15 +1,18 @@
 import { ColorPalettes } from "@/constants/theme";
+import { InventoryFilterProvider, useInventoryFilter } from "@/contexts/inventory-filter-context";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function TabLayout() {
+function TabNavigator() {
   const { resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 10);
+  const pathname = usePathname();
+  const { setPreviousRoute } = useInventoryFilter();
 
   return (
     <Tabs
@@ -53,6 +56,13 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="add-item"
+        listeners={{
+          tabPress: () => {
+            if (pathname !== "/add-item") {
+              setPreviousRoute(pathname);
+            }
+          },
+        }}
         options={{
           title: "Add Item",
           tabBarStyle: { display: "none" },
@@ -104,5 +114,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <InventoryFilterProvider>
+      <TabNavigator />
+    </InventoryFilterProvider>
   );
 }

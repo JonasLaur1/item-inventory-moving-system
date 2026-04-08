@@ -2,6 +2,7 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { CameraCaptureModal, type CaptureResult } from "@/components/ui/camera-capture-modal";
 import { ColorPalettes } from "@/constants/theme";
+import { useInventoryFilter } from "@/contexts/inventory-filter-context";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { itemService } from "@/lib/item.service";
@@ -54,8 +55,26 @@ export default function AddItemScreen() {
   const { resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
 
+  const { locationFilter, roomFilter, previousRoute } = useInventoryFilter();
+  const hasLocationContext = locationFilter !== "All";
+  const hasRoomContext = roomFilter !== "All";
+
   const { boxes, isLoading: isBoxesLoading } = useBoxes();
-  const groupedBoxes = useMemo(() => groupBoxes(boxes), [boxes]);
+  const [showAllBoxes, setShowAllBoxes] = useState(false);
+
+  const groupedBoxes = useMemo(() => {
+    const allGrouped = groupBoxes(boxes);
+    if (showAllBoxes || !hasLocationContext) return allGrouped;
+
+    return allGrouped
+      .filter((loc) => loc.locationName === locationFilter)
+      .map((loc) => ({
+        ...loc,
+        rooms: hasRoomContext
+          ? loc.rooms.filter((r) => `${locationFilter} / ${r.roomName}` === roomFilter)
+          : loc.rooms,
+      }));
+  }, [boxes, showAllBoxes, hasLocationContext, hasRoomContext, locationFilter, roomFilter]);
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -81,6 +100,7 @@ export default function AddItemScreen() {
     setCapturedPhotoUri(null);
     setCapturedPhotoBase64(null);
     setIsAiSuggested(false);
+    setShowAllBoxes(false);
   }, []);
 
   useFocusEffect(
@@ -169,7 +189,7 @@ export default function AddItemScreen() {
       <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
         <Text className="text-2xl font-bold text-text-primary">Add Item</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
           className="h-10 w-10 items-center justify-center rounded-card border border-border-strong bg-bg-input"
         >
           <Feather name="x" size={18} color={palette.textPrimary} />
@@ -297,8 +317,25 @@ export default function AddItemScreen() {
         </View>
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
-          <View className="mt-2 gap-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
+            {hasLocationContext && !showAllBoxes && (
+              <Pressable onPress={() => setShowAllBoxes(true)} hitSlop={8}>
+                <Text className="text-xs text-primary">
+                  {hasRoomContext
+                    ? roomFilter.split(" / ")[1]
+                    : locationFilter}{" "}
+                  · Show all
+                </Text>
+              </Pressable>
+            )}
+            {showAllBoxes && hasLocationContext && (
+              <Pressable onPress={() => setShowAllBoxes(false)} hitSlop={8}>
+                <Text className="text-xs text-primary">Show less</Text>
+              </Pressable>
+            )}
+          </View>
+          <View className="gap-4">
             {isBoxesLoading ? (
               <Text className="text-xs text-text-tertiary">Loading boxes...</Text>
             ) : boxes.length === 0 ? (
@@ -353,7 +390,7 @@ export default function AddItemScreen() {
           <Button
             label="Cancel"
             variant="secondary"
-            onPress={() => router.back()}
+            onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
             disabled={isSubmitting}
             className="flex-1"
           />

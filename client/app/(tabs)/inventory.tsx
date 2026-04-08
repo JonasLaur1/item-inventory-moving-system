@@ -12,6 +12,7 @@ import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { SearchBar } from "@/components/ui/search-bar";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
 import { Colors } from "@/constants/theme";
+import { useInventoryFilter } from "@/contexts/inventory-filter-context";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useBoxes } from "@/hooks/use-boxes";
@@ -81,6 +82,8 @@ export default function InventoryTabScreen() {
     refreshLocations,
   } = useLocations();
   const { rooms, isLoading: isRoomsLoading, refreshRooms } = useRooms();
+
+  const { setInventoryFilters } = useInventoryFilter();
 
   const [search, setSearch] = useState("");
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
@@ -260,6 +263,10 @@ export default function InventoryTabScreen() {
     setActiveRoomFilter(`${params.locationName} / ${params.roomName}`);
     router.setParams({ locationName: undefined, roomName: undefined });
   }, [params.locationName, params.roomName, router]);
+
+  useEffect(() => {
+    setInventoryFilters(activeLocationFilter, activeRoomFilter);
+  }, [activeLocationFilter, activeRoomFilter, setInventoryFilters]);
 
   const handleCreateBox = async () => {
     const normalizedName = newBoxName.trim();
