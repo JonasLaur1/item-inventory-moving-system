@@ -76,6 +76,12 @@ export default function AddItemScreen() {
       }));
   }, [boxes, showAllBoxes, hasLocationContext, hasRoomContext, locationFilter, roomFilter]);
 
+  const noBoxesInFilter =
+    !showAllBoxes &&
+    hasLocationContext &&
+    boxes.length > 0 &&
+    groupedBoxes.every((loc) => loc.rooms.length === 0);
+
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [isFragile, setIsFragile] = useState(false);
@@ -321,9 +327,12 @@ export default function AddItemScreen() {
             <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
             {hasLocationContext && !showAllBoxes && (
               <View className="flex-row items-center gap-2">
-                <Text className="text-xs text-text-tertiary">
-                  {hasRoomContext ? roomFilter.split(" / ")[1] : locationFilter}
-                </Text>
+                <View className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-2.5 py-1">
+                  <Feather name="tag" size={10} color={palette.textTertiary} />
+                  <Text className="text-xs text-text-secondary">
+                    {hasRoomContext ? roomFilter.split(" / ")[1] : locationFilter}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => setShowAllBoxes(true)}
                   className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1"
@@ -350,6 +359,25 @@ export default function AddItemScreen() {
               <Text className="text-xs text-text-tertiary">
                 No boxes found. Create a box first before adding items.
               </Text>
+            ) : noBoxesInFilter ? (
+              <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <Feather name="alert-circle" size={15} color={palette.textSecondary} />
+                  <Text className="text-sm font-semibold text-text-secondary">
+                    No boxes in this {hasRoomContext ? "room" : "location"}
+                  </Text>
+                </View>
+                <Text className="text-xs text-text-tertiary mb-3">
+                  Create a box here first, or pick from another location.
+                </Text>
+                <Pressable
+                  onPress={() => setShowAllBoxes(true)}
+                  className="flex-row items-center gap-1 self-start rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5"
+                >
+                  <Text className="text-xs font-semibold text-primary">Show all boxes</Text>
+                  <Feather name="chevron-down" size={11} color={palette.primary} />
+                </Pressable>
+              </View>
             ) : (
               groupedBoxes.map((location) => (
                 <View key={location.locationName}>
@@ -405,7 +433,7 @@ export default function AddItemScreen() {
           <Button
             label={isSubmitting ? "Creating..." : "Create"}
             onPress={() => void handleSubmit()}
-            disabled={isSubmitting || boxes.length === 0}
+            disabled={isSubmitting || boxes.length === 0 || noBoxesInFilter}
             className="flex-1"
           />
         </View>
