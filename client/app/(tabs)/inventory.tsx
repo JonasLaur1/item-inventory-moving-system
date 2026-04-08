@@ -366,7 +366,7 @@ export default function InventoryTabScreen() {
         />
       </View>
 
-      <View className="mt-6">
+      <View className="mt-6 flex-row">
         <QuickActionCard
           title="Add Box"
           subtitle="Create new box"
