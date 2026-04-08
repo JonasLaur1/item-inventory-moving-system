@@ -277,23 +277,38 @@ export function ItemFormModal({
       >
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: windowHeight * 0.5 }}>
           {availableBoxes.length > 0 ? (
-            availableBoxes.map((availableBox, index) => {
-              const isActive = availableBox.id === selectedBoxForDisplay?.id;
-              return (
-                <Pressable
-                  key={availableBox.id}
-                  onPress={() => onSelectBox(availableBox.id)}
-                  className={`rounded-control border px-3 py-2.5 ${index > 0 ? "mt-2" : ""} ${
-                    isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
-                  }`}
-                >
-                  <Text className="text-sm font-semibold text-text-primary">{availableBox.name}</Text>
-                  <Text className="mt-0.5 text-xs text-text-tertiary">
-                    {availableBox.parentLocationName} / {availableBox.roomName}
+            availableBoxes
+              .reduce<{ locationName: string; boxes: typeof availableBoxes }[]>((groups, box) => {
+                const existing = groups.find((g) => g.locationName === box.parentLocationName);
+                if (existing) {
+                  existing.boxes.push(box);
+                } else {
+                  groups.push({ locationName: box.parentLocationName, boxes: [box] });
+                }
+                return groups;
+              }, [])
+              .map((group, groupIndex) => (
+                <View key={group.locationName} className={groupIndex > 0 ? "mt-4" : ""}>
+                  <Text className="mb-2 text-xs uppercase tracking-[1px] text-text-tertiary">
+                    {group.locationName}
                   </Text>
-                </Pressable>
-              );
-            })
+                  {group.boxes.map((availableBox, index) => {
+                    const isActive = availableBox.id === selectedBoxForDisplay?.id;
+                    return (
+                      <Pressable
+                        key={availableBox.id}
+                        onPress={() => onSelectBox(availableBox.id)}
+                        className={`rounded-control border px-3 py-2.5 ${index > 0 ? "mt-2" : ""} ${
+                          isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
+                        }`}
+                      >
+                        <Text className="text-sm font-semibold text-text-primary">{availableBox.name}</Text>
+                        <Text className="mt-0.5 text-xs text-text-tertiary">{availableBox.roomName}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))
           ) : (
             <Text className="text-sm text-text-tertiary">No boxes available.</Text>
           )}
