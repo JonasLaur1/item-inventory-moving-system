@@ -26,7 +26,7 @@ type ActivityTimelineEvent = ActivityEvent & {
   timeLabel: string;
 };
 
-const typeFilters: TypeFilter[] = ["All", "Created", "Updated", "Moved", "Deleted", "Packed"];
+const typeFilters: TypeFilter[] = ["All", "Created", "Updated", "Deleted", "Packed", "Delivered"];
 const timeFilters: TimeFilter[] = ["24h", "3d", "7d"];
 
 function getWindowMinutes(filter: TimeFilter) {
@@ -132,14 +132,6 @@ export default function ActivityTabScreen() {
     () => visibleEvents.filter((event) => event.minutesAgo <= 24 * 60).length,
     [visibleEvents],
   );
-  const movedEventsCount = useMemo(
-    () => visibleEvents.filter((event) => event.type === "Moved").length,
-    [visibleEvents],
-  );
-  const deletedEvents = useMemo(
-    () => visibleEvents.filter((event) => event.type === "Deleted"),
-    [visibleEvents],
-  );
 
   return (
     <TabScreenLayout horizontalPadding={isCompact ? 16 : 20}>
@@ -167,18 +159,6 @@ export default function ActivityTabScreen() {
           label="Today"
           value={String(todayEventsCount)}
           hint="Activity in 24h"
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-        <MetricCard
-          label="Moves"
-          value={String(movedEventsCount)}
-          hint="Relocated items"
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-        <MetricCard
-          label="Deleted"
-          value={String(deletedEvents.length)}
-          hint="Removed entities"
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
       </View>
