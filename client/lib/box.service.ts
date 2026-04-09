@@ -640,25 +640,6 @@ async function deleteBox(boxId: string): Promise<void> {
     throw new Error(BOX_HAS_ITEMS_MESSAGE);
   }
 
-  const { data, error } = await supabase
-    .from("boxes")
-    .delete()
-    .eq("id", normalizedBoxId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    if (isForeignKeyViolation(error)) {
-      throw new Error(BOX_HAS_ITEMS_MESSAGE);
-    }
-
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Box not found.");
-  }
-
   const roomContextMap = await getRoomContextMap(
     userId,
     boxBeforeDelete.room_id ? [boxBeforeDelete.room_id] : [],
@@ -684,6 +665,25 @@ async function deleteBox(boxId: string): Promise<void> {
       locationName: roomContext?.parentLocationName ?? null,
     },
   });
+
+  const { data, error } = await supabase
+    .from("boxes")
+    .delete()
+    .eq("id", normalizedBoxId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (isForeignKeyViolation(error)) {
+      throw new Error(BOX_HAS_ITEMS_MESSAGE);
+    }
+
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Box not found.");
+  }
 }
 
 async function markBoxDelivered(boxId: string, destinationLocationId?: string | null): Promise<void> {

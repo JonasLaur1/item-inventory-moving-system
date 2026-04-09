@@ -505,6 +505,16 @@ async function deleteLocation(locationId: string): Promise<void> {
     throw new Error("Location not found.");
   }
 
+  await activityService.writeActivitySafely({
+    type: "Deleted",
+    entityType: "location",
+    entityId: locationBeforeDelete.id,
+    title: "Location deleted",
+    description: `Deleted location "${locationBeforeDelete.name}".`,
+    locationName: locationBeforeDelete.name,
+    previous: { name: locationBeforeDelete.name },
+  });
+
   const { data, error } = await supabase
     .from("locations")
     .delete()
@@ -524,16 +534,6 @@ async function deleteLocation(locationId: string): Promise<void> {
   if (!data) {
     throw new Error("Location not found.");
   }
-
-  await activityService.writeActivitySafely({
-    type: "Deleted",
-    entityType: "location",
-    entityId: locationBeforeDelete.id,
-    title: "Location deleted",
-    description: `Deleted location "${locationBeforeDelete.name}".`,
-    locationName: locationBeforeDelete.name,
-    previous: { name: locationBeforeDelete.name },
-  });
 }
 
 async function getLocationDetails(locationId: string): Promise<LocationDetails> {

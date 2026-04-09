@@ -518,18 +518,6 @@ async function deleteItem(itemId: string): Promise<void> {
 
   const boxContext = await getBoxActivityContext(itemBeforeDelete.box_id, userId);
 
-  const { data, error } = await supabase
-    .from("items")
-    .delete()
-    .eq("id", normalizedItemId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error("Item not found.");
-  }
-
   const itemName = itemBeforeDelete.name?.trim() || "Unnamed item";
   const quantity =
     typeof itemBeforeDelete.quantity === "number" && itemBeforeDelete.quantity > 0
@@ -558,6 +546,18 @@ async function deleteItem(itemId: string): Promise<void> {
       locationName: boxContext.locationName,
     },
   });
+
+  const { data, error } = await supabase
+    .from("items")
+    .delete()
+    .eq("id", normalizedItemId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Item not found.");
+  }
 }
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {

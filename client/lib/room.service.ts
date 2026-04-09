@@ -519,6 +519,21 @@ async function deleteRoom(roomId: string): Promise<void> {
 
   const locationName = await assertUserCanAccessLocation(roomBeforeDelete.location_id);
 
+  await activityService.writeActivitySafely({
+    type: "Deleted",
+    entityType: "room",
+    entityId: roomBeforeDelete.id,
+    title: "Room deleted",
+    description: `Deleted room "${roomBeforeDelete.name}".`,
+    locationName,
+    roomName: roomBeforeDelete.name,
+    previous: {
+      name: roomBeforeDelete.name,
+      locationId: roomBeforeDelete.location_id,
+      locationName,
+    },
+  });
+
   const { data, error } = await supabase
     .from("rooms")
     .delete()
@@ -536,21 +551,6 @@ async function deleteRoom(roomId: string): Promise<void> {
   if (!data) {
     throw new Error("Room not found.");
   }
-
-  await activityService.writeActivitySafely({
-    type: "Deleted",
-    entityType: "room",
-    entityId: roomBeforeDelete.id,
-    title: "Room deleted",
-    description: `Deleted room "${roomBeforeDelete.name}".`,
-    locationName,
-    roomName: roomBeforeDelete.name,
-    previous: {
-      name: roomBeforeDelete.name,
-      locationId: roomBeforeDelete.location_id,
-      locationName,
-    },
-  });
 }
 
 export const roomService = {
