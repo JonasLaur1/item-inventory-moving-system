@@ -158,7 +158,8 @@ export default function BoxDetailsScreen() {
     try {
       await boxService.markBoxDelivered(boxId, toLocationId);
       setIsDeliveryModalOpen(false);
-      void refresh();
+      await refresh();
+      setIsUnpackModalOpen(true);
     } catch {
       setDeliveryError("Failed to mark as delivered. Please try again.");
     } finally {
