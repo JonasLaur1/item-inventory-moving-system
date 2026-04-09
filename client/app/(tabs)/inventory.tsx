@@ -214,6 +214,19 @@ export default function InventoryTabScreen() {
     });
   }, [activeLocationFilter, activeRoomFilter, activeStatus, boxes, search]);
 
+  const isLocationFiltered = activeLocationFilter !== "All";
+
+  const STATUS_GROUP_ORDER: InventoryBoxStatus[] = ["Delivered", "Packed", "Not packed", "Unpacked"];
+
+  const groupedByStatus = useMemo(() => {
+    if (!isLocationFiltered) return null;
+
+    return STATUS_GROUP_ORDER.map((status) => ({
+      status,
+      boxes: filteredBoxes.filter((box) => box.status === status),
+    })).filter((group) => group.boxes.length > 0);
+  }, [isLocationFiltered, filteredBoxes]);
+
   const packedCount = filteredBoxes.filter((box) => box.status === "Packed").length;
   const unpackedCount = filteredBoxes.length - packedCount;
   const totalItemsCount = filteredBoxes.reduce((total, box) => total + box.itemsCount, 0);
@@ -460,18 +473,8 @@ export default function InventoryTabScreen() {
 
       <View className="mt-8">
         <SectionHeader title="Boxes & Items" actionLabel={`${filteredBoxes.length} boxes`} />
-        <View className="mt-4 gap-3">
-          {filteredBoxes.length > 0 ? (
-            filteredBoxes.map((box) => (
-              <BoxCard
-                key={box.id}
-                box={box}
-                compact={isCompact}
-                onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
-                onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
-              />
-            ))
-          ) : (
+        {filteredBoxes.length === 0 ? (
+          <View className="mt-4">
             <EmptyStateCard
               title={
                 isLoading || isRefreshing
@@ -489,8 +492,41 @@ export default function InventoryTabScreen() {
               }
               containerClassName="p-5"
             />
-          )}
-        </View>
+          </View>
+        ) : groupedByStatus ? (
+          <View className="mt-4 gap-6">
+            {groupedByStatus.map((group) => (
+              <View key={group.status}>
+                <Text className="mb-3 text-xs font-semibold uppercase tracking-[1px] text-text-tertiary">
+                  {group.status} ({group.boxes.length})
+                </Text>
+                <View className="gap-3">
+                  {group.boxes.map((box) => (
+                    <BoxCard
+                      key={box.id}
+                      box={box}
+                      compact={isCompact}
+                      onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
+                      onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View className="mt-4 gap-3">
+            {filteredBoxes.map((box) => (
+              <BoxCard
+                key={box.id}
+                box={box}
+                compact={isCompact}
+                onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
+                onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+              />
+            ))}
+          </View>
+        )}
       </View>
 
       <AppModal
