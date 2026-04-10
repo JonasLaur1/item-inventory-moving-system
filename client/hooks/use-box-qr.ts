@@ -1,6 +1,5 @@
 import { type BoxDetails } from "@/lib/box.service";
-import { generateBoxQrData, generateQrDataUrl, type QrMatrix } from "@/utils/box-qr";
-import * as Print from "expo-print";
+import { generateBoxQrData, type QrMatrix } from "@/utils/box-qr";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const QR_DISPLAY_SIZE = 196;
@@ -14,12 +13,10 @@ type UseBoxQrResult = {
   qrMatrix: QrMatrix | null;
   qrDarkCells: QrDarkCell[];
   qrErrorMessage: string | null;
-  isSharingQr: boolean;
-  shareQrError: string | null;
+  qrAppLinkUrl: string | null;
   openQrModal: () => void;
   closeQrModal: () => void;
   retryGenerateQr: () => void;
-  printBoxQrLabel: () => Promise<void>;
 };
 
 export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
@@ -28,8 +25,6 @@ export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
   const [qrMatrix, setQrMatrix] = useState<QrMatrix | null>(null);
   const [qrAppLinkUrl, setQrAppLinkUrl] = useState<string | null>(null);
   const [qrErrorMessage, setQrErrorMessage] = useState<string | null>(null);
-  const [isSharingQr, setIsSharingQr] = useState(false);
-  const [shareQrError, setShareQrError] = useState<string | null>(null);
   const [qrVersion, setQrVersion] = useState(0);
 
   useEffect(() => {
@@ -39,7 +34,6 @@ export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
       setQrAppLinkUrl(null);
       setQrMatrix(null);
       setQrErrorMessage(null);
-      setShareQrError(null);
       setIsGeneratingQr(false);
       return () => {
         isActive = false;
@@ -48,7 +42,6 @@ export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
 
     setIsGeneratingQr(true);
     setQrErrorMessage(null);
-    setShareQrError(null);
 
     void (async () => {
       try {
@@ -111,17 +104,12 @@ export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
       return;
     }
 
-    setShareQrError(null);
     setIsQrModalOpen(true);
   }, [box]);
 
   const closeQrModal = useCallback(() => {
-    if (isSharingQr) {
-      return;
-    }
-
     setIsQrModalOpen(false);
-  }, [isSharingQr]);
+  }, []);
 
   const retryGenerateQr = useCallback(() => {
     if (isGeneratingQr) {
@@ -131,83 +119,15 @@ export function useBoxQr(box: BoxDetails | null): UseBoxQrResult {
     setQrVersion((prev) => prev + 1);
   }, [isGeneratingQr]);
 
-  const printBoxQrLabel = useCallback(async () => {
-    if (!box || !qrAppLinkUrl || isSharingQr) {
-      return;
-    }
-
-    setIsSharingQr(true);
-    setShareQrError(null);
-
-    try {
-      const qrDataUrl = await generateQrDataUrl(qrAppLinkUrl, 720);
-      const safeBoxName = box.name
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
-
-      await Print.printAsync({
-        html: `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${safeBoxName} QR Label</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      }
-      .page {
-        display: flex;
-        min-height: 100vh;
-        align-items: center;
-        justify-content: center;
-      }
-      .label {
-        width: 320px;
-        text-align: center;
-      }
-      .title {
-        font-size: 22px;
-        font-weight: 700;
-        margin-bottom: 16px;
-      }
-      .qr {
-        width: 280px;
-        height: 280px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="page">
-      <div class="label">
-        <div class="title">${safeBoxName}</div>
-        <img class="qr" src="${qrDataUrl}" alt="Box QR code" />
-      </div>
-    </div>
-  </body>
-</html>`,
-      });
-    } catch (error) {
-      setShareQrError(error instanceof Error ? error.message : "Failed to open print dialog.");
-    } finally {
-      setIsSharingQr(false);
-    }
-  }, [box, isSharingQr, qrAppLinkUrl]);
-
   return {
     isQrModalOpen,
     isGeneratingQr,
     qrMatrix,
     qrDarkCells,
     qrErrorMessage,
-    isSharingQr,
-    shareQrError,
+    qrAppLinkUrl,
     openQrModal,
     closeQrModal,
     retryGenerateQr,
-    printBoxQrLabel,
   };
 }

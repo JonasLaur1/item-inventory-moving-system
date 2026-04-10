@@ -13,6 +13,7 @@ import { MetaPill } from "@/components/ui/meta-pill";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { Colors } from "@/constants/theme";
+import { useBluetoothPrinter } from "@/hooks/use-bluetooth-printer";
 import { useBoxModal } from "@/hooks/use-box-modal";
 import { useBoxQr } from "@/hooks/use-box-qr";
 import { useItemModal } from "@/hooks/use-item-modal";
@@ -136,6 +137,7 @@ export default function BoxDetailsScreen() {
   const boxModal = useBoxModal({ box, onRefresh: refresh });
   const itemModal = useItemModal({ box, availableBoxes, onRefresh: refresh });
   const qr = useBoxQr(box);
+  const btPrinter = useBluetoothPrinter();
 
   useEffect(() => {
     if (shouldPromptDelivery && box && !isLoading) {
@@ -357,10 +359,21 @@ export default function BoxDetailsScreen() {
         qrMatrix={qr.qrMatrix}
         qrDarkCells={qr.qrDarkCells}
         qrErrorMessage={qr.qrErrorMessage}
-        isSharingQr={qr.isSharingQr}
-        shareQrError={qr.shareQrError}
+        isPrinting={btPrinter.isPrinting}
+        printError={btPrinter.printError}
+        savedPrinterName={btPrinter.savedPrinter?.name ?? null}
+        pairedDevices={btPrinter.pairedDevices}
+        isScanning={btPrinter.isScanning}
+        scanError={btPrinter.scanError}
         onClose={qr.closeQrModal}
-        onPrint={() => void qr.printBoxQrLabel()}
+        onPrint={() => {
+          if (box && qr.qrAppLinkUrl) {
+            void btPrinter.printLabel(box.name, qr.qrAppLinkUrl);
+          }
+        }}
+        onSelectPrinter={() => void btPrinter.prepareScan()}
+        onSelectDevice={(device) => void btPrinter.selectPrinter(device)}
+        onRescan={() => void btPrinter.rescan()}
         onRegenerate={qr.retryGenerateQr}
       />
 

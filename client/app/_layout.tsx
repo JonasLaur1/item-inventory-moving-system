@@ -1,4 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -45,6 +47,12 @@ const themeVars = {
 };
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts(MaterialCommunityIcons.font);
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <ThemePreferenceProvider>
       <MovingModeProvider>
