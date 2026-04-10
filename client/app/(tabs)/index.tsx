@@ -143,8 +143,8 @@ export default function HomeTabScreen() {
       <StartMovingModal
         visible={isStartMovingModalOpen}
         locations={locations}
-        onConfirm={(from, to) => {
-          void startMoving(from, to);
+        onConfirm={(from, fromName, to, toName) => {
+          void startMoving(from, fromName, to, toName);
           setIsStartMovingModalOpen(false);
         }}
         onClose={() => setIsStartMovingModalOpen(false)}

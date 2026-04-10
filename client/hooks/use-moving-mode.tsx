@@ -12,13 +12,17 @@ import {
 const MOVING_MODE_STORAGE_KEY = "@boxit/moving-mode-active";
 const MOVING_MODE_FROM_KEY = "@boxit/moving-mode-from";
 const MOVING_MODE_TO_KEY = "@boxit/moving-mode-to";
+const MOVING_MODE_FROM_NAME_KEY = "@boxit/moving-mode-from-name";
+const MOVING_MODE_TO_NAME_KEY = "@boxit/moving-mode-to-name";
 
 type MovingModeContextValue = {
   isMovingActive: boolean;
   isMovingModeLoaded: boolean;
   fromLocationId: string | null;
   toLocationId: string | null;
-  startMoving: (fromLocationId: string, toLocationId: string) => Promise<void>;
+  fromLocationName: string | null;
+  toLocationName: string | null;
+  startMoving: (fromLocationId: string, fromLocationName: string, toLocationId: string, toLocationName: string) => Promise<void>;
   stopMoving: () => Promise<void>;
 };
 
@@ -29,22 +33,28 @@ export function MovingModeProvider({ children }: { children: ReactNode }) {
   const [isMovingModeLoaded, setIsMovingModeLoaded] = useState(false);
   const [fromLocationId, setFromLocationId] = useState<string | null>(null);
   const [toLocationId, setToLocationId] = useState<string | null>(null);
+  const [fromLocationName, setFromLocationName] = useState<string | null>(null);
+  const [toLocationName, setToLocationName] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadMovingMode = async () => {
       try {
-        const [stored, from, to] = await AsyncStorage.multiGet([
+        const [stored, from, to, fromName, toName] = await AsyncStorage.multiGet([
           MOVING_MODE_STORAGE_KEY,
           MOVING_MODE_FROM_KEY,
           MOVING_MODE_TO_KEY,
+          MOVING_MODE_FROM_NAME_KEY,
+          MOVING_MODE_TO_NAME_KEY,
         ]);
 
         if (isMounted) {
           setIsMovingActive(stored[1] === "true");
           setFromLocationId(from[1] ?? null);
           setToLocationId(to[1] ?? null);
+          setFromLocationName(fromName[1] ?? null);
+          setToLocationName(toName[1] ?? null);
         }
       } finally {
         if (isMounted) {
@@ -60,20 +70,26 @@ export function MovingModeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const startMoving = useCallback(async (from: string, to: string) => {
+  const startMoving = useCallback(async (from: string, fromName: string, to: string, toName: string) => {
     setIsMovingActive(true);
     setFromLocationId(from);
     setToLocationId(to);
+    setFromLocationName(fromName);
+    setToLocationName(toName);
     try {
       await AsyncStorage.multiSet([
         [MOVING_MODE_STORAGE_KEY, "true"],
         [MOVING_MODE_FROM_KEY, from],
         [MOVING_MODE_TO_KEY, to],
+        [MOVING_MODE_FROM_NAME_KEY, fromName],
+        [MOVING_MODE_TO_NAME_KEY, toName],
       ]);
     } catch (error) {
       setIsMovingActive(false);
       setFromLocationId(null);
       setToLocationId(null);
+      setFromLocationName(null);
+      setToLocationName(null);
       throw error;
     }
   }, []);
@@ -82,11 +98,15 @@ export function MovingModeProvider({ children }: { children: ReactNode }) {
     setIsMovingActive(false);
     setFromLocationId(null);
     setToLocationId(null);
+    setFromLocationName(null);
+    setToLocationName(null);
     try {
       await AsyncStorage.multiSet([
         [MOVING_MODE_STORAGE_KEY, "false"],
         [MOVING_MODE_FROM_KEY, ""],
         [MOVING_MODE_TO_KEY, ""],
+        [MOVING_MODE_FROM_NAME_KEY, ""],
+        [MOVING_MODE_TO_NAME_KEY, ""],
       ]);
     } catch (error) {
       setIsMovingActive(true);
@@ -95,8 +115,8 @@ export function MovingModeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ isMovingActive, isMovingModeLoaded, fromLocationId, toLocationId, startMoving, stopMoving }),
-    [isMovingActive, isMovingModeLoaded, fromLocationId, toLocationId, startMoving, stopMoving],
+    () => ({ isMovingActive, isMovingModeLoaded, fromLocationId, toLocationId, fromLocationName, toLocationName, startMoving, stopMoving }),
+    [isMovingActive, isMovingModeLoaded, fromLocationId, toLocationId, fromLocationName, toLocationName, startMoving, stopMoving],
   );
 
   return <MovingModeContext.Provider value={value}>{children}</MovingModeContext.Provider>;

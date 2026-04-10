@@ -56,17 +56,214 @@ const BYTES_PER_LINE = 90;
 const QUIET_ZONE_MODULES = 4;
 const TOP_MARGIN_PX = 20;
 const BOTTOM_MARGIN_PX = 20;
+const TEXT_TO_QR_GAP_PX = 10;
+
+// ─── Bitmap font ─────────────────────────────────────────────────────────────
+// Classic 5×7 bitmap font for printable ASCII codes 32–126 (Adafruit GFX style).
+// Each character: 5 bytes (columns left→right). Within each byte, bit 0 = top
+// pixel, bit 7 = bottom. 8 pixel rows rendered per char: rows 0–6 are the
+// glyph, row 7 is always blank (inter-line spacing).
+// prettier-ignore
+const FONT_DATA = new Uint8Array([
+  0x00, 0x00, 0x00, 0x00, 0x00, // 32  (space)
+  0x00, 0x00, 0x5F, 0x00, 0x00, // 33  !
+  0x00, 0x07, 0x00, 0x07, 0x00, // 34  "
+  0x14, 0x7F, 0x14, 0x7F, 0x14, // 35  #
+  0x24, 0x2A, 0x7F, 0x2A, 0x12, // 36  $
+  0x23, 0x13, 0x08, 0x64, 0x62, // 37  %
+  0x36, 0x49, 0x55, 0x22, 0x50, // 38  &
+  0x00, 0x05, 0x03, 0x00, 0x00, // 39  '
+  0x00, 0x1C, 0x22, 0x41, 0x00, // 40  (
+  0x00, 0x41, 0x22, 0x1C, 0x00, // 41  )
+  0x14, 0x08, 0x3E, 0x08, 0x14, // 42  *
+  0x08, 0x08, 0x3E, 0x08, 0x08, // 43  +
+  0x00, 0x50, 0x30, 0x00, 0x00, // 44  ,
+  0x08, 0x08, 0x08, 0x08, 0x08, // 45  -
+  0x00, 0x60, 0x60, 0x00, 0x00, // 46  .
+  0x20, 0x10, 0x08, 0x04, 0x02, // 47  /
+  0x3E, 0x51, 0x49, 0x45, 0x3E, // 48  0
+  0x00, 0x42, 0x7F, 0x40, 0x00, // 49  1
+  0x42, 0x61, 0x51, 0x49, 0x46, // 50  2
+  0x21, 0x41, 0x45, 0x4B, 0x31, // 51  3
+  0x18, 0x14, 0x12, 0x7F, 0x10, // 52  4
+  0x27, 0x45, 0x45, 0x45, 0x39, // 53  5
+  0x3C, 0x4A, 0x49, 0x49, 0x30, // 54  6
+  0x01, 0x71, 0x09, 0x05, 0x03, // 55  7
+  0x36, 0x49, 0x49, 0x49, 0x36, // 56  8
+  0x06, 0x49, 0x49, 0x29, 0x1E, // 57  9
+  0x00, 0x36, 0x36, 0x00, 0x00, // 58  :
+  0x00, 0x56, 0x36, 0x00, 0x00, // 59  ;
+  0x08, 0x14, 0x22, 0x41, 0x00, // 60  <
+  0x14, 0x14, 0x14, 0x14, 0x14, // 61  =
+  0x00, 0x41, 0x22, 0x14, 0x08, // 62  >
+  0x02, 0x01, 0x51, 0x09, 0x06, // 63  ?
+  0x32, 0x49, 0x79, 0x41, 0x3E, // 64  @
+  0x7E, 0x11, 0x11, 0x11, 0x7E, // 65  A
+  0x7F, 0x49, 0x49, 0x49, 0x36, // 66  B
+  0x3E, 0x41, 0x41, 0x41, 0x22, // 67  C
+  0x7F, 0x41, 0x41, 0x22, 0x1C, // 68  D
+  0x7F, 0x49, 0x49, 0x49, 0x41, // 69  E
+  0x7F, 0x09, 0x09, 0x09, 0x01, // 70  F
+  0x3E, 0x41, 0x49, 0x49, 0x7A, // 71  G
+  0x7F, 0x08, 0x08, 0x08, 0x7F, // 72  H
+  0x00, 0x41, 0x7F, 0x41, 0x00, // 73  I
+  0x20, 0x40, 0x41, 0x3F, 0x01, // 74  J
+  0x7F, 0x08, 0x14, 0x22, 0x41, // 75  K
+  0x7F, 0x40, 0x40, 0x40, 0x40, // 76  L
+  0x7F, 0x02, 0x0C, 0x02, 0x7F, // 77  M
+  0x7F, 0x04, 0x08, 0x10, 0x7F, // 78  N
+  0x3E, 0x41, 0x41, 0x41, 0x3E, // 79  O
+  0x7F, 0x09, 0x09, 0x09, 0x06, // 80  P
+  0x3E, 0x41, 0x51, 0x21, 0x5E, // 81  Q
+  0x7F, 0x09, 0x19, 0x29, 0x46, // 82  R
+  0x46, 0x49, 0x49, 0x49, 0x31, // 83  S
+  0x01, 0x01, 0x7F, 0x01, 0x01, // 84  T
+  0x3F, 0x40, 0x40, 0x40, 0x3F, // 85  U
+  0x1F, 0x20, 0x40, 0x20, 0x1F, // 86  V
+  0x3F, 0x40, 0x38, 0x40, 0x3F, // 87  W
+  0x63, 0x14, 0x08, 0x14, 0x63, // 88  X
+  0x07, 0x08, 0x70, 0x08, 0x07, // 89  Y
+  0x61, 0x51, 0x49, 0x45, 0x43, // 90  Z
+  0x00, 0x7F, 0x41, 0x41, 0x00, // 91  [
+  0x02, 0x04, 0x08, 0x10, 0x20, // 92  backslash
+  0x00, 0x41, 0x41, 0x7F, 0x00, // 93  ]
+  0x04, 0x02, 0x01, 0x02, 0x04, // 94  ^
+  0x40, 0x40, 0x40, 0x40, 0x40, // 95  _
+  0x00, 0x01, 0x02, 0x04, 0x00, // 96  `
+  0x20, 0x54, 0x54, 0x54, 0x78, // 97  a
+  0x7F, 0x48, 0x44, 0x44, 0x38, // 98  b
+  0x38, 0x44, 0x44, 0x44, 0x20, // 99  c
+  0x38, 0x44, 0x44, 0x48, 0x7F, // 100 d
+  0x38, 0x54, 0x54, 0x54, 0x18, // 101 e
+  0x08, 0x7E, 0x09, 0x01, 0x02, // 102 f
+  0x0C, 0x52, 0x52, 0x52, 0x3E, // 103 g
+  0x7F, 0x08, 0x04, 0x04, 0x78, // 104 h
+  0x00, 0x44, 0x7D, 0x40, 0x00, // 105 i
+  0x20, 0x40, 0x44, 0x3D, 0x00, // 106 j
+  0x7F, 0x10, 0x28, 0x44, 0x00, // 107 k
+  0x00, 0x41, 0x7F, 0x40, 0x00, // 108 l
+  0x7C, 0x04, 0x18, 0x04, 0x78, // 109 m
+  0x7C, 0x08, 0x04, 0x04, 0x78, // 110 n
+  0x38, 0x44, 0x44, 0x44, 0x38, // 111 o
+  0x7C, 0x14, 0x14, 0x14, 0x08, // 112 p
+  0x08, 0x14, 0x14, 0x18, 0x7C, // 113 q
+  0x7C, 0x08, 0x04, 0x04, 0x08, // 114 r
+  0x48, 0x54, 0x54, 0x54, 0x20, // 115 s
+  0x04, 0x3F, 0x44, 0x40, 0x20, // 116 t
+  0x3C, 0x40, 0x40, 0x40, 0x3C, // 117 u
+  0x1C, 0x20, 0x40, 0x20, 0x1C, // 118 v
+  0x3C, 0x40, 0x30, 0x40, 0x3C, // 119 w
+  0x44, 0x28, 0x10, 0x28, 0x44, // 120 x
+  0x0C, 0x50, 0x50, 0x50, 0x3C, // 121 y
+  0x44, 0x64, 0x54, 0x4C, 0x44, // 122 z
+  0x00, 0x08, 0x36, 0x41, 0x00, // 123 {
+  0x00, 0x00, 0x7F, 0x00, 0x00, // 124 |
+  0x00, 0x41, 0x36, 0x08, 0x00, // 125 }
+  0x10, 0x08, 0x08, 0x10, 0x08, // 126 ~
+]);
+
+const FONT_CHAR_COLS = 5;
+const FONT_CHAR_GAP = 1;
+const FONT_CHAR_ROWS = 8; // 7 visible rows + 1 blank spacing row
+const TEXT_SCALE = 4;         // render each font pixel as 4×4 physical pixels
+const TEXT_MAX_CHARS_PER_LINE = 30; // 720px / (6px/char × 4) = 30 chars per line at TEXT_SCALE=4
+const TEXT_LINE_GAP_PX = 4;  // blank rows between wrapped lines
+const FRAGILE_SCALE = 5;      // render each font pixel as 5×5 physical pixels for FRAGILE banner
+const FRAGILE_GAP_PX = 12;   // gap between QR code and FRAGILE banner
+
+function getCharCols(charCode: number): Uint8Array {
+  const idx = charCode < 32 || charCode > 126 ? 63 - 32 : charCode - 32; // '?' fallback
+  return FONT_DATA.subarray(idx * FONT_CHAR_COLS, idx * FONT_CHAR_COLS + FONT_CHAR_COLS);
+}
+
+/** Sanitise text so all characters are renderable by the bitmap font. */
+function normalizeForFont(text: string): string {
+  return text
+    .replace(/\u2192/g, "->") // → right arrow
+    .replace(/[\u2013\u2014]/g, "-") // en-dash / em-dash
+    .replace(/[^\x20-\x7E]/g, "?"); // anything else non-ASCII
+}
+
+/** Wrap text at word boundaries so each line fits within maxChars. */
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const chunk = word.slice(0, maxChars); // hard-cap single oversized words
+    if (current.length === 0) {
+      current = chunk;
+    } else if (current.length + 1 + chunk.length <= maxChars) {
+      current += " " + chunk;
+    } else {
+      lines.push(current);
+      current = chunk;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/**
+ * Render a single text string into pixel-row raster lines using the bitmap font.
+ * Returns (FONT_CHAR_ROWS × TEXT_SCALE) Uint8Arrays, each BYTES_PER_LINE bytes wide.
+ */
+function renderTextLine(text: string, scale = TEXT_SCALE): Uint8Array[] {
+  const charWidthPx = (FONT_CHAR_COLS + FONT_CHAR_GAP) * scale;
+  const leftPadPx = Math.max(0, Math.floor((BYTES_PER_LINE * 8 - text.length * charWidthPx) / 2));
+  const totalRows = FONT_CHAR_ROWS * scale;
+
+  const lines: Uint8Array[] = Array.from({ length: totalRows }, () => new Uint8Array(BYTES_PER_LINE));
+
+  for (let ci = 0; ci < text.length; ci++) {
+    const cols = getCharCols(text.charCodeAt(ci));
+    const charStartPx = leftPadPx + ci * charWidthPx;
+
+    for (let col = 0; col < FONT_CHAR_COLS; col++) {
+      const colByte = cols[col];
+      if (colByte === 0) continue;
+
+      for (let row = 0; row < FONT_CHAR_ROWS; row++) {
+        if (!((colByte >> row) & 1)) continue;
+
+        for (let rs = 0; rs < scale; rs++) {
+          const rasterRow = row * scale + rs;
+          for (let cs = 0; cs < scale; cs++) {
+            const pixX = charStartPx + col * scale + cs;
+            if (pixX >= 0 && pixX < BYTES_PER_LINE * 8) {
+              const mirX = BYTES_PER_LINE * 8 - 1 - pixX;
+              lines[rasterRow][Math.floor(mirX / 8)] |= 1 << (7 - mirX % 8);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return lines;
+}
 
 /**
  * Build a complete Brother QL raster print payload for a QR code.
  * Protocol reference: Brother P-touch Raster Command Reference (QL series).
  */
-function buildBrotherRasterBytes(qrMatrix: QrMatrix): Uint8Array {
+function buildBrotherRasterBytes(qrMatrix: QrMatrix, routeLabel?: string, fragile?: boolean): Uint8Array {
   const totalModules = qrMatrix.size + QUIET_ZONE_MODULES * 2;
   const modulePixels = Math.floor((BYTES_PER_LINE * 8) / totalModules);
   const qrAreaPixels = modulePixels * totalModules;
   const leftPadPx = Math.floor(((BYTES_PER_LINE * 8) - qrAreaPixels) / 2);
   const qrHeightPx = modulePixels * totalModules;
+
+  const routeWrapped = routeLabel ? wrapText(normalizeForFont(routeLabel), TEXT_MAX_CHARS_PER_LINE) : [];
+  const routeRasterGroups = routeWrapped.map((line) => renderTextLine(line));
+  const textSectionPx = routeRasterGroups.length > 0
+    ? routeRasterGroups.reduce((sum, g) => sum + g.length, 0)
+      + (routeRasterGroups.length - 1) * TEXT_LINE_GAP_PX
+      + TEXT_TO_QR_GAP_PX
+    : 0;
+
+  const fragileLines = fragile ? renderTextLine("** FRAGILE **", FRAGILE_SCALE) : [];
+  const fragileSectionPx = fragileLines.length > 0 ? FRAGILE_GAP_PX + fragileLines.length : 0;
 
   const buildRasterLine = (pixRow: number): Uint8Array => {
     const modRow = Math.floor(pixRow / modulePixels) - QUIET_ZONE_MODULES;
@@ -78,14 +275,14 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix): Uint8Array {
         modCol >= 0 && modCol < qrMatrix.size &&
         qrMatrix.modules[modRow * qrMatrix.size + modCol] === true;
       if (dark) {
-        line[Math.floor(pixCol / 8)] |= 1 << (7 - (pixCol % 8));
+        line[Math.floor(pixCol / 8)] |= 1 << (7 - pixCol % 8);
       }
     }
     return line;
   };
 
   const blankLine = new Uint8Array(BYTES_PER_LINE);
-  const numRasterLines = TOP_MARGIN_PX + qrHeightPx + BOTTOM_MARGIN_PX;
+  const numRasterLines = TOP_MARGIN_PX + textSectionPx + qrHeightPx + fragileSectionPx + BOTTOM_MARGIN_PX;
 
   // Assemble protocol commands
   const parts: Uint8Array[] = [];
@@ -127,9 +324,18 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix): Uint8Array {
     parts.push(new Uint8Array([0x77, 0x02, BYTES_PER_LINE, ...redPlane])); // red plane (empty)
   };
 
-  // 8. Raster lines: top margin + QR code + bottom margin
+  // 8. Raster lines: top margin + optional route label + gap + QR code + optional FRAGILE banner + bottom margin
   for (let i = 0; i < TOP_MARGIN_PX; i++) pushLine(blankLine);
+  for (let gi = 0; gi < routeRasterGroups.length; gi++) {
+    for (const line of routeRasterGroups[gi]) pushLine(line);
+    if (gi < routeRasterGroups.length - 1) {
+      for (let i = 0; i < TEXT_LINE_GAP_PX; i++) pushLine(blankLine);
+    }
+  }
+  for (let i = 0; i < (routeRasterGroups.length > 0 ? TEXT_TO_QR_GAP_PX : 0); i++) pushLine(blankLine);
   for (let row = 0; row < qrHeightPx; row++) pushLine(buildRasterLine(row));
+  for (let i = 0; i < (fragileLines.length > 0 ? FRAGILE_GAP_PX : 0); i++) pushLine(blankLine);
+  for (const line of fragileLines) pushLine(line);
   for (let i = 0; i < BOTTOM_MARGIN_PX; i++) pushLine(blankLine);
 
   // 9. Print with feeding
@@ -176,7 +382,7 @@ export type UseBluetoothPrinterResult = {
   rescan: () => Promise<void>;
   selectPrinter: (device: BluetoothDevice) => Promise<void>;
   forgetPrinter: () => Promise<void>;
-  printLabel: (boxName: string, qrValue: string) => Promise<void>;
+  printLabel: (boxName: string, qrValue: string, routeLabel?: string, fragile?: boolean) => Promise<void>;
 };
 
 export function useBluetoothPrinter(): UseBluetoothPrinterResult {
@@ -316,7 +522,7 @@ export function useBluetoothPrinter(): UseBluetoothPrinterResult {
   }, []);
 
   const printLabel = useCallback(
-    async (_boxName: string, qrValue: string) => {
+    async (_boxName: string, qrValue: string, routeLabel?: string, fragile?: boolean) => {
       if (!savedPrinter) {
         setPrintError("No printer selected. Tap 'Select Printer' first.");
         return;
@@ -346,7 +552,7 @@ export function useBluetoothPrinter(): UseBluetoothPrinterResult {
         const qrMatrix = generateQrMatrix(qrValue);
 
         console.log("[BTPrint] building Brother raster payload");
-        const payload = buildBrotherRasterBytes(qrMatrix);
+        const payload = buildBrotherRasterBytes(qrMatrix, routeLabel, fragile);
         const base64 = toBase64(payload);
         console.log("[BTPrint] sending", payload.length, "bytes via sendRawData");
 

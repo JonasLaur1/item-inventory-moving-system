@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx tsc:*)",
       "mcp__supabase__list_projects",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "Read(//c/boxit/**)"
     ]
   }
 }

@@ -10,7 +10,7 @@ import { useThemePreference } from "@/hooks/use-theme-preference";
 type Props = {
   visible: boolean;
   locations: LocationSummary[];
-  onConfirm: (fromLocationId: string, toLocationId: string) => void;
+  onConfirm: (fromLocationId: string, fromLocationName: string, toLocationId: string, toLocationName: string) => void;
   onClose: () => void;
 };
 
@@ -73,7 +73,9 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
 
   const handleConfirm = () => {
     if (!fromId || !toId) return;
-    onConfirm(fromId, toId);
+    const fromName = locations.find((l) => l.id === fromId)?.name ?? fromId;
+    const toName = locations.find((l) => l.id === toId)?.name ?? toId;
+    onConfirm(fromId, fromName, toId, toName);
     setFromId(null);
     setToId(null);
   };
