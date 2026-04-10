@@ -133,7 +133,7 @@ export default function BoxDetailsScreen() {
     }, [loadBox]),
   );
 
-  const { isMovingActive, fromLocationId, fromLocationName, toLocationName, toLocationId } = useMovingMode();
+  const { toLocationId } = useMovingMode();
   const boxModal = useBoxModal({ box, onRefresh: refresh });
   const itemModal = useItemModal({ box, availableBoxes, onRefresh: refresh });
   const qr = useBoxQr(box);
@@ -368,10 +368,11 @@ export default function BoxDetailsScreen() {
         onClose={qr.closeQrModal}
         onPrint={() => {
           if (box && qr.qrAppLinkUrl) {
-            const routeLabel =
-              isMovingActive && box.parentLocationId === fromLocationId && fromLocationName && toLocationName
-                ? `${fromLocationName} -> ${toLocationName}`
-                : undefined;
+            const boxIndex = availableBoxes.findIndex((b) => b.id === box.id);
+            const boxNumber = boxIndex >= 0 ? boxIndex + 1 : null;
+            const routeLabel = boxNumber != null
+              ? `#${boxNumber} ${box.name} (${box.roomName})`
+              : `${box.name} (${box.roomName})`;
             void btPrinter.printLabel(box.name, qr.qrAppLinkUrl, routeLabel, box.isFragile);
           }
         }}
