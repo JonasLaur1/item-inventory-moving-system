@@ -1,0 +1,57 @@
+import { render, screen } from '@testing-library/react-native';
+import { ActivityEventCard, type ActivityEvent } from '@/components/activity/activity-event-card';
+
+jest.mock('@/hooks/use-theme-preference', () => ({
+  useThemePreference: () => ({ resolvedTheme: 'dark' }),
+}));
+
+const baseEvent: ActivityEvent = {
+  id: '1',
+  type: 'Created',
+  title: 'Box created',
+  description: 'Kitchen supplies box was created',
+  location: 'New Apartment',
+  occurredAt: '2024-01-01T00:00:00Z',
+  isOwnEvent: true,
+};
+
+describe('ActivityEventCard', () => {
+  it('renders event title and description', () => {
+    render(<ActivityEventCard event={baseEvent} timeLabel="2 hours ago" />);
+    expect(screen.getByText('Box created')).toBeTruthy();
+    expect(screen.getByText('Kitchen supplies box was created')).toBeTruthy();
+  });
+
+  it('renders the correct badge label from EVENT_DISPLAY_LABEL', () => {
+    render(<ActivityEventCard event={baseEvent} timeLabel="2 hours ago" />);
+    expect(screen.getByText('Created')).toBeTruthy();
+  });
+
+  it('renders CollaboratorPill with actorName when isOwnEvent is false', () => {
+    const event: ActivityEvent = { ...baseEvent, isOwnEvent: false, actorName: 'Alice' };
+    render(<ActivityEventCard event={event} timeLabel="3 hours ago" />);
+    expect(screen.getByText('Alice')).toBeTruthy();
+  });
+
+  it('does not render CollaboratorPill when isOwnEvent is true', () => {
+    render(<ActivityEventCard event={baseEvent} timeLabel="2 hours ago" />);
+    expect(screen.queryByText('Alice')).toBeNull();
+  });
+
+  it('renders room MetaPill when event.room is provided', () => {
+    const event: ActivityEvent = { ...baseEvent, room: 'Kitchen' };
+    render(<ActivityEventCard event={event} timeLabel="1 hour ago" />);
+    expect(screen.getByText('Kitchen')).toBeTruthy();
+  });
+
+  it('does not render room MetaPill when event.room is absent', () => {
+    render(<ActivityEventCard event={baseEvent} timeLabel="1 hour ago" />);
+    expect(screen.queryByText('Kitchen')).toBeNull();
+  });
+
+  it('renders box MetaPill when event.box is provided', () => {
+    const event: ActivityEvent = { ...baseEvent, box: 'Box #3' };
+    render(<ActivityEventCard event={event} timeLabel="30 mins ago" />);
+    expect(screen.getByText('Box #3')).toBeTruthy();
+  });
+});
