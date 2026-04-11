@@ -56,6 +56,8 @@ export function MovingModeProvider({ children }: { children: ReactNode }) {
           setFromLocationName(fromName[1] ?? null);
           setToLocationName(toName[1] ?? null);
         }
+      } catch {
+        // storage errors are non-fatal; state stays at defaults
       } finally {
         if (isMounted) {
           setIsMovingModeLoaded(true);

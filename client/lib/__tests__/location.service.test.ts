@@ -238,6 +238,144 @@ describe('locationService.getLocationDetails', () => {
   });
 });
 
+describe('locationService – getCurrentUserId null user', () => {
+  it('throws when getUser returns no user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(locationService.listLocationSummaries()).rejects.toThrow('No authenticated user found.');
+  });
+});
+
+describe('locationService.listLocationSummaries – with rooms, boxes, and items', () => {
+  it('aggregates packed, delivered, and item counts', async () => {
+    const roomRow = { id: 'room-1', location_id: LOCATION_ID, name: 'Kitchen', cover_image_url: null, sort_order: 0, created_at: null, updated_at: null };
+    const boxRow1 = { id: 'box-1', room_id: 'room-1', status: 'packed', updated_at: null, fragility: 'fragile', name: 'Box 1' };
+    const boxRow2 = { id: 'box-2', room_id: 'room-1', status: 'delivered', updated_at: null, fragility: null, name: 'Box 2' };
+    const boxRow3 = { id: 'box-3', room_id: 'room-1', status: 'unpacked_at_destination', updated_at: null, fragility: null, name: 'Box 3' };
+    const itemRow = { box_id: 'box-1', quantity: 4 };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'locations') return makeMockChain({ data: [fakeLocation], error: null });
+      if (table === 'rooms') return makeMockChain({ data: [roomRow], error: null });
+      if (table === 'boxes') return makeMockChain({ data: [boxRow1, boxRow2, boxRow3], error: null });
+      if (table === 'items') return makeMockChain({ data: [itemRow], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await locationService.listLocationSummaries();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].packedBoxes).toBe(1);
+    expect(result[0].deliveredBoxes).toBeGreaterThanOrEqual(1);
+    expect(result[0].unpackedAtDestinationBoxes).toBe(1);
+    expect(result[0].items).toBe(4);
+  });
+});
+
+describe('locationService.getLocationDetails – with rooms and boxes', () => {
+  it('returns roomList and boxList populated from aggregation', async () => {
+    const roomRow = { id: 'room-1', location_id: LOCATION_ID, name: 'Kitchen', cover_image_url: null, sort_order: 0, created_at: null, updated_at: null };
+    const boxRow = { id: 'box-1', room_id: 'room-1', status: 'packed', updated_at: null, fragility: 'fragile', name: null };
+    const itemRow = { box_id: 'box-1', quantity: 2 };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'locations') return makeMockChain({ data: fakeLocation, error: null });
+      if (table === 'rooms') return makeMockChain({ data: [roomRow], error: null });
+      if (table === 'boxes') return makeMockChain({ data: [boxRow], error: null });
+      if (table === 'items') return makeMockChain({ data: [itemRow], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await locationService.getLocationDetails(LOCATION_ID);
+
+    expect(result.roomList).toHaveLength(1);
+    expect(result.roomList[0].packedBoxes).toBe(1);
+    expect(result.boxList).toHaveLength(1);
+    // box.name is null → falls back to "Box #1"
+    expect(result.boxList[0].name).toBe('Box #1');
+    expect(result.boxList[0].isFragile).toBe(true);
+    expect(result.boxList[0].itemsCount).toBe(2);
+  });
+});
+
+describe('locationService.updateLocation – field-specific updates and edge cases', () => {
+  it('updates kind when provided', async () => {
+    const fetchChain = makeMockChain({
+      data: { id: LOCATION_ID, name: 'Old Name', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+      error: null,
+    });
+    const updateChain = makeMockChain({ data: { id: LOCATION_ID }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(updateChain);
+
+    await expect(locationService.updateLocation(LOCATION_ID, { kind: 'start' })).resolves.toBeUndefined();
+    expect(updateChain.update).toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' }));
+  });
+
+  it('updates sortOrder when provided', async () => {
+    const fetchChain = makeMockChain({
+      data: { id: LOCATION_ID, name: 'Old Name', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+      error: null,
+    });
+    const updateChain = makeMockChain({ data: { id: LOCATION_ID }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(updateChain);
+
+    await expect(locationService.updateLocation(LOCATION_ID, { sortOrder: 5 })).resolves.toBeUndefined();
+    expect(updateChain.update).toHaveBeenCalledWith(expect.objectContaining({ sort_order: 5 }));
+  });
+
+  it('throws when update returns no data', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({
+        data: { id: LOCATION_ID, name: 'Old', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+        error: null,
+      }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(locationService.updateLocation(LOCATION_ID, { name: 'New' })).rejects.toThrow('Location not found.');
+  });
+});
+
+describe('locationService.deleteLocation – error paths', () => {
+  it('throws non-FK errors from delete', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: { code: '42501', message: 'permission denied' } }));
+
+    await expect(locationService.deleteLocation(LOCATION_ID)).rejects.toMatchObject({ message: 'permission denied' });
+  });
+
+  it('throws when delete returns no data', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(locationService.deleteLocation(LOCATION_ID)).rejects.toThrow('Location not found.');
+  });
+});
+
+describe('locationService.updateLocationAddress', () => {
+  it('delegates to updateLocation with only address', async () => {
+    const fetchChain = makeMockChain({
+      data: { id: LOCATION_ID, name: 'My Home', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+      error: null,
+    });
+    const updateChain = makeMockChain({ data: { id: LOCATION_ID }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(updateChain);
+
+    await expect(locationService.updateLocationAddress(LOCATION_ID, '123 Main St')).resolves.toBeUndefined();
+    expect(updateChain.update).toHaveBeenCalledWith(expect.objectContaining({ address: '123 Main St' }));
+  });
+});
+
 describe('locationService.updateLocationName', () => {
   it('delegates to updateLocation with only name', async () => {
     const fetchChain = makeMockChain({

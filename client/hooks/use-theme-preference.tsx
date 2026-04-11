@@ -43,6 +43,8 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
         if (isMounted && isThemePreference(storedThemePreference)) {
           setThemePreferenceState(storedThemePreference);
         }
+      } catch {
+        // storage errors are non-fatal; preference stays at default "system"
       } finally {
         if (isMounted) {
           setIsThemePreferenceLoaded(true);

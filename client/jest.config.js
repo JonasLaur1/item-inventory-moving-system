@@ -66,4 +66,10 @@ module.exports = {
   ],
 
   moduleDirectories: ['node_modules', '<rootDir>'],
+
+  coverageThreshold: {
+    './utils/': { statements: 90, branches: 90 },
+    './lib/': { statements: 70, branches: 70 },
+    './hooks/': { statements: 65, branches: 65 },
+  },
 };

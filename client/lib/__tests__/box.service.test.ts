@@ -257,6 +257,85 @@ describe('boxService.markBoxDelivered', () => {
   });
 });
 
+describe('boxService – getCurrentUserId null user', () => {
+  it('throws when getUser returns no user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(boxService.listBoxes()).rejects.toThrow('No authenticated user found.');
+  });
+});
+
+describe('boxService.listBoxes – with items and various statuses', () => {
+  it('counts items and normalizes packed/fragile status', async () => {
+    const packedBox = { id: 'b1', room_id: ROOM_ID, status: 'packed', fragility: 'fragile', name: 'Packed Box', updated_at: null };
+    // items: one with valid box_id, one with null box_id (null-guard branch)
+    const itemRows = [{ box_id: 'b1', quantity: 3 }, { box_id: null, quantity: 1 }];
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'boxes') return makeMockChain({ data: [packedBox], error: null });
+      if (table === 'items') return makeMockChain({ data: itemRows, error: null });
+      if (table === 'rooms') return makeMockChain({ data: [fakeRoom], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await boxService.listBoxes();
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('packed');
+    expect(result[0].isFragile).toBe(true);
+    expect(result[0].itemsCount).toBe(3);
+  });
+
+  it('normalizes delivered and unpacked_at_destination statuses', async () => {
+    const deliveredBox = { id: 'b2', room_id: ROOM_ID, status: 'delivered', fragility: null, name: 'Delivered Box', updated_at: null };
+    const unpackedBox = { id: 'b3', room_id: ROOM_ID, status: 'unpacked_at_destination', fragility: null, name: 'Unpacked Box', updated_at: null };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'boxes') return makeMockChain({ data: [deliveredBox, unpackedBox], error: null });
+      if (table === 'items') return makeMockChain({ data: [], error: null });
+      if (table === 'rooms') return makeMockChain({ data: [fakeRoom], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await boxService.listBoxes();
+    const statuses = result.map(b => b.status);
+    expect(statuses).toContain('delivered');
+    expect(statuses).toContain('unpacked_at_destination');
+  });
+});
+
+describe('boxService.createBox – insert edge cases', () => {
+  it('throws when insert returns no id', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(boxService.createBox({ name: 'Box', roomId: ROOM_ID, status: 'unpacked' })).rejects.toThrow('Failed to create box.');
+  });
+});
+
+describe('boxService.deleteBox – error paths', () => {
+  it('throws non-FK errors from delete', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeBox, error: null }))
+      .mockReturnValueOnce(makeMockChain({ count: 0, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: { code: '42501', message: 'permission denied' } }));
+
+    await expect(boxService.deleteBox(BOX_ID)).rejects.toMatchObject({ message: 'permission denied' });
+  });
+
+  it('throws when delete returns no data', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeBox, error: null }))
+      .mockReturnValueOnce(makeMockChain({ count: 0, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(boxService.deleteBox(BOX_ID)).rejects.toThrow('Box not found.');
+  });
+});
+
 describe('boxService.markBoxUnpackedAtDestination', () => {
   it('throws when boxId is empty', async () => {
     await expect(boxService.markBoxUnpackedAtDestination('   ')).rejects.toThrow('Box id is required.');

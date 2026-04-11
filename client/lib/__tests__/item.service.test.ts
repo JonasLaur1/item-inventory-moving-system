@@ -241,6 +241,83 @@ describe('itemService.deleteItem', () => {
   });
 });
 
+describe('itemService – getCurrentUserId null user', () => {
+  it('throws when getUser returns no user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(itemService.listItemsByBox(BOX_ID)).rejects.toThrow('No authenticated user found.');
+  });
+});
+
+describe('itemService.listItemsByBox – item normalisation', () => {
+  it('falls back to "Unnamed item" for null name and quantity 1 for non-positive', async () => {
+    const badItem = { id: 'i2', name: null, notes: null, quantity: 0, is_fragile: false, photo_url: null, box_id: BOX_ID, created_at: null, updated_at: null };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [badItem], error: null }));
+
+    const result = await itemService.listItemsByBox(BOX_ID);
+
+    expect(result[0].name).toBe('Unnamed item');
+    expect(result[0].quantity).toBe(1);
+  });
+});
+
+describe('itemService.createItem – insert edge cases', () => {
+  it('throws when insert returns no id', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(itemService.createItem({ name: 'Plates', quantity: 1, boxId: BOX_ID })).rejects.toThrow('Failed to create item.');
+  });
+
+  it('calls markBoxFragileIfNeeded when isFragile is true', async () => {
+    const insertChain = makeMockChain({ data: { id: 'new-item-1' }, error: null });
+    const boxUpdateChain = makeMockChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { ...fakeBoxContext, fragility: 'normal' }, error: null })) // assertUserOwnsBox
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null })) // siblings
+      .mockReturnValueOnce(insertChain) // insert
+      .mockReturnValueOnce(boxUpdateChain); // markBoxFragileIfNeeded: update box fragility
+
+    await expect(itemService.createItem({ name: 'Glass', quantity: 1, boxId: BOX_ID, isFragile: true })).resolves.toBe('new-item-1');
+    // The box should be updated to fragile
+    expect(boxUpdateChain.update).toHaveBeenCalledWith({ fragility: 'fragile' });
+  });
+});
+
+describe('itemService.updateItem – box change', () => {
+  it('logs Moved activity when box changes', async () => {
+    const activityService = require('@/lib/activity.service').activityService;
+    const updateChain = makeMockChain({ data: { id: ITEM_ID }, error: null });
+    const oldBoxContext = {
+      id: 'old-box',
+      name: 'Old Box',
+      room_id: ROOM_ID,
+      fragility: null,
+      room: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID, location: { id: LOCATION_ID, name: 'My Home' } },
+    };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: false, box_id: 'old-box' }, error: null })) // itemBeforeUpdate
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null })) // assertUserOwnsBox (target)
+      .mockReturnValueOnce(makeMockChain({ data: oldBoxContext, error: null })) // assertUserOwnsBox (previous)
+      .mockReturnValueOnce(updateChain); // item update
+
+    await expect(
+      itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID }),
+    ).resolves.toBeUndefined();
+
+    expect(activityService.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Moved' }),
+    );
+  });
+});
+
 describe('itemService.uploadItemPhoto', () => {
   it('uploads photo and updates photo_url', async () => {
     const updateChain = makeMockChain({ error: null });
@@ -263,6 +340,34 @@ describe('itemService.uploadItemPhoto', () => {
     });
 
     await expect(itemService.uploadItemPhoto(ITEM_ID, 'dGVzdA==')).rejects.toThrow('upload failed');
+  });
+});
+
+describe('itemService.createItem – numbered sibling', () => {
+  it('increments beyond the highest numbered sibling', async () => {
+    const insertChain = makeMockChain({ data: { id: 'new-item-3' }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [{ name: 'Plates' }, { name: 'Plates #2' }], error: null }))
+      .mockReturnValueOnce(insertChain);
+
+    await itemService.createItem({ name: 'Plates', quantity: 1, boxId: BOX_ID });
+    const insertArgs = insertChain.insert.mock.calls[0][0];
+    expect(insertArgs.name).toBe('Plates #3');
+  });
+});
+
+describe('itemService.deleteItem – null fragility box', () => {
+  it('deletes item successfully when box has null fragility', async () => {
+    const nullFragilityBox = { ...fakeBoxContext, fragility: null };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeItem, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: nullFragilityBox, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await expect(itemService.deleteItem(ITEM_ID)).resolves.toBeUndefined();
   });
 });
 

@@ -227,6 +227,134 @@ describe('roomService.deleteRoom', () => {
   });
 });
 
+describe('roomService – getCurrentUserId null user', () => {
+  it('throws when getUser returns no user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(roomService.listRoomSummaries()).rejects.toThrow('No authenticated user found.');
+  });
+});
+
+describe('roomService.listRoomSummaries – with boxes and items', () => {
+  it('counts packed boxes and items when boxes exist', async () => {
+    const boxRow = { id: 'box-1', room_id: ROOM_ID, status: 'packed', updated_at: null, fragility: 'fragile', name: 'Box 1' };
+    const itemRow = { box_id: 'box-1', quantity: 3 };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'rooms') return makeMockChain({ data: [fakeRoom], error: null });
+      if (table === 'locations') return makeMockChain({ data: [{ id: LOCATION_ID, name: 'My Home' }], error: null });
+      if (table === 'boxes') return makeMockChain({ data: [boxRow], error: null });
+      if (table === 'items') return makeMockChain({ data: [itemRow], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await roomService.listRoomSummaries();
+    expect(result).toHaveLength(1);
+    expect(result[0].packedBoxes).toBe(1);
+    expect(result[0].items).toBe(3);
+  });
+});
+
+describe('roomService.createRoom – insert edge cases', () => {
+  it('throws when insert returns error', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: new Error('insert error') }));
+
+    await expect(roomService.createRoom({ locationId: LOCATION_ID, name: 'Kitchen' })).rejects.toThrow('insert error');
+  });
+
+  it('throws when insert returns no id', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(roomService.createRoom({ locationId: LOCATION_ID, name: 'Kitchen' })).rejects.toThrow('Failed to create room.');
+  });
+});
+
+describe('roomService.getRoomDetails – with boxes and items', () => {
+  it('returns boxList with isFragile true and correct item counts', async () => {
+    const boxRow = { id: 'box-1', room_id: ROOM_ID, status: 'packed', updated_at: null, fragility: 'fragile', name: 'Box 1' };
+    const itemRow = { box_id: 'box-1', quantity: 5 };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: LOCATION_ID, name: 'My Home' }], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [boxRow], error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { user_id: USER_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [itemRow], error: null }));
+
+    const result = await roomService.getRoomDetails(ROOM_ID);
+
+    expect(result.boxList).toHaveLength(1);
+    expect(result.boxList[0].isFragile).toBe(true);
+    expect(result.boxList[0].itemsCount).toBe(5);
+  });
+});
+
+describe('roomService.updateRoom – validation and edge cases', () => {
+  it('throws when name is empty string', async () => {
+    await expect(roomService.updateRoom(ROOM_ID, { name: '   ' })).rejects.toThrow('Room name is required.');
+  });
+
+  it('throws when locationId is empty string', async () => {
+    await expect(roomService.updateRoom(ROOM_ID, { locationId: '   ' })).rejects.toThrow('Location is required.');
+  });
+
+  it('returns early when updates object is empty (no name or locationId provided)', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }));
+
+    await expect(roomService.updateRoom(ROOM_ID, {})).resolves.toBeUndefined();
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it('sets location_id in updates when locationId is provided', async () => {
+    const updateChain = makeMockChain({ data: { id: ROOM_ID }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(updateChain);
+
+    await expect(roomService.updateRoom(ROOM_ID, { locationId: LOCATION_ID })).resolves.toBeUndefined();
+    expect(updateChain.update).toHaveBeenCalledWith(expect.objectContaining({ location_id: LOCATION_ID }));
+  });
+
+  it('throws when update returns no data', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(roomService.updateRoom(ROOM_ID, { name: 'New Name' })).rejects.toThrow('Room not found.');
+  });
+});
+
+describe('roomService.deleteRoom – error paths', () => {
+  it('throws non-FK errors from delete', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: { code: '42501', message: 'permission denied' } }));
+
+    await expect(roomService.deleteRoom(ROOM_ID)).rejects.toMatchObject({ message: 'permission denied' });
+  });
+
+  it('throws when delete returns no data', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ROOM_ID, name: 'Kitchen', location_id: LOCATION_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(roomService.deleteRoom(ROOM_ID)).rejects.toThrow('Room not found.');
+  });
+});
+
 describe('roomService.updateRoomName', () => {
   it('delegates to updateRoom with only name', async () => {
     const updateChain = makeMockChain({ data: { id: ROOM_ID }, error: null });

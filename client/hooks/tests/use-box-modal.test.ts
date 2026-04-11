@@ -275,6 +275,80 @@ describe('useBoxModal – openDeleteModal / closeDeleteModal', () => {
   });
 });
 
+describe('useBoxModal – saveBox (null box guard)', () => {
+  it('is a no-op when box is null', async () => {
+    const { result } = renderBoxModal(null);
+
+    await act(async () => {
+      await result.current.saveBox();
+    });
+
+    expect(mockUpdateBox).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBoxModal – closeDeleteModal (isDeleting guard)', () => {
+  it('is a no-op when isDeleting is true', async () => {
+    let resolveDelete!: () => void;
+    mockDeleteBox.mockReturnValue(new Promise<void>(r => { resolveDelete = r; }));
+    mockCanGoBack.mockReturnValue(true);
+
+    const { result } = renderBoxModal();
+
+    act(() => {
+      result.current.openDeleteModal();
+    });
+
+    let deletePromise!: Promise<void>;
+    act(() => {
+      deletePromise = result.current.deleteBox();
+    });
+
+    // isDeleting is now true — closeDeleteModal should be a no-op
+    act(() => {
+      result.current.closeDeleteModal();
+    });
+
+    expect(result.current.isDeleteModalOpen).toBe(true);
+
+    await act(async () => {
+      resolveDelete();
+      await deletePromise;
+    });
+  });
+});
+
+describe('useBoxModal – saveBox non-Error fallback', () => {
+  it('uses fallback message when saveBox throws a non-Error', async () => {
+    mockUpdateBox.mockRejectedValue('string error');
+    const { result } = renderBoxModal();
+
+    act(() => {
+      result.current.openEditModal();
+      result.current.setEditedName('New Name');
+    });
+
+    await act(async () => {
+      await result.current.saveBox();
+    });
+
+    expect(result.current.saveError).toBe('Failed to update box.');
+  });
+});
+
+describe('useBoxModal – deleteBox non-Error fallback', () => {
+  it('uses fallback message when deleteBox throws a non-Error', async () => {
+    mockDeleteBox.mockRejectedValue('string error');
+    const { result } = renderBoxModal();
+
+    await act(async () => {
+      await result.current.deleteBox();
+    });
+
+    expect(result.current.deleteError).toBe('Failed to delete box.');
+  });
+});
+
 describe('useBoxModal – deleteBox', () => {
   it('is a no-op when box is null', async () => {
     const { result } = renderBoxModal(null);

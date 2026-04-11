@@ -106,4 +106,21 @@ describe('profileService.updateDisplayName', () => {
 
     await expect(profileService.updateDisplayName('Alice')).rejects.toThrow('no session');
   });
+
+  it('throws Not authenticated when getUser returns no user id', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(profileService.updateDisplayName('Alice')).rejects.toThrow('Not authenticated');
+  });
+});
+
+describe('profileService.getProfile – null email', () => {
+  it('returns null email when user has no email field', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+    const chain = makeMockChain({ data: { id: USER_ID, display_name: 'Alice' }, error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await profileService.getProfile();
+    expect(result.email).toBeNull();
+  });
 });

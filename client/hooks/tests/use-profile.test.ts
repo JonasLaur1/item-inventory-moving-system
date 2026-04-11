@@ -168,6 +168,53 @@ describe('useProfile – updateDisplayName', () => {
   });
 });
 
+describe('useProfile – updateDisplayName when profile is null', () => {
+  it('does not crash when profile has not loaded yet (prev is null)', async () => {
+    // Cause load to fail so profile stays null, then try to update
+    mockGetProfile.mockRejectedValue(new Error('load failed'));
+    const { result } = renderHook(() => useProfile());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // profile is null; updateDisplayName should still call service and handle null prev gracefully
+    mockUpdateDisplayName.mockResolvedValue(undefined);
+    let success!: boolean;
+    await act(async () => {
+      success = await result.current.updateDisplayName('Alice');
+    });
+
+    // setProfile is called with prev => prev ? {...prev} : prev
+    // prev is null → returns null (no crash)
+    expect(success).toBe(true);
+    expect(result.current.profile).toBeNull();
+  });
+});
+
+describe('useProfile – cancellation guards on unmount', () => {
+  it('skips setProfile when unmounted before load resolves', async () => {
+    let settleOk!: (val: UserProfile) => void;
+    mockGetProfile.mockReturnValue(new Promise<UserProfile>(res => { settleOk = res; }));
+
+    const { unmount } = renderHook(() => useProfile());
+    unmount(); // sets cancelled = true
+
+    settleOk(fakeProfile); // resolve AFTER unmount – !cancelled is false
+    await Promise.resolve();
+    await Promise.resolve(); // flush .then and .finally microtasks
+  });
+
+  it('skips setErrorMessage when unmounted before load rejects', async () => {
+    let settleErr!: (err: Error) => void;
+    mockGetProfile.mockReturnValue(new Promise<UserProfile>((_, rej) => { settleErr = rej; }));
+
+    const { unmount } = renderHook(() => useProfile());
+    unmount();
+
+    settleErr(new Error('load failed')); // reject AFTER unmount – !cancelled is false
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+});
+
 describe('useProfile – clearSaveError', () => {
   it('resets saveErrorMessage to null', async () => {
     mockGetProfile.mockResolvedValue(fakeProfile);

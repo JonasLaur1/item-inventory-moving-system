@@ -571,6 +571,114 @@ describe('useItemModal – deleteItem', () => {
   });
 });
 
+describe('useItemModal – saveItem (null box guard)', () => {
+  it('is a no-op when box is null', async () => {
+    const { result } = renderItemModal(null);
+
+    await act(async () => {
+      await result.current.saveItem();
+    });
+
+    expect(mockCreateItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('useItemModal – saveItem (photo upload failure in create mode)', () => {
+  it('continues silently when photo upload throws in create mode', async () => {
+    mockCreateItem.mockResolvedValue('new-item-id');
+    mockUploadItemPhoto.mockRejectedValue(new Error('upload failed'));
+    const { result } = renderItemModal();
+
+    const capture = { uri: 'file://photo.jpg', base64: 'base64data', suggestedName: null, suggestedNotes: null };
+
+    act(() => {
+      result.current.openCreateItemModal();
+      result.current.handleItemNameChange('Plates');
+      result.current.handleItemCaptureResult(capture);
+    });
+
+    await act(async () => {
+      await result.current.saveItem();
+    });
+
+    expect(mockUploadItemPhoto).toHaveBeenCalled();
+    // Modal closes despite photo upload failure (non-fatal)
+    expect(result.current.isItemModalOpen).toBe(false);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useItemModal – saveItem (edit mode photo paths)', () => {
+  it('continues silently when photo upload throws in edit mode', async () => {
+    mockUpdateItem.mockResolvedValue(undefined);
+    mockUploadItemPhoto.mockRejectedValue(new Error('upload failed'));
+    const { result } = renderItemModal();
+
+    const capture = { uri: 'file://photo.jpg', base64: 'base64data', suggestedName: null, suggestedNotes: null };
+
+    act(() => {
+      result.current.openEditItemModal(fakeItem);
+      result.current.handleItemCaptureResult(capture);
+    });
+
+    await act(async () => {
+      await result.current.saveItem();
+    });
+
+    expect(mockUploadItemPhoto).toHaveBeenCalled();
+    expect(result.current.isItemModalOpen).toBe(false);
+  });
+
+  it('continues silently when photo removal throws in edit mode', async () => {
+    mockUpdateItem.mockResolvedValue(undefined);
+    mockRemoveItemPhoto.mockRejectedValue(new Error('removal failed'));
+    const itemWithPhoto = { ...fakeItem, photoUrl: 'https://example.com/photo.jpg' };
+    const { result } = renderItemModal();
+
+    act(() => {
+      result.current.openEditItemModal(itemWithPhoto);
+      result.current.setItemPhotoMarkedForRemoval(true);
+    });
+
+    await act(async () => {
+      await result.current.saveItem();
+    });
+
+    expect(mockRemoveItemPhoto).toHaveBeenCalled();
+    expect(result.current.isItemModalOpen).toBe(false);
+  });
+});
+
+describe('useItemModal – closeDeleteItemModal (isDeletingItem guard)', () => {
+  it('is a no-op when isDeletingItem is true', async () => {
+    let resolveDelete!: () => void;
+    mockDeleteItem.mockReturnValue(new Promise<void>(r => { resolveDelete = r; }));
+
+    const { result } = renderItemModal();
+
+    act(() => {
+      result.current.openDeleteItemModal(fakeItem);
+    });
+
+    let deletePromise!: Promise<void>;
+    act(() => {
+      deletePromise = result.current.deleteItem();
+    });
+
+    // isDeletingItem is true — closeDeleteItemModal should be no-op
+    act(() => {
+      result.current.closeDeleteItemModal();
+    });
+
+    expect(result.current.isDeleteItemModalOpen).toBe(true);
+
+    await act(async () => {
+      resolveDelete();
+      await deletePromise;
+    });
+  });
+});
+
 describe('useItemModal – selectedBoxForDisplay', () => {
   it('returns the matching box from availableBoxes', () => {
     const { result } = renderItemModal();
