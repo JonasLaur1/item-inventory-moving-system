@@ -4,6 +4,7 @@ import { QuickActionCard } from "@/components/home/quick-action-card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { BoxCard, type InventoryBox, type InventoryBoxStatus } from "@/components/inventory/box-card";
 import { CreateLocationModal } from "@/components/inventory/create-location-modal";
+import { SearchItemResult } from "@/components/inventory/search-item-result";
 import { AppModal } from "@/components/ui/app-modal";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { FilterGroup } from "@/components/ui/filter-group";
@@ -18,6 +19,7 @@ import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useBoxes } from "@/hooks/use-boxes";
 import { useLocations } from "@/hooks/use-locations";
 import { useRooms } from "@/hooks/use-rooms";
+import { useSearch } from "@/hooks/use-search";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -86,6 +88,9 @@ export default function InventoryTabScreen() {
   const { setInventoryFilters } = useInventoryFilter();
 
   const [search, setSearch] = useState("");
+  const { itemResults, isSearching } = useSearch(search);
+  const isSearchActive = search.trim().length >= 2;
+
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("All");
   const [activeLocationFilter, setActiveLocationFilter] = useState("All");
   const [activeRoomFilter, setActiveRoomFilter] = useState("All");
@@ -363,45 +368,49 @@ export default function InventoryTabScreen() {
         />
       ) : null}
 
-      <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
-        <MetricCard
-          label="Total Boxes"
-          value={String(filteredBoxes.length)}
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-        <MetricCard
-          label="Packed"
-          value={String(packedCount)}
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-        <MetricCard
-          label="Not packed"
-          value={String(unpackedCount)}
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-        <MetricCard
-          label="Total Items"
-          value={String(totalItemsCount)}
-          style={{ width: isNarrow ? "100%" : "48.5%" }}
-        />
-      </View>
+      {!isSearchActive ? (
+        <>
+          <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
+            <MetricCard
+              label="Total Boxes"
+              value={String(filteredBoxes.length)}
+              style={{ width: isNarrow ? "100%" : "48.5%" }}
+            />
+            <MetricCard
+              label="Packed"
+              value={String(packedCount)}
+              style={{ width: isNarrow ? "100%" : "48.5%" }}
+            />
+            <MetricCard
+              label="Not packed"
+              value={String(unpackedCount)}
+              style={{ width: isNarrow ? "100%" : "48.5%" }}
+            />
+            <MetricCard
+              label="Total Items"
+              value={String(totalItemsCount)}
+              style={{ width: isNarrow ? "100%" : "48.5%" }}
+            />
+          </View>
 
-      <View className="mt-6 flex-row">
-        <QuickActionCard
-          title="Add Box"
-          subtitle="Create new box"
-          icon="plus"
-          variant="secondary"
-          onPress={openCreateModal}
-          disabled={availableRoomsForBox.length === 0}
-        />
-      </View>
+          <View className="mt-6 flex-row">
+            <QuickActionCard
+              title="Add Box"
+              subtitle="Create new box"
+              icon="plus"
+              variant="secondary"
+              onPress={openCreateModal}
+              disabled={availableRoomsForBox.length === 0}
+            />
+          </View>
+        </>
+      ) : null}
 
       <View className="mt-6 flex-row gap-3">
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search box, room"
+          placeholder="Search boxes and items"
           containerClassName="flex-1"
         />
         <Pressable
@@ -427,7 +436,7 @@ export default function InventoryTabScreen() {
         </Pressable>
       </View>
 
-      {isFilterOpen ? (
+      {isFilterOpen && !isSearchActive ? (
         <View className="mt-3 rounded-card border border-border-default bg-bg-elevated/80 p-4">
           <View className="flex-row items-center justify-between">
             <Text className="text-sm font-semibold text-text-primary">Filters</Text>
@@ -471,63 +480,111 @@ export default function InventoryTabScreen() {
         </View>
       ) : null}
 
-      <View className="mt-8">
-        <SectionHeader title="Boxes & Items" actionLabel={`${filteredBoxes.length} boxes`} />
-        {filteredBoxes.length === 0 ? (
-          <View className="mt-4">
-            <EmptyStateCard
-              title={
-                isLoading || isRefreshing
-                  ? "Loading boxes..."
-                  : search.trim().length > 0 || activeFilterCount > 0
-                    ? "No boxes found"
-                    : "No boxes yet"
-              }
-              description={
-                isLoading || isRefreshing
-                  ? "Fetching your inventory boxes."
-                  : search.trim().length > 0 || activeFilterCount > 0
-                    ? "Try a different search query or filter combination."
-                    : "Create your first box to start organizing your move."
-              }
-              containerClassName="p-5"
-            />
-          </View>
-        ) : groupedByStatus ? (
-          <View className="mt-4 gap-6">
-            {groupedByStatus.map((group) => (
-              <View key={group.status}>
-                <Text className="mb-3 text-xs font-semibold uppercase tracking-[1px] text-text-tertiary">
-                  {group.status} ({group.boxes.length})
-                </Text>
-                <View className="gap-3">
-                  {group.boxes.map((box) => (
-                    <BoxCard
-                      key={box.id}
-                      box={box}
-                      compact={isCompact}
-                      onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
-                      onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
-                    />
-                  ))}
-                </View>
+      {isSearchActive ? (
+        <View className="mt-8 gap-6">
+          <View>
+            <SectionHeader title="Boxes" actionLabel={`${filteredBoxes.length} found`} />
+            {filteredBoxes.length > 0 ? (
+              <View className="mt-4 gap-3">
+                {filteredBoxes.map((box) => (
+                  <BoxCard
+                    key={box.id}
+                    box={box}
+                    compact={isCompact}
+                    onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
+                    onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+                  />
+                ))}
               </View>
-            ))}
+            ) : (
+              <View className="mt-4">
+                <EmptyStateCard title="No boxes found" containerClassName="p-5" />
+              </View>
+            )}
           </View>
-        ) : (
-          <View className="mt-4 gap-3">
-            {filteredBoxes.map((box) => (
-              <BoxCard
-                key={box.id}
-                box={box}
-                compact={isCompact}
-                onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
-                onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+
+          <View>
+            <SectionHeader title="Items" actionLabel={`${itemResults.length} found`} />
+            {isSearching ? (
+              <View className="mt-4">
+                <EmptyStateCard title="Searching..." containerClassName="p-5" />
+              </View>
+            ) : itemResults.length > 0 ? (
+              <View className="mt-4 gap-3">
+                {itemResults.map((item) => (
+                  <SearchItemResult
+                    key={item.id}
+                    item={item}
+                    onPress={() => router.push({ pathname: "/box/[id]", params: { id: item.boxId } })}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View className="mt-4">
+                <EmptyStateCard title="No items found" containerClassName="p-5" />
+              </View>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View className="mt-8">
+          <SectionHeader title="Boxes & Items" actionLabel={`${filteredBoxes.length} boxes`} />
+          {filteredBoxes.length === 0 ? (
+            <View className="mt-4">
+              <EmptyStateCard
+                title={
+                  isLoading || isRefreshing
+                    ? "Loading boxes..."
+                    : activeFilterCount > 0
+                      ? "No boxes found"
+                      : "No boxes yet"
+                }
+                description={
+                  isLoading || isRefreshing
+                    ? "Fetching your inventory boxes."
+                    : activeFilterCount > 0
+                      ? "Try a different filter combination."
+                      : "Create your first box to start organizing your move."
+                }
+                containerClassName="p-5"
               />
-            ))}
-          </View>
-        )}
-      </View>
+            </View>
+          ) : groupedByStatus ? (
+            <View className="mt-4 gap-6">
+              {groupedByStatus.map((group) => (
+                <View key={group.status}>
+                  <Text className="mb-3 text-xs font-semibold uppercase tracking-[1px] text-text-tertiary">
+                    {group.status} ({group.boxes.length})
+                  </Text>
+                  <View className="gap-3">
+                    {group.boxes.map((box) => (
+                      <BoxCard
+                        key={box.id}
+                        box={box}
+                        compact={isCompact}
+                        onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
+                        onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View className="mt-4 gap-3">
+              {filteredBoxes.map((box) => (
+                <BoxCard
+                  key={box.id}
+                  box={box}
+                  compact={isCompact}
+                  onPressOpen={() => router.push({ pathname: "/box/[id]", params: { id: box.id } })}
+                  onPressEdit={() => router.push({ pathname: "/box/[id]", params: { id: box.id, edit: "1" } })}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       <AppModal
         visible={isCreateModalOpen}

@@ -34,6 +34,40 @@ type BoxContextRow = {
     | null;
 };
 
+type BoxSearchContext = {
+  name: string | null;
+  rooms: RoomSearchContext | RoomSearchContext[] | null;
+};
+
+type RoomSearchContext = {
+  name: string | null;
+  locations: LocationSearchContext | LocationSearchContext[] | null;
+};
+
+type LocationSearchContext = {
+  name: string | null;
+};
+
+type ItemSearchRow = {
+  id: string;
+  name: string | null;
+  quantity: number | null;
+  is_fragile: boolean | null;
+  box_id: string | null;
+  boxes: BoxSearchContext | BoxSearchContext[] | null;
+};
+
+export type ItemSearchResult = {
+  id: string;
+  name: string;
+  quantity: number;
+  isFragile: boolean;
+  boxId: string;
+  boxName: string;
+  roomName: string;
+  locationName: string;
+};
+
 export type ItemSummary = {
   id: string;
   name: string;
@@ -591,6 +625,37 @@ async function uploadItemPhoto(itemId: string, base64: string): Promise<void> {
   if (updateError) throw updateError;
 }
 
+async function searchItems(query: string): Promise<ItemSearchResult[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const { data, error } = await supabase
+    .from("items")
+    .select("id,name,quantity,is_fragile,box_id,boxes(name,rooms(name,locations(name)))")
+    .ilike("name", `%${trimmed}%`)
+    .not("box_id", "is", null)
+    .limit(20);
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: ItemSearchRow) => {
+    const box = Array.isArray(row.boxes) ? row.boxes[0] : row.boxes;
+    const room = box ? (Array.isArray(box.rooms) ? box.rooms[0] : box.rooms) : null;
+    const location = room ? (Array.isArray(room.locations) ? room.locations[0] : room.locations) : null;
+
+    return {
+      id: row.id,
+      name: row.name?.trim() || "Unnamed item",
+      quantity: typeof row.quantity === "number" && row.quantity > 0 ? row.quantity : 1,
+      isFragile: row.is_fragile === true,
+      boxId: row.box_id ?? "",
+      boxName: box?.name?.trim() || "Unknown box",
+      roomName: room?.name?.trim() || "Unknown room",
+      locationName: location?.name?.trim() || "Unknown location",
+    };
+  });
+}
+
 async function removeItemPhoto(itemId: string): Promise<void> {
   const userId = await getCurrentUserId();
   const path = `${userId}/${itemId}.jpg`;
@@ -607,6 +672,7 @@ async function removeItemPhoto(itemId: string): Promise<void> {
 
 export const itemService = {
   listItemsByBox,
+  searchItems,
   createItem,
   updateItem,
   deleteItem,
