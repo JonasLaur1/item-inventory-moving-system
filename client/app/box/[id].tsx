@@ -19,6 +19,7 @@ import { useBoxQr } from "@/hooks/use-box-qr";
 import { useItemModal } from "@/hooks/use-item-modal";
 import { useMovingMode } from "@/hooks/use-moving-mode";
 import { boxService, type BoxDetails, type BoxSummary } from "@/lib/box.service";
+import { itemService } from "@/lib/item.service";
 import { roomService, type RoomSummary } from "@/lib/room.service";
 import { formatStatusLabel, formatUpdatedAt, mapItemToRow } from "@/utils/box-detail-utils";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -168,6 +169,22 @@ export default function BoxDetailsScreen() {
       setIsMarkingDelivered(false);
     }
   }, [boxId, toLocationId, refresh]);
+
+  const handleUnpackItem = useCallback(async (itemId: string) => {
+    if (!box) return;
+
+    await itemService.markItemUnpacked(itemId);
+
+    const allWillBeUnpacked = box.items.length > 0 && box.items.every(
+      (item) => item.id === itemId || item.unpackedAt !== null,
+    );
+
+    if (allWillBeUnpacked) {
+      await boxService.markBoxUnpackedAtDestination(boxId);
+    }
+
+    void refresh();
+  }, [box, boxId, refresh]);
 
   const confirmUnpackAtDestination = useCallback(async () => {
     if (!boxId) {
@@ -336,14 +353,23 @@ export default function BoxDetailsScreen() {
               />
               <View className="mt-3 gap-3">
                 {box.items.length > 0 ? (
-                  box.items.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={mapItemToRow(item)}
-                      onPressEdit={() => itemModal.openEditItemModal(item)}
-                      onPressDelete={() => itemModal.openDeleteItemModal(item)}
-                    />
-                  ))
+                  box.items.map((item) =>
+                    box.status === "delivered" ? (
+                      <ItemRow
+                        key={item.id}
+                        item={mapItemToRow(item)}
+                        isChecked={item.unpackedAt !== null}
+                        onPressCheck={() => void handleUnpackItem(item.id)}
+                      />
+                    ) : (
+                      <ItemRow
+                        key={item.id}
+                        item={mapItemToRow(item)}
+                        onPressEdit={() => itemModal.openEditItemModal(item)}
+                        onPressDelete={() => itemModal.openDeleteItemModal(item)}
+                      />
+                    ),
+                  )
                 ) : (
                   <EmptyStateCard title="No items yet" description="Add your first item to this box." />
                 )}

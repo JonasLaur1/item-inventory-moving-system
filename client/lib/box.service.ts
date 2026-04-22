@@ -29,6 +29,7 @@ type ItemRow = {
   quantity: number | null;
   is_fragile: boolean | null;
   photo_url: string | null;
+  unpacked_at: string | null;
 };
 
 type RoomContextRow = {
@@ -67,6 +68,7 @@ export type BoxDetailsItem = {
   quantity: number;
   isFragile: boolean;
   photoUrl: string | null;
+  unpackedAt: string | null;
 };
 
 export type BoxDetails = BoxSummary & {
@@ -384,7 +386,7 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     getRoomContextMap(userId, box.room_id ? [box.room_id] : []),
     supabase
       .from("items")
-      .select("id,name,notes,quantity,is_fragile,photo_url")
+      .select("id,name,notes,quantity,is_fragile,photo_url,unpacked_at")
       .eq("box_id", normalizedBoxId)
       .order("created_at", { ascending: true }),
   ]);
@@ -398,6 +400,7 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
     isFragile: item.is_fragile === true,
     photoUrl: item.photo_url ?? null,
+    unpackedAt: item.unpacked_at ?? null,
   }));
 
   const row = {

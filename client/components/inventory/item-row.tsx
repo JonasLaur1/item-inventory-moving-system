@@ -23,9 +23,11 @@ type ItemRowProps = {
   item: InventoryItemRowData;
   onPressEdit?: (item: InventoryItemRowData) => void;
   onPressDelete?: (item: InventoryItemRowData) => void;
+  isChecked?: boolean;
+  onPressCheck?: () => void;
 };
 
-export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
+export function ItemRow({ item, onPressEdit, onPressDelete, isChecked, onPressCheck }: ItemRowProps) {
   const { resolvedTheme } = useThemePreference();
   const palette = Colors[resolvedTheme];
 
@@ -74,10 +76,25 @@ export function ItemRow({ item, onPressEdit, onPressDelete }: ItemRowProps) {
         ) : null}
       </View>
 
-      {!hasActions && item.rightLabel ? (
+      {onPressCheck ? (
+        <Pressable
+          onPress={onPressCheck}
+          hitSlop={8}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isChecked }}
+          accessibilityLabel={isChecked ? `Uncheck ${item.title}` : `Check ${item.title}`}
+        >
+          <Feather
+            name={isChecked ? "check-circle" : "circle"}
+            size={22}
+            color={isChecked ? palette.primary : palette.textTertiary}
+          />
+        </Pressable>
+      ) : null}
+      {!onPressCheck && !hasActions && item.rightLabel ? (
         <Text className="text-xs font-semibold text-text-link">{item.rightLabel}</Text>
       ) : null}
-      {hasActions ? (
+      {!onPressCheck && hasActions ? (
         <View className="flex-row gap-2">
           {onPressEdit ? (
             <Pressable

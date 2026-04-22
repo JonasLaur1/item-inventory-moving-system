@@ -670,6 +670,47 @@ async function removeItemPhoto(itemId: string): Promise<void> {
   if (error) throw error;
 }
 
+async function markItemUnpacked(itemId: string): Promise<void> {
+  const normalizedItemId = itemId.trim();
+  if (!normalizedItemId) {
+    throw new Error("Item id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .select("id,name,box_id")
+    .eq("id", normalizedItemId)
+    .maybeSingle();
+
+  if (itemError) throw itemError;
+  if (!item) throw new Error("Item not found.");
+
+  const { error } = await supabase
+    .from("items")
+    .update({ unpacked_at: new Date().toISOString() })
+    .eq("id", normalizedItemId);
+
+  if (error) throw error;
+
+  if (item.box_id) {
+    const boxContext = await getBoxActivityContext(item.box_id, userId);
+    const itemName = item.name?.trim() || "Unnamed item";
+    await activityService.writeActivitySafely({
+      type: "Updated",
+      entityType: "item",
+      entityId: normalizedItemId,
+      title: "Item unpacked",
+      description: `Unpacked item "${itemName}" from "${boxContext.name}".`,
+      locationName: boxContext.locationName,
+      roomName: boxContext.roomName,
+      boxName: boxContext.name,
+      next: { unpacked: true },
+    });
+  }
+}
+
 export const itemService = {
   listItemsByBox,
   searchItems,
@@ -678,4 +719,5 @@ export const itemService = {
   deleteItem,
   uploadItemPhoto,
   removeItemPhoto,
+  markItemUnpacked,
 };

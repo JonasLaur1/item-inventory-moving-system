@@ -105,6 +105,7 @@ describe("mapItemToRow", () => {
     quantity: 6,
     isFragile: true,
     photoUrl: "https://example.com/photo.jpg",
+    unpackedAt: null,
   };
 
   it("maps all fields correctly", () => {

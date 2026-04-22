@@ -60,6 +60,7 @@ const fakeItem: BoxDetailsItem = {
   quantity: 4,
   isFragile: false,
   photoUrl: null,
+  unpackedAt: null,
 };
 
 const onRefresh = jest.fn().mockResolvedValue(undefined);
