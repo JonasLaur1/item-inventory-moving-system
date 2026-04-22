@@ -1,15 +1,17 @@
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
-import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { SectionHeader } from "@/components/ui/section-header";
-import { AppModal } from "@/components/ui/app-modal";
 import { CardGrid } from "@/components/ui/card-grid";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
+import { AppModal } from "@/components/ui/app-modal";
 import { Colors } from "@/constants/theme";
+import { ROOM_SUGGESTIONS } from "@/constants/room-suggestions";
+import { useRooms } from "@/hooks/use-rooms";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { locationService, type LocationDetails } from "@/lib/location.service";
+import { type RoomSummary } from "@/lib/room.service";
 import { getLocationIcon } from "@/utils/location-icon";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -17,6 +19,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -27,14 +30,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 function getKindLabel(kind: LocationDetails["kind"]): string {
-  if (kind === "start") {
-    return "Start";
-  }
-
-  if (kind === "destination") {
-    return "Destination";
-  }
-
+  if (kind === "start") return "Start";
+  if (kind === "destination") return "Destination";
   return "Other";
 }
 
@@ -49,10 +46,7 @@ export default function LocationDetailsScreen() {
   const isNarrow = width < 360;
 
   const locationId = useMemo(() => {
-    if (!params.id) {
-      return "";
-    }
-
+    if (!params.id) return "";
     return Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
   }, [params.id]);
 
@@ -73,7 +67,30 @@ export default function LocationDetailsScreen() {
 
   const [isDeletingLocation, setIsDeletingLocation] = useState(false);
   const [deleteLocationError, setDeleteLocationError] = useState<string | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteLocationModalOpen, setIsDeleteLocationModalOpen] = useState(false);
+
+  const {
+    rooms,
+    isLoading: isRoomsLoading,
+    isCreating: isCreatingRoom,
+    isUpdating: isUpdatingRoom,
+    isDeleting: isDeletingRoom,
+    refreshRooms,
+    createRoom,
+    updateRoom,
+    deleteRoom,
+  } = useRooms(locationId);
+
+  const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
+  const [addRoomName, setAddRoomName] = useState("");
+  const [addRoomError, setAddRoomError] = useState<string | null>(null);
+
+  const [roomToRename, setRoomToRename] = useState<RoomSummary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameRoomError, setRenameRoomError] = useState<string | null>(null);
+
+  const [roomToDelete, setRoomToDelete] = useState<RoomSummary | null>(null);
+  const [deleteRoomError, setDeleteRoomError] = useState<string | null>(null);
 
   const loadLocation = useCallback(
     async (refresh: boolean) => {
@@ -119,36 +136,19 @@ export default function LocationDetailsScreen() {
         hasFocusedOnceRef.current = true;
         return;
       }
-
       void loadLocation(true);
     }, [loadLocation]),
   );
 
   useEffect(() => {
-    if (!location || isEditingName) {
-      return;
-    }
-
+    if (!location || isEditingName) return;
     setEditedLocationName(location.name);
   }, [isEditingName, location]);
 
-  const locationRooms = useMemo(
-    () =>
-      (location?.roomList ?? []).map((room) => ({
-        id: room.id,
-        name: room.name,
-        icon: getLocationIcon(room.name) as RoomCardProps["icon"],
-      })),
-    [location?.roomList],
-  );
-
-  const hasRooms = locationRooms.length > 0;
+  const hasRooms = rooms.length > 0;
 
   const openNameEditor = useCallback(() => {
-    if (!location) {
-      return;
-    }
-
+    if (!location) return;
     setEditedLocationName(location.name);
     setEditNameError(null);
     setIsEditingName(true);
@@ -161,62 +161,30 @@ export default function LocationDetailsScreen() {
   }, [location?.name]);
 
   const saveLocationName = useCallback(async () => {
-    if (!location) {
-      return;
-    }
-
+    if (!location) return;
     const normalizedName = editedLocationName.trim();
     if (!normalizedName) {
       setEditNameError("Location name is required.");
       return;
     }
-
     if (normalizedName === location.name) {
       setEditNameError(null);
       setIsEditingName(false);
       return;
     }
-
     setIsSavingName(true);
     setEditNameError(null);
-
     try {
       await locationService.updateLocationName(location.id, normalizedName);
-      setLocation((previousLocation) =>
-        previousLocation ? { ...previousLocation, name: normalizedName } : previousLocation,
-      );
+      setLocation((prev) => (prev ? { ...prev, name: normalizedName } : prev));
       setIsEditingName(false);
       await loadLocation(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update location name.";
-      setEditNameError(message);
+      setEditNameError(error instanceof Error ? error.message : "Failed to update location name.");
     } finally {
       setIsSavingName(false);
     }
   }, [editedLocationName, loadLocation, location]);
-
-  const deleteLocation = useCallback(async () => {
-    if (!location) {
-      return;
-    }
-
-    setIsDeletingLocation(true);
-    setDeleteLocationError(null);
-
-    try {
-      await locationService.deleteLocation(location.id);
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace("/(tabs)/rooms");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete location.";
-      setDeleteLocationError(message);
-    } finally {
-      setIsDeletingLocation(false);
-    }
-  }, [location, router]);
 
   const openAddressEditor = useCallback(() => {
     setEditedAddress(location?.address ?? "");
@@ -232,41 +200,139 @@ export default function LocationDetailsScreen() {
 
   const saveLocationAddress = useCallback(async () => {
     if (!location) return;
-
     const normalizedAddress = editedAddress.trim() || null;
-
     setIsSavingAddress(true);
     setEditAddressError(null);
-
     try {
       await locationService.updateLocationAddress(location.id, normalizedAddress);
       setLocation((prev) => (prev ? { ...prev, address: normalizedAddress } : prev));
       setIsEditingAddress(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update address.";
-      setEditAddressError(message);
+      setEditAddressError(error instanceof Error ? error.message : "Failed to update address.");
     } finally {
       setIsSavingAddress(false);
     }
   }, [editedAddress, location]);
 
-  const openDeleteModal = useCallback(() => {
-    if (!location) {
-      return;
-    }
-
+  const openDeleteLocationModal = useCallback(() => {
+    if (!location) return;
     setDeleteLocationError(null);
-    setIsDeleteModalOpen(true);
+    setIsDeleteLocationModalOpen(true);
   }, [location]);
 
-  const closeDeleteModal = useCallback(() => {
-    if (isDeletingLocation) {
-      return;
-    }
-
-    setIsDeleteModalOpen(false);
+  const closeDeleteLocationModal = useCallback(() => {
+    if (isDeletingLocation) return;
+    setIsDeleteLocationModalOpen(false);
     setDeleteLocationError(null);
   }, [isDeletingLocation]);
+
+  const deleteLocation = useCallback(async () => {
+    if (!location) return;
+    setIsDeletingLocation(true);
+    setDeleteLocationError(null);
+    try {
+      await locationService.deleteLocation(location.id);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/rooms");
+      }
+    } catch (error) {
+      setDeleteLocationError(error instanceof Error ? error.message : "Failed to delete location.");
+    } finally {
+      setIsDeletingLocation(false);
+    }
+  }, [location, router]);
+
+  const openAddRoomModal = useCallback(() => {
+    setAddRoomName("");
+    setAddRoomError(null);
+    setIsAddRoomModalOpen(true);
+  }, []);
+
+  const closeAddRoomModal = useCallback(() => {
+    if (isCreatingRoom) return;
+    setIsAddRoomModalOpen(false);
+    setAddRoomName("");
+    setAddRoomError(null);
+  }, [isCreatingRoom]);
+
+  const handleAddRoom = useCallback(async () => {
+    const trimmed = addRoomName.trim();
+    if (!trimmed) {
+      setAddRoomError("Room name is required.");
+      return;
+    }
+    setAddRoomError(null);
+    Keyboard.dismiss();
+    try {
+      await createRoom({ locationId, name: trimmed });
+      setIsAddRoomModalOpen(false);
+      setAddRoomName("");
+      void loadLocation(true);
+    } catch (error) {
+      setAddRoomError(error instanceof Error ? error.message : "Failed to add room.");
+    }
+  }, [addRoomName, createRoom, locationId, loadLocation]);
+
+  const handleRoomSuggestionPress = useCallback((suggestion: string) => {
+    setAddRoomName(suggestion);
+    setAddRoomError(null);
+  }, []);
+
+  const openRenameRoomModal = useCallback((room: RoomSummary) => {
+    setRenameValue(room.name);
+    setRenameRoomError(null);
+    setRoomToRename(room);
+  }, []);
+
+  const closeRenameRoomModal = useCallback(() => {
+    if (isUpdatingRoom) return;
+    setRoomToRename(null);
+    setRenameValue("");
+    setRenameRoomError(null);
+  }, [isUpdatingRoom]);
+
+  const confirmRenameRoom = useCallback(async () => {
+    if (!roomToRename) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameRoomError("Room name is required.");
+      return;
+    }
+    setRenameRoomError(null);
+    Keyboard.dismiss();
+    try {
+      await updateRoom(roomToRename.id, { name: trimmed });
+      setRoomToRename(null);
+      setRenameValue("");
+    } catch (error) {
+      setRenameRoomError(error instanceof Error ? error.message : "Failed to rename room.");
+    }
+  }, [roomToRename, renameValue, updateRoom]);
+
+  const openDeleteRoomModal = useCallback((room: RoomSummary) => {
+    setDeleteRoomError(null);
+    setRoomToDelete(room);
+  }, []);
+
+  const closeDeleteRoomModal = useCallback(() => {
+    if (isDeletingRoom) return;
+    setRoomToDelete(null);
+    setDeleteRoomError(null);
+  }, [isDeletingRoom]);
+
+  const confirmDeleteRoom = useCallback(async () => {
+    if (!roomToDelete) return;
+    setDeleteRoomError(null);
+    try {
+      await deleteRoom(roomToDelete.id);
+      setRoomToDelete(null);
+      void loadLocation(true);
+    } catch (error) {
+      setDeleteRoomError(error instanceof Error ? error.message : "Failed to delete room.");
+    }
+  }, [deleteRoom, roomToDelete, loadLocation]);
 
   if (isLoading && !location) {
     return (
@@ -347,11 +413,9 @@ export default function LocationDetailsScreen() {
                         editable={!isSavingName}
                         showDefaultBorder={false}
                       />
-
                       {editNameError ? (
                         <Text className="mt-2 text-xs text-text-tertiary">{editNameError}</Text>
                       ) : null}
-
                       <View className="mt-3 flex-row gap-2">
                         <Button
                           label={isSavingName ? "Saving..." : "Save"}
@@ -404,7 +468,7 @@ export default function LocationDetailsScreen() {
                             <Feather name="edit-2" size={18} color={themeColors.textPrimary} />
                           </Pressable>
                           <Pressable
-                            onPress={openDeleteModal}
+                            onPress={openDeleteLocationModal}
                             hitSlop={8}
                             className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasRooms ? "opacity-40" : ""}`}
                             disabled={isDeletingLocation || hasRooms}
@@ -437,33 +501,106 @@ export default function LocationDetailsScreen() {
             </View>
 
             <View className="mt-8">
-              <SectionHeader title="Rooms" />
-              {locationRooms.length > 0 ? (
+              <SectionHeader
+                title="Rooms"
+                actionLabel={location.isOwner ? "Add Room" : undefined}
+                onPressAction={location.isOwner ? openAddRoomModal : undefined}
+              />
+
+              {isRoomsLoading ? (
+                <View className="mt-4 items-center">
+                  <ActivityIndicator />
+                </View>
+              ) : rooms.length > 0 ? (
                 <CardGrid
-                  items={locationRooms}
+                  items={rooms}
                   compact={isCompact}
                   className="mt-4"
                   keyExtractor={(room) => room.id}
                   renderItem={(room, contentStyle) => (
-                    <RoomCard
-                      name={room.name}
-                      icon={room.icon}
-                      style={contentStyle}
+                    <Pressable
                       onPress={() =>
                         router.push({
                           pathname: "/(tabs)/inventory",
                           params: { locationName: location.name, roomName: room.name },
                         })
                       }
-                    />
+                      className="rounded-card border border-border-default bg-bg-elevated/75"
+                      style={contentStyle}
+                    >
+                      <View className="flex-1 p-3">
+                        <View className="flex-row items-start justify-between">
+                          <View className="h-9 w-9 items-center justify-center rounded-xl bg-primary/15">
+                            <MaterialCommunityIcons
+                              name={getLocationIcon(room.name)}
+                              size={20}
+                              color={themeColors.primary}
+                            />
+                          </View>
+                          {location.isOwner ? (
+                            <View className="flex-row gap-1">
+                              <Pressable
+                                onPress={() => openRenameRoomModal(room)}
+                                hitSlop={6}
+                                disabled={isUpdatingRoom || isDeletingRoom}
+                                className="h-7 w-7 items-center justify-center rounded-full border border-border-default bg-bg-elevated"
+                              >
+                                <Feather name="edit-2" size={12} color={themeColors.textSecondary} />
+                              </Pressable>
+                              <Pressable
+                                onPress={() => openDeleteRoomModal(room)}
+                                hitSlop={6}
+                                disabled={room.boxes > 0 || isDeletingRoom}
+                                className={`h-7 w-7 items-center justify-center rounded-full border ${
+                                  room.boxes > 0
+                                    ? "border-border-default bg-bg-base opacity-30"
+                                    : "border-crimson/40 bg-crimson/10"
+                                }`}
+                              >
+                                <Feather
+                                  name="trash-2"
+                                  size={12}
+                                  color={room.boxes > 0 ? themeColors.textTertiary : themeColors.crimson}
+                                />
+                              </Pressable>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text className="mt-2 text-sm font-semibold text-text-primary" numberOfLines={2}>
+                          {room.name}
+                        </Text>
+                        <Text className="mt-0.5 text-xs text-text-tertiary">
+                          {room.boxes} {room.boxes === 1 ? "box" : "boxes"}
+                        </Text>
+                      </View>
+                    </Pressable>
                   )}
+                  footer={
+                    location.isOwner
+                      ? (contentStyle) => (
+                          <Pressable
+                            onPress={openAddRoomModal}
+                            className="items-center justify-center rounded-card border border-dashed border-border-strong bg-bg-elevated/40"
+                            style={contentStyle}
+                          >
+                            <Feather name="plus" size={20} color={themeColors.primary} />
+                            <Text className="mt-2 text-xs font-medium text-text-secondary">Add Room</Text>
+                          </Pressable>
+                        )
+                      : undefined
+                  }
                 />
               ) : (
-                <EmptyStateCard
-                  title="No rooms"
-                  description="Rooms are set up when a location is created. Manage rooms via Settings → Location Configuration."
-                  containerClassName="mt-4"
-                />
+                <>
+                  <EmptyStateCard
+                    title="No rooms yet"
+                    description="Add a room to start organizing boxes in this location."
+                    containerClassName="mt-4"
+                  />
+                  {location.isOwner ? (
+                    <Button label="Add Room" onPress={openAddRoomModal} className="mt-4" />
+                  ) : null}
+                </>
               )}
             </View>
           </>
@@ -507,23 +644,22 @@ export default function LocationDetailsScreen() {
       </AppModal>
 
       <AppModal
-        visible={isDeleteModalOpen}
+        visible={isDeleteLocationModalOpen}
         title="Delete location?"
         description={
           location
             ? `Delete "${location.name}" permanently. If this location still has rooms, deletion will be blocked.`
             : "Delete this location permanently."
         }
-        onRequestClose={closeDeleteModal}
+        onRequestClose={closeDeleteLocationModal}
         maxWidth={420}
       >
         {deleteLocationError ? <Text className="text-xs text-crimson">{deleteLocationError}</Text> : null}
-
         <View className={`${deleteLocationError ? "mt-4" : ""} flex-row gap-3`}>
           <Button
             label="Cancel"
             variant="secondary"
-            onPress={closeDeleteModal}
+            onPress={closeDeleteLocationModal}
             disabled={isDeletingLocation}
             className="flex-1"
           />
@@ -537,7 +673,129 @@ export default function LocationDetailsScreen() {
           />
         </View>
       </AppModal>
+
+      <AppModal
+        visible={isAddRoomModalOpen}
+        title="Add Room"
+        description="Choose a suggestion or enter a custom room name."
+        onRequestClose={closeAddRoomModal}
+        maxWidth={420}
+      >
+        <View className="flex-row flex-wrap gap-2">
+          {ROOM_SUGGESTIONS.map((suggestion) => (
+            <Pressable
+              key={suggestion}
+              onPress={() => handleRoomSuggestionPress(suggestion)}
+              disabled={isCreatingRoom}
+              className={`rounded-control border px-3 py-2 ${
+                addRoomName === suggestion
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">{suggestion}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View className="mt-4">
+          <FormInput
+            value={addRoomName}
+            onChangeText={(text) => {
+              setAddRoomName(text);
+              setAddRoomError(null);
+            }}
+            placeholder="Room name"
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!isCreatingRoom}
+            maxLength={60}
+          />
+        </View>
+        {addRoomError ? <Text className="mt-2 text-xs text-crimson">{addRoomError}</Text> : null}
+        <View className={`${addRoomError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeAddRoomModal}
+            disabled={isCreatingRoom}
+            className="flex-1"
+          />
+          <Button
+            label={isCreatingRoom ? "Adding..." : "Add"}
+            onPress={() => void handleAddRoom()}
+            disabled={isCreatingRoom}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
+
+      <AppModal
+        visible={roomToRename !== null}
+        title="Rename Room"
+        description="Enter a new name for this room."
+        onRequestClose={closeRenameRoomModal}
+        maxWidth={420}
+      >
+        <FormInput
+          value={renameValue}
+          onChangeText={(text) => {
+            setRenameValue(text);
+            setRenameRoomError(null);
+          }}
+          placeholder="Room name"
+          autoCapitalize="words"
+          autoCorrect={false}
+          editable={!isUpdatingRoom}
+          maxLength={60}
+        />
+        {renameRoomError ? <Text className="mt-2 text-xs text-crimson">{renameRoomError}</Text> : null}
+        <View className={`${renameRoomError ? "mt-4" : "mt-5"} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeRenameRoomModal}
+            disabled={isUpdatingRoom}
+            className="flex-1"
+          />
+          <Button
+            label={isUpdatingRoom ? "Saving..." : "Save"}
+            onPress={() => void confirmRenameRoom()}
+            disabled={isUpdatingRoom}
+            className="flex-1"
+          />
+        </View>
+      </AppModal>
+
+      <AppModal
+        visible={roomToDelete !== null}
+        title="Delete room?"
+        description={
+          roomToDelete
+            ? `Delete "${roomToDelete.name}" permanently. This cannot be undone.`
+            : "Delete this room permanently."
+        }
+        onRequestClose={closeDeleteRoomModal}
+        maxWidth={420}
+      >
+        {deleteRoomError ? <Text className="text-xs text-crimson">{deleteRoomError}</Text> : null}
+        <View className={`${deleteRoomError ? "mt-4" : ""} flex-row gap-3`}>
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={closeDeleteRoomModal}
+            disabled={isDeletingRoom}
+            className="flex-1"
+          />
+          <Button
+            label={isDeletingRoom ? "Deleting..." : "Delete"}
+            variant="secondary"
+            onPress={() => void confirmDeleteRoom()}
+            disabled={isDeletingRoom}
+            className="flex-1 border-crimson/60 bg-crimson/10"
+            textClassName="text-crimson"
+          />
+        </View>
+      </AppModal>
     </SafeAreaView>
   );
 }
-

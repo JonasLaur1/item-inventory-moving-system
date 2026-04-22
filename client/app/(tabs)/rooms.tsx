@@ -63,14 +63,8 @@ export default function RoomsTabScreen() {
         />
       ) : null}
 
-      <View className="mt-6 flex-row items-center justify-between">
+      <View className="mt-6">
         <SectionHeader title="Locations" />
-        <Pressable
-          onPress={() => setIsAddLocationModalOpen(true)}
-          className="h-8 w-8 items-center justify-center rounded-control border border-dashed border-border-strong bg-bg-elevated/40"
-        >
-          <Feather name="plus" size={14} color={themeColors.primary} />
-        </Pressable>
       </View>
 
       {isLoading && locations.length === 0 ? (

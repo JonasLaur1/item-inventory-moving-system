@@ -121,15 +121,20 @@ export default function MovingProgressScreen() {
   const { locations, isLoading, isRefreshing, errorMessage, refreshLocations, clearError } =
     useLocations();
 
+  const moveLocations = useMemo(
+    () => locations.filter((loc) => loc.id === fromLocationId || loc.id === toLocationId),
+    [locations, fromLocationId, toLocationId],
+  );
+
   const stats = useMemo(() => {
-    const total = locations.reduce((sum, loc) => sum + loc.boxes, 0);
-    const packed = locations.reduce((sum, loc) => sum + loc.packedBoxes, 0);
-    const totalDeliveredCombined = locations.reduce((sum, loc) => sum + loc.deliveredBoxes, 0);
-    const unpacked = locations.reduce((sum, loc) => sum + loc.unpackedAtDestinationBoxes, 0);
+    const total = moveLocations.reduce((sum, loc) => sum + loc.boxes, 0);
+    const packed = moveLocations.reduce((sum, loc) => sum + loc.packedBoxes, 0);
+    const totalDeliveredCombined = moveLocations.reduce((sum, loc) => sum + loc.deliveredBoxes, 0);
+    const unpacked = moveLocations.reduce((sum, loc) => sum + loc.unpackedAtDestinationBoxes, 0);
     const delivered = totalDeliveredCombined - unpacked;
     const progress = total > 0 ? (totalDeliveredCombined / total) * 100 : 0;
     return { total, packed, delivered, unpacked, totalDeliveredCombined, progress };
-  }, [locations]);
+  }, [moveLocations]);
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-bg-base">
@@ -231,7 +236,7 @@ export default function MovingProgressScreen() {
             <View className="mt-8">
               <SectionHeader title="By Location" />
               <View className="mt-4 gap-3">
-                {locations.map((loc) => (
+                {moveLocations.map((loc) => (
                   <LocationProgressCard
                     key={loc.id}
                     location={loc}

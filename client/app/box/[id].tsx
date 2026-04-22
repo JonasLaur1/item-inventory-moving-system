@@ -134,17 +134,17 @@ export default function BoxDetailsScreen() {
     }, [loadBox]),
   );
 
-  const { toLocationId } = useMovingMode();
+  const { fromLocationId, toLocationId } = useMovingMode();
   const boxModal = useBoxModal({ box, onRefresh: refresh });
   const itemModal = useItemModal({ box, availableBoxes, onRefresh: refresh });
   const qr = useBoxQr(box);
   const btPrinter = useBluetoothPrinter();
 
   useEffect(() => {
-    if (shouldPromptDelivery && box && !isLoading) {
+    if (shouldPromptDelivery && box && !isLoading && box.parentLocationId === fromLocationId) {
       setIsDeliveryModalOpen(true);
     }
-  }, [shouldPromptDelivery, box, isLoading]);
+  }, [shouldPromptDelivery, box, isLoading, fromLocationId]);
 
   useEffect(() => {
     boxModal.setIsEditModalOpen(shouldStartEditing);
