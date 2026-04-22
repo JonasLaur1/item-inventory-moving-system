@@ -141,7 +141,7 @@ export default function BoxDetailsScreen() {
   const btPrinter = useBluetoothPrinter();
 
   useEffect(() => {
-    if (shouldPromptDelivery && box && !isLoading && box.parentLocationId === fromLocationId) {
+    if (shouldPromptDelivery && box && !isLoading && box.parentLocationId === fromLocationId && box.status === "packed") {
       setIsDeliveryModalOpen(true);
     }
   }, [shouldPromptDelivery, box, isLoading, fromLocationId]);

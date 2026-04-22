@@ -601,6 +601,38 @@ async function getLocationDetails(locationId: string): Promise<LocationDetails> 
   };
 }
 
+async function countUncheckedItems(fromLocationId: string, toLocationId: string): Promise<number> {
+  const { data: rooms, error: roomsError } = await supabase
+    .from("rooms")
+    .select("id")
+    .in("location_id", [fromLocationId, toLocationId]);
+
+  if (roomsError) throw roomsError;
+
+  const roomIds = (rooms ?? []).map((r: { id: string }) => r.id);
+  if (roomIds.length === 0) return 0;
+
+  const { data: boxes, error: boxesError } = await supabase
+    .from("boxes")
+    .select("id")
+    .in("room_id", roomIds)
+    .in("status", ["delivered", "unpacked_at_destination"]);
+
+  if (boxesError) throw boxesError;
+
+  const boxIds = (boxes ?? []).map((b: { id: string }) => b.id);
+  if (boxIds.length === 0) return 0;
+
+  const { count, error: itemsError } = await supabase
+    .from("items")
+    .select("id", { count: "exact", head: true })
+    .in("box_id", boxIds)
+    .is("unpacked_at", null);
+
+  if (itemsError) throw itemsError;
+  return count ?? 0;
+}
+
 export const locationService = {
   listLocationSummaries,
   createLocation,
@@ -609,4 +641,5 @@ export const locationService = {
   updateLocationAddress,
   deleteLocation,
   getLocationDetails,
+  countUncheckedItems,
 };
