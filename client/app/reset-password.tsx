@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 type RecoveryTokens = {
   accessToken: string | null;
@@ -52,6 +53,7 @@ function getRecoveryTokensFromUrl(url: string | null): RecoveryTokens {
 }
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export default function ResetPasswordScreen() {
       const { accessToken, refreshToken } = recoveryTokens;
 
       if (!accessToken || !refreshToken) {
-        setErrorMessage("Reset link is missing or invalid. Request a new one.");
+        setErrorMessage(t("auth.resetLinkMissing"));
         setIsSettingRecoverySession(false);
         return;
       }
@@ -81,7 +83,7 @@ export default function ResetPasswordScreen() {
         setIsRecoverySessionReady(true);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Invalid or expired reset link";
+          error instanceof Error ? error.message : t("auth.invalidResetLink");
         setErrorMessage(message);
       } finally {
         setIsSettingRecoverySession(false);
@@ -89,7 +91,7 @@ export default function ResetPasswordScreen() {
     };
 
     void initializeRecoverySession();
-  }, [recoveryTokens]);
+  }, [recoveryTokens, t]);
 
   const onBackToLogin = (): void => {
     router.replace("/");
@@ -99,17 +101,17 @@ export default function ResetPasswordScreen() {
     const trimmedPassword = password.trim();
 
     if (!trimmedPassword || !confirmPassword.trim()) {
-      setErrorMessage("Please fill in all fields");
+      setErrorMessage(t("auth.fillAllFields"));
       return;
     }
 
     if (trimmedPassword.length < 6) {
-      setErrorMessage("Password must be at least 6 characters long");
+      setErrorMessage(t("auth.passwordMin6"));
       return;
     }
 
     if (trimmedPassword !== confirmPassword.trim()) {
-      setErrorMessage("Passwords do not match");
+      setErrorMessage(t("auth.passwordsMismatch"));
       return;
     }
 
@@ -119,10 +121,10 @@ export default function ResetPasswordScreen() {
 
     try {
       await authService.updatePassword(trimmedPassword);
-      setSuccessMessage("Password updated successfully.");
+      setSuccessMessage(t("auth.passwordUpdated"));
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to update password";
+        error instanceof Error ? error.message : t("auth.failedUpdatePassword");
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -165,18 +167,18 @@ export default function ResetPasswordScreen() {
                 </View>
 
                 <Text className="mt-12 text-center text-3xl font-bold text-text-primary">
-                  Reset Password
+                  {t("auth.resetPassword")}
                 </Text>
 
                 <Text className="mt-3 px-4 text-center text-sm leading-5 text-text-tertiary">
-                  Enter your new password below
+                  {t("auth.resetPasswordDesc")}
                 </Text>
               </View>
 
               <View className="mt-12 gap-4">
                 <FormInput
-                  label="New Password"
-                  placeholder="At least 6 characters"
+                  label={t("auth.newPassword")}
+                  placeholder={t("auth.atLeast6Chars")}
                   leftIcon="lock"
                   value={password}
                   onChangeText={setPassword}
@@ -187,8 +189,8 @@ export default function ResetPasswordScreen() {
                 />
 
                 <FormInput
-                  label="Confirm Password"
-                  placeholder="Repeat your new password"
+                  label={t("auth.confirmPassword")}
+                  placeholder={t("auth.repeatNewPassword")}
                   leftIcon="lock"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -199,7 +201,7 @@ export default function ResetPasswordScreen() {
                 />
 
                 <Button
-                  label={isSubmitting ? "Updating..." : "Update Password"}
+                  label={isSubmitting ? t("auth.updating") : t("auth.updatePassword")}
                   className="mt-2 shadow-card"
                   textClassName="font-bold"
                   onPress={onResetPassword}
@@ -215,7 +217,7 @@ export default function ResetPasswordScreen() {
 
                 {isSettingRecoverySession ? (
                   <Text className="mt-2 text-sm text-text-tertiary">
-                    Verifying reset link...
+                    {t("auth.verifyingResetLink")}
                   </Text>
                 ) : null}
 
@@ -242,7 +244,7 @@ export default function ResetPasswordScreen() {
                     color={Colors.dark.primary}
                   />
                   <Text className="text-sm font-medium text-text-link">
-                    Back to Login
+                    {t("auth.backToLogin")}
                   </Text>
                 </Pressable>
               </View>

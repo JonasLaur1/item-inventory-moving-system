@@ -1,20 +1,16 @@
 import { Colors } from "@/constants/theme";
-import { EVENT_DISPLAY_LABEL, getEventTone } from "@/utils/activity-tone";
+import { getEventDisplayLabel, getEventTone } from "@/utils/activity-tone";
 
-describe("EVENT_DISPLAY_LABEL", () => {
-  it("has entries for all expected activity types", () => {
-    expect(EVENT_DISPLAY_LABEL).toMatchObject({
-      Created: "Created",
-      Updated: "Updated",
-      Moved: "Moved",
-      Deleted: "Deleted",
-      Packed: "Packed",
-      Delivered: "Delivered",
-    });
+describe("getEventDisplayLabel", () => {
+  it("returns a string for each known activity type", () => {
+    const types = ["Created", "Updated", "Moved", "Deleted", "Packed", "Delivered"] as const;
+    for (const type of types) {
+      expect(typeof getEventDisplayLabel(type)).toBe("string");
+    }
   });
 
-  it("has exactly 6 keys", () => {
-    expect(Object.keys(EVENT_DISPLAY_LABEL)).toHaveLength(6);
+  it("falls back to the raw type for unknown values", () => {
+    expect(getEventDisplayLabel("Unknown" as never)).toBe("Unknown");
   });
 });
 

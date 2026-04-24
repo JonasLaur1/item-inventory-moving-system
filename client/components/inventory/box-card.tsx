@@ -4,6 +4,7 @@ import { MetaPill } from "@/components/ui/meta-pill";
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 
 export type InventoryBoxStatus = "Packed" | "Not packed" | "Delivered" | "Unpacked";
@@ -26,6 +27,7 @@ type BoxCardProps = {
 };
 
 export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxCardProps) {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const palette = Colors[resolvedTheme];
 
@@ -43,7 +45,7 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
       </View>
 
       <View className="mt-4 flex-row flex-wrap gap-2">
-        <MetaPill icon="archive" text={`${box.itemsCount} items`} />
+        <MetaPill icon="archive" text={t("inventory.itemsCount", { count: box.itemsCount })} />
         <MetaPill icon="clock" text={box.updatedAt} />
       </View>
 
@@ -56,7 +58,7 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
           className="flex-1 flex-row items-center justify-center gap-1.5 rounded-control border border-border-default bg-bg-input/60 py-3"
         >
           <Feather name="eye" size={13} color={palette.textSecondary} />
-          <Text className="text-xs font-semibold text-text-secondary">Open</Text>
+          <Text className="text-xs font-semibold text-text-secondary">{t("common.open")}</Text>
         </Pressable>
         <Pressable
           onPress={onPressEdit ? () => onPressEdit(box) : undefined}
@@ -66,7 +68,7 @@ export function BoxCard({ box, compact = false, onPressOpen, onPressEdit }: BoxC
           className="flex-1 flex-row items-center justify-center gap-1.5 rounded-control border border-border-default bg-bg-input/60 py-3"
         >
           <Feather name="edit-2" size={13} color={palette.textSecondary} />
-          <Text className="text-xs font-semibold text-text-secondary">Edit</Text>
+          <Text className="text-xs font-semibold text-text-secondary">{t("common.edit")}</Text>
         </Pressable>
       </View>
     </View>

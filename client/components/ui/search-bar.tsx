@@ -1,6 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { TextInput, type TextInputProps, View } from "react-native";
 
 type SearchBarProps = TextInputProps & {
@@ -11,11 +12,12 @@ type SearchBarProps = TextInputProps & {
 export function SearchBar({
   containerClassName = "",
   inputClassName = "",
-  placeholder = "Search",
+  placeholder,
   placeholderTextColor,
   selectionColor,
   ...props
 }: SearchBarProps) {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const palette = Colors[resolvedTheme];
 
@@ -26,7 +28,7 @@ export function SearchBar({
       <Feather name="search" size={16} color={palette.textSecondary} />
       <TextInput
         className={`ml-3 flex-1 text-sm text-text-primary ${inputClassName}`}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("common.search")}
         placeholderTextColor={placeholderTextColor ?? palette.textSecondary}
         selectionColor={selectionColor ?? palette.primary}
         {...props}

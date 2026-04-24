@@ -10,6 +10,7 @@ import { type CollaboratorEntry } from "@/lib/collaborator.service";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,6 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LocationSettingsScreen() {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
 
@@ -57,7 +59,7 @@ export default function LocationSettingsScreen() {
   const handleAdd = useCallback(async () => {
     const trimmed = emailInput.trim();
     if (!trimmed || !trimmed.includes("@")) {
-      setAddError("Enter a valid email address.");
+      setAddError(t("locationSettings.invalidEmail"));
       return;
     }
 
@@ -68,9 +70,9 @@ export default function LocationSettingsScreen() {
       await addByEmail(trimmed);
       setEmailInput("");
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : "Failed to add collaborator.");
+      setAddError(error instanceof Error ? error.message : t("locationSettings.failedAdd"));
     }
-  }, [addByEmail, emailInput]);
+  }, [addByEmail, emailInput, t]);
 
   const openRemoveModal = useCallback((collaborator: CollaboratorEntry) => {
     setRemoveError(null);
@@ -91,19 +93,19 @@ export default function LocationSettingsScreen() {
       await remove(collaboratorToRemove.collaboratorId);
       setCollaboratorToRemove(null);
     } catch (error) {
-      setRemoveError(error instanceof Error ? error.message : "Failed to remove collaborator.");
+      setRemoveError(error instanceof Error ? error.message : t("locationSettings.failedRemove"));
     }
-  }, [collaboratorToRemove, remove]);
+  }, [collaboratorToRemove, remove, t]);
 
   const renderCollaborator = useCallback(
     ({ item }: { item: CollaboratorEntry }) => (
       <View className="mb-3 flex-row items-center justify-between rounded-card border border-border-default bg-bg-elevated px-4 py-3.5">
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-primary">
-            {item.displayName ?? "BoxIt user"}
+            {item.displayName ?? t("locationSettings.defaultUser")}
           </Text>
           <Text className="mt-0.5 text-xs text-text-tertiary">
-            Added {new Date(item.addedAt).toLocaleDateString()}
+            {t("locationSettings.added", { date: new Date(item.addedAt).toLocaleDateString() })}
           </Text>
         </View>
         <Pressable
@@ -116,7 +118,7 @@ export default function LocationSettingsScreen() {
         </Pressable>
       </View>
     ),
-    [isRemoving, openRemoveModal, themeColors.crimson],
+    [isRemoving, openRemoveModal, t, themeColors.crimson],
   );
 
   return (
@@ -131,7 +133,9 @@ export default function LocationSettingsScreen() {
             <Feather name="arrow-left" size={18} color={themeColors.textPrimary} />
           </Pressable>
           <View className="items-center">
-            <Text className="text-base font-semibold text-text-primary">Location Settings</Text>
+            <Text className="text-base font-semibold text-text-primary">
+              {t("locationSettings.title")}
+            </Text>
             {locationName ? (
               <Text className="text-xs text-text-tertiary">{locationName}</Text>
             ) : null}
@@ -143,7 +147,7 @@ export default function LocationSettingsScreen() {
           <RetryErrorCard
             message={errorMessage}
             isRetrying={isRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => {
               clearError();
               void refresh();
@@ -168,21 +172,21 @@ export default function LocationSettingsScreen() {
             ListHeaderComponent={
               <View className="mb-5">
                 <Text className="mb-3 text-sm font-semibold text-text-secondary">
-                  People with access
+                  {t("locationSettings.peopleWithAccess")}
                 </Text>
               </View>
             }
             ListEmptyComponent={
               <EmptyStateCard
-                title="No collaborators yet"
-                description="Add someone below to give them access to this location."
+                title={t("locationSettings.noCollaborators")}
+                description={t("locationSettings.noCollaboratorsDesc")}
                 containerClassName="mb-6"
               />
             }
             ListFooterComponent={
               <View className="mt-2">
                 <Text className="mb-3 text-sm font-semibold text-text-secondary">
-                  Add collaborator
+                  {t("locationSettings.addCollaborator")}
                 </Text>
                 <FormInput
                   value={emailInput}
@@ -190,7 +194,7 @@ export default function LocationSettingsScreen() {
                     setEmailInput(text);
                     setAddError(null);
                   }}
-                  placeholder="Email address"
+                  placeholder={t("locationSettings.emailPlaceholder")}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
@@ -200,7 +204,7 @@ export default function LocationSettingsScreen() {
                   <Text className="mt-2 text-xs text-crimson">{addError}</Text>
                 ) : null}
                 <Button
-                  label={isAdding ? "Adding..." : "Add"}
+                  label={isAdding ? t("common.adding") : t("common.add")}
                   onPress={() => void handleAdd()}
                   disabled={isAdding}
                   className={`${addError ? "mt-3" : "mt-4"}`}
@@ -214,11 +218,13 @@ export default function LocationSettingsScreen() {
 
       <AppModal
         visible={collaboratorToRemove !== null}
-        title="Remove collaborator?"
+        title={t("locationSettings.removeCollaborator")}
         description={
           collaboratorToRemove
-            ? `Remove ${collaboratorToRemove.displayName ?? "this user"} from this location? They will lose access immediately.`
-            : "Remove this collaborator?"
+            ? t("locationSettings.removeCollaboratorDesc", {
+                name: collaboratorToRemove.displayName ?? t("locationSettings.defaultUser"),
+              })
+            : t("locationSettings.removeCollaboratorFallback")
         }
         onRequestClose={closeRemoveModal}
         maxWidth={420}
@@ -227,14 +233,14 @@ export default function LocationSettingsScreen() {
 
         <View className={`${removeError ? "mt-4" : ""} flex-row gap-3`}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             onPress={closeRemoveModal}
             disabled={isRemoving}
             className="flex-1"
           />
           <Button
-            label={isRemoving ? "Removing..." : "Remove"}
+            label={isRemoving ? t("common.removing") : t("common.remove")}
             variant="secondary"
             onPress={() => void confirmRemove()}
             disabled={isRemoving}

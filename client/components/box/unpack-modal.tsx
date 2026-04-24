@@ -1,5 +1,6 @@
 import { Button } from "@/components/button";
 import { AppModal } from "@/components/ui/app-modal";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 type UnpackModalProps = {
@@ -11,21 +12,22 @@ type UnpackModalProps = {
 };
 
 export function UnpackModal({ visible, isLoading, error, onConfirm, onClose }: UnpackModalProps) {
+  const { t } = useTranslation();
   return (
     <AppModal
       visible={visible}
-      title="Mark as Unpacked?"
-      description="Mark this box as unpacked at its destination? This completes the delivery lifecycle for this box."
+      title={t("modals.unpackTitle")}
+      description={t("modals.unpackDesc")}
       onRequestClose={onClose}
     >
       {error ? <Text className="mb-3 text-sm text-crimson">{error}</Text> : null}
       <View className="gap-3">
         <Button
-          label={isLoading ? "Updating..." : "Confirm"}
+          label={isLoading ? t("common.saving") : t("common.confirm")}
           onPress={onConfirm}
           disabled={isLoading}
         />
-        <Button label="Cancel" variant="secondary" onPress={onClose} disabled={isLoading} />
+        <Button label={t("common.cancel")} variant="secondary" onPress={onClose} disabled={isLoading} />
       </View>
     </AppModal>
   );

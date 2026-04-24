@@ -21,15 +21,17 @@ import { useMovingMode } from "@/hooks/use-moving-mode";
 import { boxService, type BoxDetails, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
 import { roomService, type RoomSummary } from "@/lib/room.service";
-import { formatStatusLabel, formatUpdatedAt, mapItemToRow } from "@/utils/box-detail-utils";
+import { formatUpdatedAt, mapItemToRow } from "@/utils/box-detail-utils";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function BoxDetailsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { height: windowHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ id?: string | string[]; edit?: string | string[]; delivery?: string | string[] }>();
@@ -79,7 +81,7 @@ export default function BoxDetailsScreen() {
   const loadBox = useCallback(
     async (refresh: boolean) => {
       if (!boxId) {
-        setErrorMessage("Box id is missing.");
+        setErrorMessage(t("boxDetail.missingId"));
         setBox(null);
         setRooms([]);
         setAvailableBoxes([]);
@@ -105,7 +107,7 @@ export default function BoxDetailsScreen() {
         setAvailableBoxes(boxList);
         setErrorMessage(null);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load box.");
+        setErrorMessage(error instanceof Error ? error.message : t("boxDetail.failedLoad"));
       } finally {
         if (refresh) {
           setIsRefreshing(false);
@@ -114,7 +116,7 @@ export default function BoxDetailsScreen() {
         }
       }
     },
-    [boxId],
+    [boxId, t],
   );
 
   const refresh = useCallback(() => loadBox(true), [loadBox]);
@@ -164,11 +166,11 @@ export default function BoxDetailsScreen() {
       await refresh();
       setIsUnpackModalOpen(true);
     } catch {
-      setDeliveryError("Failed to mark as delivered. Please try again.");
+      setDeliveryError(t("boxDetail.failedMarkDelivered"));
     } finally {
       setIsMarkingDelivered(false);
     }
-  }, [boxId, toLocationId, refresh]);
+  }, [boxId, toLocationId, refresh, t]);
 
   const handleUnpackItem = useCallback(async (itemId: string) => {
     if (!box) return;
@@ -199,11 +201,20 @@ export default function BoxDetailsScreen() {
       setIsUnpackModalOpen(false);
       void refresh();
     } catch {
-      setUnpackError("Failed to update box status. Please try again.");
+      setUnpackError(t("boxDetail.failedUpdateStatus"));
     } finally {
       setIsMarkingUnpacked(false);
     }
-  }, [boxId, refresh]);
+  }, [boxId, refresh, t]);
+
+  const getStatusLabel = useCallback((status: string): string => {
+    switch (status) {
+      case "packed": return t("inventory.packed");
+      case "delivered": return t("inventory.delivered");
+      case "unpacked_at_destination": return t("inventory.unpacked");
+      default: return t("inventory.notPacked");
+    }
+  }, [t]);
 
   if (isLoading && !box) {
     return (
@@ -214,6 +225,8 @@ export default function BoxDetailsScreen() {
       </SafeAreaView>
     );
   }
+
+  const unknownLabel = t("common.unknown");
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
@@ -230,7 +243,7 @@ export default function BoxDetailsScreen() {
           >
             <Feather name="arrow-left" size={18} color={Colors.dark.textPrimary} />
           </Pressable>
-          <Text className="text-base font-semibold text-text-primary">Box Details</Text>
+          <Text className="text-base font-semibold text-text-primary">{t("boxDetail.title")}</Text>
           <View className="h-10 w-10" />
         </View>
 
@@ -238,7 +251,7 @@ export default function BoxDetailsScreen() {
           <RetryErrorCard
             message={errorMessage}
             isRetrying={isRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => void loadBox(true)}
             className="mt-6"
           />
@@ -311,7 +324,7 @@ export default function BoxDetailsScreen() {
                           : "text-crimson"
                     }`}
                   >
-                    {formatStatusLabel(box.status)}
+                    {getStatusLabel(box.status)}
                   </Text>
                 </View>
                 <View
@@ -324,16 +337,16 @@ export default function BoxDetailsScreen() {
                       box.isFragile ? "text-amber-300" : "text-slate-300"
                     }`}
                   >
-                    {box.isFragile ? "Fragile" : "Not fragile"}
+                    {box.isFragile ? t("boxDetail.fragile") : t("boxDetail.notFragile")}
                   </Text>
                 </View>
-                <MetaPill icon="clock" text={`Updated ${formatUpdatedAt(box.updatedAt)}`} />
+                <MetaPill icon="clock" text={t("boxDetail.updatedAt", { time: formatUpdatedAt(box.updatedAt, unknownLabel) })} />
               </View>
 
               {box.status === "delivered" ? (
                 <View className="mt-4">
                   <Button
-                    label="Mark as Unpacked"
+                    label={t("boxDetail.markAsUnpacked")}
                     variant="secondary"
                     onPress={() => setIsUnpackModalOpen(true)}
                   />
@@ -342,13 +355,13 @@ export default function BoxDetailsScreen() {
             </View>
 
             <View className="mt-6">
-              <MetricCard label="Items" value={String(box.itemsCount)} style={{ width: "100%" }} />
+              <MetricCard label={t("boxDetail.items")} value={String(box.itemsCount)} style={{ width: "100%" }} />
             </View>
 
             <View className="mt-6">
               <SectionHeader
-                title="Items in this box"
-                actionLabel="Add Item"
+                title={t("boxDetail.itemsInBox")}
+                actionLabel={t("boxDetail.addItem")}
                 onPressAction={itemModal.openCreateItemModal}
               />
               <View className="mt-3 gap-3">
@@ -371,7 +384,10 @@ export default function BoxDetailsScreen() {
                     ),
                   )
                 ) : (
-                  <EmptyStateCard title="No items yet" description="Add your first item to this box." />
+                  <EmptyStateCard
+                    title={t("boxDetail.noItemsYet")}
+                    description={t("boxDetail.noItemsYetDesc")}
+                  />
                 )}
               </View>
             </View>
@@ -460,11 +476,11 @@ export default function BoxDetailsScreen() {
 
       <DeleteConfirmationModal
         visible={itemModal.isDeleteItemModalOpen}
-        title="Delete item?"
+        title={t("boxDetail.deleteItem")}
         description={
           itemModal.itemPendingDelete
-            ? `Delete "${itemModal.itemPendingDelete.name}" permanently.`
-            : "Delete this item permanently."
+            ? t("boxDetail.deleteItemDesc", { name: itemModal.itemPendingDelete.name })
+            : t("boxDetail.deleteItemFallback")
         }
         isDeleting={itemModal.isDeletingItem}
         error={itemModal.deleteItemError}
@@ -474,11 +490,11 @@ export default function BoxDetailsScreen() {
 
       <DeleteConfirmationModal
         visible={boxModal.isDeleteModalOpen}
-        title="Delete box?"
+        title={t("boxDetail.deleteBox")}
         description={
           box
-            ? `Delete "${box.name}" permanently. Deletion is blocked if the box still has items.`
-            : "Delete this box permanently."
+            ? t("boxDetail.deleteBoxDesc", { name: box.name })
+            : t("boxDetail.deleteBoxFallback")
         }
         isDeleting={boxModal.isDeleting}
         error={boxModal.deleteError}

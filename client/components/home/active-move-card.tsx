@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { type LocationSummary } from "@/lib/location.service";
+import { useTranslation } from "react-i18next";
 
 type ActiveMoveCardProps = {
   fromLocation: LocationSummary;
@@ -11,6 +12,7 @@ type ActiveMoveCardProps = {
 };
 
 export function ActiveMoveCard({ fromLocation, toLocation, onPress }: ActiveMoveCardProps) {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const iconColor = Colors[resolvedTheme].textTertiary;
 
@@ -47,7 +49,9 @@ export function ActiveMoveCard({ fromLocation, toLocation, onPress }: ActiveMove
       </View>
 
       <Text className="mt-2 text-xs text-text-tertiary">
-        {delivered === total && total > 0 ? "All boxes delivered" : `${delivered} of ${total} boxes delivered`}
+        {delivered === total && total > 0
+          ? t("home.allBoxesDelivered")
+          : t("home.boxesDelivered", { delivered, total })}
       </Text>
     </Pressable>
   );

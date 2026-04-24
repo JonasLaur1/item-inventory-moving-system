@@ -9,9 +9,9 @@ export const editableStatuses: { label: string; value: EditableStatus }[] = [
   { label: "Not packed", value: "unpacked" },
 ];
 
-export function formatUpdatedAt(isoDate: string | null): string {
+export function formatUpdatedAt(isoDate: string | null, unknownLabel = "Unknown"): string {
   if (!isoDate) {
-    return "Unknown";
+    return unknownLabel;
   }
 
   return formatRelativeTime(getMinutesAgo(isoDate, Date.now()));

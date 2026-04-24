@@ -11,6 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -52,6 +53,7 @@ function parseQuantity(value: string): number | null {
 }
 
 export default function AddItemScreen() {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
 
@@ -147,18 +149,18 @@ export default function AddItemScreen() {
   const handleSubmit = useCallback(async () => {
     const normalizedName = name.trim();
     if (!normalizedName) {
-      setError("Item name is required.");
+      setError(t("addItem.itemNameRequired"));
       return;
     }
 
     const parsedQuantity = parseQuantity(quantity);
     if (!parsedQuantity) {
-      setError("Quantity must be a whole number greater than 0.");
+      setError(t("addItem.quantityInvalid"));
       return;
     }
 
     if (!selectedBoxId) {
-      setError("Box is required.");
+      setError(t("addItem.boxRequired"));
       return;
     }
 
@@ -184,16 +186,16 @@ export default function AddItemScreen() {
 
       router.replace("/(tabs)/inventory");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create item.";
+      const message = err instanceof Error ? err.message : t("addItem.failedCreateItem");
       setError(message);
       setIsSubmitting(false);
     }
-  }, [name, quantity, isFragile, notes, selectedBoxId, capturedPhotoBase64]);
+  }, [name, quantity, isFragile, notes, selectedBoxId, capturedPhotoBase64, t]);
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-bg-base">
       <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
-        <Text className="text-2xl font-bold text-text-primary">Add Item</Text>
+        <Text className="text-2xl font-bold text-text-primary">{t("addItem.title")}</Text>
         <Pressable
           onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
           className="h-10 w-10 items-center justify-center rounded-card border border-border-strong bg-bg-input"
@@ -216,12 +218,12 @@ export default function AddItemScreen() {
               contentFit="cover"
             />
             <View className="flex-1">
-              <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.photoAttached")}</Text>
               {isAiSuggested ? (
-                <Text className="mt-0.5 text-xs text-primary">AI suggestion applied</Text>
+                <Text className="mt-0.5 text-xs text-primary">{t("addItem.aiSuggestionApplied")}</Text>
               ) : (
                 <Text className="mt-0.5 text-xs text-text-tertiary">
-                  Will be saved with item
+                  {t("addItem.willBeSaved")}
                 </Text>
               )}
             </View>
@@ -244,9 +246,9 @@ export default function AddItemScreen() {
               <Feather name="camera" size={16} color={palette.primary} />
             </View>
             <View className="flex-1">
-              <Text className="text-sm font-semibold text-text-primary">Take Photo</Text>
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.takePhoto")}</Text>
               <Text className="mt-0.5 text-xs text-text-tertiary">
-                AI will identify the item for you
+                {t("addItem.aiWillIdentify")}
               </Text>
             </View>
             <Feather name="chevron-right" size={16} color={palette.textTertiary} />
@@ -257,14 +259,14 @@ export default function AddItemScreen() {
           <FormInput
             value={name}
             onChangeText={handleNameChange}
-            placeholder="Item name"
+            placeholder={t("addItem.itemName")}
             autoCapitalize="sentences"
             autoCorrect={false}
             editable={!isSubmitting}
             maxLength={120}
           />
           {isAiSuggested ? (
-            <Text className="mt-1 text-xs text-primary">AI suggested</Text>
+            <Text className="mt-1 text-xs text-primary">{t("addItem.aiSuggested")}</Text>
           ) : null}
         </View>
 
@@ -272,7 +274,7 @@ export default function AddItemScreen() {
           <FormInput
             value={quantity}
             onChangeText={setQuantity}
-            placeholder="Quantity"
+            placeholder={t("addItem.quantity")}
             keyboardType="number-pad"
             editable={!isSubmitting}
             maxLength={4}
@@ -283,7 +285,7 @@ export default function AddItemScreen() {
           <FormInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Notes (optional)"
+            placeholder={t("addItem.notesOptional")}
             autoCapitalize="sentences"
             editable={!isSubmitting}
             multiline
@@ -295,7 +297,7 @@ export default function AddItemScreen() {
         </View>
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Fragility</Text>
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.fragility")}</Text>
           <View className="mt-2 flex-row gap-2">
             <Pressable
               onPress={() => setIsFragile(false)}
@@ -306,7 +308,7 @@ export default function AddItemScreen() {
                   : "border-border-default bg-bg-input/60"
               }`}
             >
-              <Text className="text-sm font-semibold text-text-primary">Not fragile</Text>
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.notFragile")}</Text>
             </Pressable>
             <Pressable
               onPress={() => setIsFragile(true)}
@@ -317,14 +319,14 @@ export default function AddItemScreen() {
                   : "border-border-default bg-bg-input/60"
               }`}
             >
-              <Text className="text-sm font-semibold text-text-primary">Fragile</Text>
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.fragile")}</Text>
             </Pressable>
           </View>
         </View>
 
         <View className="mt-4">
           <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
+            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.box")}</Text>
             {hasLocationContext && !showAllBoxes && (
               <View className="flex-row items-center gap-2">
                 <View className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-2.5 py-1">
@@ -337,7 +339,7 @@ export default function AddItemScreen() {
                   onPress={() => setShowAllBoxes(true)}
                   className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1"
                 >
-                  <Text className="text-xs font-semibold text-primary">Show more</Text>
+                  <Text className="text-xs font-semibold text-primary">{t("addItem.showMore")}</Text>
                   <Feather name="chevron-down" size={11} color={palette.primary} />
                 </Pressable>
               </View>
@@ -347,34 +349,34 @@ export default function AddItemScreen() {
                 onPress={() => setShowAllBoxes(false)}
                 className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-3 py-1"
               >
-                <Text className="text-xs font-semibold text-text-secondary">Show less</Text>
+                <Text className="text-xs font-semibold text-text-secondary">{t("addItem.showLess")}</Text>
                 <Feather name="chevron-up" size={11} color={palette.textSecondary} />
               </Pressable>
             )}
           </View>
           <View className="gap-4">
             {isBoxesLoading ? (
-              <Text className="text-xs text-text-tertiary">Loading boxes...</Text>
+              <Text className="text-xs text-text-tertiary">{t("addItem.loadingBoxes")}</Text>
             ) : boxes.length === 0 ? (
               <Text className="text-xs text-text-tertiary">
-                No boxes found. Create a box first before adding items.
+                {t("addItem.noBoxesCreate")}
               </Text>
             ) : noBoxesInFilter ? (
               <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
                 <View className="flex-row items-center gap-2 mb-2">
                   <Feather name="alert-circle" size={15} color={palette.textSecondary} />
                   <Text className="text-sm font-semibold text-text-secondary">
-                    No boxes in this {hasRoomContext ? "room" : "location"}
+                    {hasRoomContext ? t("addItem.noBoxesInRoom") : t("addItem.noBoxesInLocation")}
                   </Text>
                 </View>
                 <Text className="text-xs text-text-tertiary mb-3">
-                  Create a box here first, or pick from another location.
+                  {t("addItem.createBoxFirst")}
                 </Text>
                 <Pressable
                   onPress={() => setShowAllBoxes(true)}
                   className="flex-row items-center gap-1 self-start rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5"
                 >
-                  <Text className="text-xs font-semibold text-primary">Show all boxes</Text>
+                  <Text className="text-xs font-semibold text-primary">{t("addItem.showAllBoxes")}</Text>
                   <Feather name="chevron-down" size={11} color={palette.primary} />
                 </Pressable>
               </View>
@@ -424,14 +426,14 @@ export default function AddItemScreen() {
 
         <View className={`${error ? "mt-4" : "mt-6"} flex-row gap-3`}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
             disabled={isSubmitting}
             className="flex-1"
           />
           <Button
-            label={isSubmitting ? "Creating..." : "Create"}
+            label={isSubmitting ? t("common.creating") : t("common.create")}
             onPress={() => void handleSubmit()}
             disabled={isSubmitting || boxes.length === 0 || noBoxesInFilter}
             className="flex-1"

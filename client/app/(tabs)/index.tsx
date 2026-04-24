@@ -15,11 +15,13 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshControl, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
-import { getEventTone } from "@/utils/activity-tone";
+import { getEventTone, getTranslatedActivityText } from "@/utils/activity-tone";
 
 
 export default function HomeTabScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [isStartMovingModalOpen, setIsStartMovingModalOpen] = useState(false);
   const { isMovingActive, fromLocationId, toLocationId, fromLocationName, toLocationName, startMoving, stopMoving } = useMovingMode();
@@ -100,10 +102,11 @@ export default function HomeTabScreen() {
 
       return recentEvents.map((event) => {
         const minutesAgo = getMinutesAgo(event.occurredAt, nowMs);
+        const { title, description } = getTranslatedActivityText(event);
         return {
           id: event.id,
-          title: event.title,
-          subtitle: event.description,
+          title,
+          subtitle: description,
           rightLabel: formatRelativeTime(minutesAgo),
           icon: getEventTone(event.type).icon,
           isCollaborator: !event.isOwnEvent,
@@ -135,7 +138,7 @@ export default function HomeTabScreen() {
 
         {hasMultipleLocations ? (
           <Button
-            label={isMovingActive ? "Stop Moving" : "Start Moving"}
+            label={isMovingActive ? t("home.stopMoving") : t("home.startMoving")}
             variant={isMovingActive ? "secondary" : "primary"}
             onPress={() => void (isMovingActive ? handleStopMovingPress() : setIsStartMovingModalOpen(true))}
           />
@@ -143,12 +146,12 @@ export default function HomeTabScreen() {
       </View>
 
       <View className="mt-10">
-        <SectionHeader title="Recent Activity" />
+        <SectionHeader title={t("home.recentActivity")} />
         {activityErrorMessage ? (
           <RetryErrorCard
             message={activityErrorMessage}
             isRetrying={isActivityRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => {
               clearActivityError();
               void refreshActivity();
@@ -159,8 +162,8 @@ export default function HomeTabScreen() {
         <View className="mt-4 gap-3">
           {isActivityLoading ? (
             <EmptyStateCard
-              title="Loading activity…"
-              description="Fetching your latest activity."
+              title={t("home.loadingActivity")}
+              description={t("home.fetchingActivity")}
             />
           ) : recentActivityRows.length > 0 ? (
             recentActivityRows.map((activity) => (
@@ -168,8 +171,8 @@ export default function HomeTabScreen() {
             ))
           ) : (
             <EmptyStateCard
-              title="No activity yet"
-              description="Your latest inventory actions will appear here."
+              title={t("home.noActivity")}
+              description={t("home.noActivityDesc")}
             />
           )}
         </View>

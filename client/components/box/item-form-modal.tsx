@@ -5,6 +5,7 @@ import { Colors } from "@/constants/theme";
 import { type BoxDetails, type BoxSummary } from "@/lib/box.service";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 type ItemFormModalProps = {
@@ -70,13 +71,14 @@ export function ItemFormModal({
   onCloseBoxPicker,
   onSelectBox,
 }: ItemFormModalProps) {
+  const { t } = useTranslation();
   return (
     <>
       <AppModal
         visible={visible}
-        title={mode === "create" ? "Add item" : "Edit item"}
+        title={mode === "create" ? t("modals.addItemTitle") : t("modals.editItemTitle")}
         description={
-          mode === "create" ? "Create a new item for this box." : "Update item details and assigned box."
+          mode === "create" ? t("modals.addItemDesc") : t("modals.editItemDesc")
         }
         onRequestClose={onClose}
         maxWidth={420}
@@ -94,11 +96,11 @@ export function ItemFormModal({
                 contentFit="cover"
               />
               <View className="flex-1">
-                <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("addItem.photoAttached")}</Text>
                 {isNameAiSuggested ? (
-                  <Text className="mt-0.5 text-xs text-primary">AI suggestion applied</Text>
+                  <Text className="mt-0.5 text-xs text-primary">{t("addItem.aiSuggestionApplied")}</Text>
                 ) : (
-                  <Text className="mt-0.5 text-xs text-text-tertiary">Will be saved with item</Text>
+                  <Text className="mt-0.5 text-xs text-text-tertiary">{t("addItem.willBeSaved")}</Text>
                 )}
               </View>
               <Pressable
@@ -118,9 +120,9 @@ export function ItemFormModal({
                 contentFit="cover"
               />
               <View className="flex-1">
-                <Text className="text-sm font-semibold text-text-primary">Photo attached</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("addItem.photoAttached")}</Text>
                 <Pressable hitSlop={8} onPress={onOpenCamera} disabled={isSaving}>
-                  <Text className="mt-0.5 text-xs text-primary">Tap to replace</Text>
+                  <Text className="mt-0.5 text-xs text-primary">{t("modals.tapToReplace")}</Text>
                 </Pressable>
               </View>
               <Pressable
@@ -142,9 +144,9 @@ export function ItemFormModal({
                 <Feather name="camera" size={16} color={Colors.dark.primary} />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-semibold text-text-primary">Take Photo</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("addItem.takePhoto")}</Text>
                 <Text className="mt-0.5 text-xs text-text-tertiary">
-                  {mode === "create" ? "AI will identify the item for you" : "Add a photo to this item"}
+                  {mode === "create" ? t("addItem.aiWillIdentify") : t("modals.addPhotoToItem")}
                 </Text>
               </View>
               <Feather name="chevron-right" size={16} color={Colors.dark.textTertiary} />
@@ -154,19 +156,19 @@ export function ItemFormModal({
           <FormInput
             value={name}
             onChangeText={onNameChange}
-            placeholder="Item name"
+            placeholder={t("addItem.itemName")}
             autoCapitalize="sentences"
             autoCorrect={false}
             editable={!isSaving}
             maxLength={120}
           />
-          {isNameAiSuggested ? <Text className="mt-1 text-xs text-primary">AI suggested</Text> : null}
+          {isNameAiSuggested ? <Text className="mt-1 text-xs text-primary">{t("addItem.aiSuggested")}</Text> : null}
 
           <View className="mt-4">
             <FormInput
               value={quantity}
               onChangeText={onQuantityChange}
-              placeholder="Quantity"
+              placeholder={t("addItem.quantity")}
               keyboardType="number-pad"
               editable={!isSaving}
               maxLength={4}
@@ -177,7 +179,7 @@ export function ItemFormModal({
             <FormInput
               value={notes}
               onChangeText={onNotesChange}
-              placeholder="Notes (optional)"
+              placeholder={t("addItem.notesOptional")}
               autoCapitalize="sentences"
               editable={!isSaving}
               multiline
@@ -189,7 +191,7 @@ export function ItemFormModal({
           </View>
 
           <View className="mt-4">
-            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Fragility</Text>
+            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.fragility")}</Text>
             <View className="mt-2 flex-row gap-2">
               <Pressable
                 onPress={() => onFragileChange(false)}
@@ -198,7 +200,7 @@ export function ItemFormModal({
                   !isFragile ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
                 }`}
               >
-                <Text className="text-sm font-semibold text-text-primary">Not fragile</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("addItem.notFragile")}</Text>
               </Pressable>
               <Pressable
                 onPress={() => onFragileChange(true)}
@@ -207,13 +209,13 @@ export function ItemFormModal({
                   isFragile ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
                 }`}
               >
-                <Text className="text-sm font-semibold text-text-primary">Fragile</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("addItem.fragile")}</Text>
               </Pressable>
             </View>
           </View>
 
           <View className="mt-4">
-            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Box</Text>
+            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.box")}</Text>
             <View className="mt-2">
               {mode === "create" && box ? (
                 <View className="rounded-control border border-primary bg-primary/15 px-3 py-2.5">
@@ -239,7 +241,7 @@ export function ItemFormModal({
                         </Text>
                       </>
                     ) : (
-                      <Text className="text-sm text-text-tertiary">Select a box...</Text>
+                      <Text className="text-sm text-text-tertiary">{t("modals.selectBox")}</Text>
                     )}
                   </View>
                   <Feather name="chevron-down" size={16} color={Colors.dark.textTertiary} />
@@ -253,14 +255,14 @@ export function ItemFormModal({
 
         <View className={`${error ? "mt-4" : "mt-5"} flex-row gap-3`}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             onPress={onClose}
             disabled={isSaving}
             className="flex-1"
           />
           <Button
-            label={isSaving ? "Saving..." : mode === "create" ? "Create" : "Save"}
+            label={isSaving ? t("common.saving") : mode === "create" ? t("common.create") : t("common.save")}
             onPress={onSave}
             disabled={isSaving}
             className="flex-1"
@@ -270,7 +272,7 @@ export function ItemFormModal({
 
       <AppModal
         visible={isBoxPickerOpen}
-        title="Select Box"
+        title={t("modals.selectBoxTitle")}
         onRequestClose={onCloseBoxPicker}
         closeOnBackdropPress
         showCornerClose
@@ -310,7 +312,7 @@ export function ItemFormModal({
                 </View>
               ))
           ) : (
-            <Text className="text-sm text-text-tertiary">No boxes available.</Text>
+            <Text className="text-sm text-text-tertiary">{t("modals.noBoxesAvailable")}</Text>
           )}
         </ScrollView>
       </AppModal>

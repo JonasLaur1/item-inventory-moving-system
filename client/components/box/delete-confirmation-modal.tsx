@@ -1,5 +1,6 @@
 import { Button } from "@/components/button";
 import { AppModal } from "@/components/ui/app-modal";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 type DeleteConfirmationModalProps = {
@@ -21,6 +22,7 @@ export function DeleteConfirmationModal({
   onClose,
   onConfirm,
 }: DeleteConfirmationModalProps) {
+  const { t } = useTranslation();
   return (
     <AppModal
       visible={visible}
@@ -33,14 +35,14 @@ export function DeleteConfirmationModal({
 
       <View className={`${error ? "mt-4" : ""} flex-row gap-3`}>
         <Button
-          label="Cancel"
+          label={t("common.cancel")}
           variant="secondary"
           onPress={onClose}
           disabled={isDeleting}
           className="flex-1"
         />
         <Button
-          label={isDeleting ? "Deleting..." : "Delete"}
+          label={isDeleting ? t("common.deleting") : t("common.delete")}
           variant="secondary"
           onPress={onConfirm}
           disabled={isDeleting}

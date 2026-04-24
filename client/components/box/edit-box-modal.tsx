@@ -6,6 +6,7 @@ import { type RoomSummary } from "@/lib/room.service";
 import { editableStatuses, type EditableStatus } from "@/utils/box-detail-utils";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useState } from "react";
 
@@ -38,6 +39,7 @@ export function EditBoxModal({
   onRoomChange,
   onStatusChange,
 }: EditBoxModalProps) {
+  const { t } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
   const { resolvedTheme } = useThemePreference();
   const colors = Colors[resolvedTheme];
@@ -60,15 +62,15 @@ export function EditBoxModal({
     <>
       <AppModal
         visible={visible}
-        title="Edit box"
-        description="Update box name, room, and status."
+        title={t("modals.editBoxTitle")}
+        description={t("modals.editBoxDesc")}
         onRequestClose={onClose}
         maxWidth={420}
       >
         <FormInput
           value={editedName}
           onChangeText={onNameChange}
-          placeholder="Box name"
+          placeholder={t("modals.boxNamePlaceholder")}
           autoCapitalize="words"
           autoCorrect={false}
           editable={!isSaving}
@@ -76,7 +78,7 @@ export function EditBoxModal({
         />
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("inventory.room")}</Text>
           <View className="mt-2">
             <Pressable
               onPress={() => setIsRoomPickerOpen(true)}
@@ -90,7 +92,7 @@ export function EditBoxModal({
                     <Text className="mt-0.5 text-xs text-text-tertiary">{selectedRoom.locationName}</Text>
                   </>
                 ) : (
-                  <Text className="text-sm text-text-tertiary">Select a room...</Text>
+                  <Text className="text-sm text-text-tertiary">{t("modals.selectRoom")}</Text>
                 )}
               </View>
               <Feather name="chevron-down" size={16} color={colors.textTertiary} />
@@ -99,7 +101,7 @@ export function EditBoxModal({
         </View>
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Status</Text>
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("inventory.status")}</Text>
           <View className="mt-2 flex-row gap-2">
             {editableStatuses.map((option) => {
               const isActive = option.value === editedStatus;
@@ -112,7 +114,9 @@ export function EditBoxModal({
                     isActive ? "border-primary bg-primary/15" : "border-border-default bg-bg-input/60"
                   }`}
                 >
-                  <Text className="text-sm font-semibold text-text-primary">{option.label}</Text>
+                  <Text className="text-sm font-semibold text-text-primary">
+                    {option.value === "packed" ? t("inventory.packed") : t("inventory.notPacked")}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -123,14 +127,14 @@ export function EditBoxModal({
 
         <View className={`${saveError ? "mt-4" : "mt-5"} flex-row gap-3`}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             onPress={onClose}
             disabled={isSaving}
             className="flex-1"
           />
           <Button
-            label={isSaving ? "Saving..." : "Save"}
+            label={isSaving ? t("common.saving") : t("common.save")}
             onPress={onSave}
             disabled={isSaving}
             className="flex-1"
@@ -140,7 +144,7 @@ export function EditBoxModal({
 
       <AppModal
         visible={isRoomPickerOpen}
-        title="Select Room"
+        title={t("modals.selectRoomTitle")}
         onRequestClose={() => setIsRoomPickerOpen(false)}
         closeOnBackdropPress
         showCornerClose
@@ -172,7 +176,7 @@ export function EditBoxModal({
               </View>
             ))
           ) : (
-            <Text className="text-sm text-text-tertiary">No rooms available.</Text>
+            <Text className="text-sm text-text-tertiary">{t("modals.noRoomsAvailable")}</Text>
           )}
         </ScrollView>
       </AppModal>

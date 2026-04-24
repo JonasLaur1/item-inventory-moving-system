@@ -4,22 +4,15 @@ import { FormInput } from "@/components/form-input";
 import { ColorPalettes } from "@/constants/theme";
 import { useProfile } from "@/hooks/use-profile";
 import { type ThemePreference, useThemePreference } from "@/hooks/use-theme-preference";
+import { useLanguage } from "@/hooks/use-language";
+import { SUPPORTED_LANGUAGES, type AppLanguage } from "@/lib/i18n";
 import { authService } from "@/lib/auth.service";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const THEME_OPTIONS: {
-  value: ThemePreference;
-  label: string;
-  icon: keyof typeof Feather.glyphMap;
-}[] = [
-  { value: "system", label: "Device", icon: "smartphone" },
-  { value: "light", label: "Light", icon: "sun" },
-  { value: "dark", label: "Dark", icon: "moon" },
-];
+import { useTranslation } from "react-i18next";
 
 function getInitials(displayName: string | null, email: string | null): string {
   if (displayName) {
@@ -32,10 +25,22 @@ function getInitials(displayName: string | null, email: string | null): string {
 }
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { themePreference, setThemePreference, resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
   const { profile, isLoading, isSaving, errorMessage, saveErrorMessage, updateDisplayName, clearSaveError } =
     useProfile();
+  const { language, changeLanguage } = useLanguage();
+
+  const THEME_OPTIONS: {
+    value: ThemePreference;
+    label: string;
+    icon: keyof typeof Feather.glyphMap;
+  }[] = [
+    { value: "system", label: t("profile.themeDevice"), icon: "smartphone" },
+    { value: "light", label: t("profile.themeLight"), icon: "sun" },
+    { value: "dark", label: t("profile.themeDark"), icon: "moon" },
+  ];
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
@@ -104,11 +109,11 @@ export default function ProfileScreen() {
     if (isChangingPassword) return;
 
     if (newPassword.length < 6) {
-      setPasswordErrorMessage("Password must be at least 6 characters.");
+      setPasswordErrorMessage(t("profile.passwordMin6"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordErrorMessage("Passwords do not match.");
+      setPasswordErrorMessage(t("profile.passwordsMismatch"));
       return;
     }
 
@@ -118,10 +123,16 @@ export default function ProfileScreen() {
       await authService.updatePassword(newPassword);
       closePasswordModal();
     } catch (error) {
-      setPasswordErrorMessage(error instanceof Error ? error.message : "Failed to update password");
+      setPasswordErrorMessage(error instanceof Error ? error.message : t("profile.failedUpdatePassword"));
     } finally {
       setIsChangingPassword(false);
     }
+  };
+
+  const getActiveModeName = () => {
+    if (themePreference === "system") return t("profile.themeDevice");
+    if (themePreference === "dark") return t("profile.themeDark");
+    return t("profile.themeLight");
   };
 
   return (
@@ -140,14 +151,14 @@ export default function ProfileScreen() {
           >
             <Feather name="arrow-left" size={18} color={palette.textPrimary} />
           </Pressable>
-          <Text className="text-lg font-semibold text-text-primary">Profile & Settings</Text>
+          <Text className="text-lg font-semibold text-text-primary">{t("profile.title")}</Text>
           <View className="h-10 w-10" />
         </View>
 
         {/* Account section */}
         <View className="mt-8 rounded-card border border-border-default bg-bg-elevated p-5">
-          <Text className="text-base font-semibold text-text-primary">Account</Text>
-          <Text className="mt-1 text-sm text-text-tertiary">Your personal details.</Text>
+          <Text className="text-base font-semibold text-text-primary">{t("profile.account")}</Text>
+          <Text className="mt-1 text-sm text-text-tertiary">{t("profile.accountDesc")}</Text>
 
           {isLoading ? (
             <ActivityIndicator size="small" color={palette.primary} className="mt-5 self-start" />
@@ -165,7 +176,7 @@ export default function ProfileScreen() {
               {/* Info */}
               <View className="flex-1">
                 <Text className="text-base font-semibold text-text-primary" numberOfLines={1}>
-                  {profile?.displayName ?? "No name set"}
+                  {profile?.displayName ?? t("profile.noNameSet")}
                 </Text>
                 <Text className="mt-0.5 text-sm text-text-tertiary" numberOfLines={1}>
                   {profile?.email ?? ""}
@@ -189,8 +200,8 @@ export default function ProfileScreen() {
               className="mt-4 flex-row items-center justify-between border-t border-border-default pt-4"
             >
               <View>
-                <Text className="text-sm font-semibold text-text-primary">Change Password</Text>
-                <Text className="mt-0.5 text-xs text-text-tertiary">Update your account password.</Text>
+                <Text className="text-sm font-semibold text-text-primary">{t("profile.changePassword")}</Text>
+                <Text className="mt-0.5 text-xs text-text-tertiary">{t("profile.changePasswordDesc")}</Text>
               </View>
               <Feather name="chevron-right" size={16} color={palette.textTertiary} />
             </Pressable>
@@ -199,10 +210,10 @@ export default function ProfileScreen() {
 
         {/* Preferences section */}
         <View className="mt-4 rounded-card border border-border-default bg-bg-elevated p-5">
-          <Text className="text-base font-semibold text-text-primary">Preferences</Text>
-          <Text className="mt-1 text-sm text-text-tertiary">Manage theme and app behavior.</Text>
+          <Text className="text-base font-semibold text-text-primary">{t("profile.preferences")}</Text>
+          <Text className="mt-1 text-sm text-text-tertiary">{t("profile.preferencesDesc")}</Text>
 
-          <Text className="mt-4 text-sm font-semibold text-text-primary">Theme</Text>
+          <Text className="mt-4 text-sm font-semibold text-text-primary">{t("profile.theme")}</Text>
           <View className="mt-3 flex-row gap-2">
             {THEME_OPTIONS.map((option) => {
               const isActive = themePreference === option.value;
@@ -231,9 +242,32 @@ export default function ProfileScreen() {
             })}
           </View>
           <Text className="mt-3 text-xs text-text-tertiary">
-            Active mode:{" "}
-            {themePreference === "system" ? "Device" : themePreference === "dark" ? "Dark" : "Light"}
+            {t("profile.activeMode", { mode: getActiveModeName() })}
           </Text>
+
+          <Text className="mt-5 text-sm font-semibold text-text-primary">{t("profile.language")}</Text>
+          <View className="mt-3 flex-row gap-2">
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const isActive = language === lang.value;
+              return (
+                <Pressable
+                  key={lang.value}
+                  onPress={() => void changeLanguage(lang.value as AppLanguage)}
+                  className={`flex-1 flex-row items-center justify-center gap-2 rounded-control border px-3 py-2.5 ${
+                    isActive ? "border-text-link bg-bg-input" : "border-border-default bg-bg-elevated"
+                  }`}
+                >
+                  <Text
+                    className={
+                      isActive ? "text-sm font-semibold text-text-link" : "text-sm font-semibold text-text-secondary"
+                    }
+                  >
+                    {lang.labelNative}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {themeErrorMessage ? (
@@ -246,7 +280,7 @@ export default function ProfileScreen() {
           <Text className="mb-3 text-sm text-red-400">{logoutErrorMessage}</Text>
         ) : null}
         <Button
-          label={isLoggingOut ? "Signing out..." : "Log Out"}
+          label={isLoggingOut ? t("profile.signingOut") : t("profile.logOut")}
           onPress={onLogout}
           disabled={isLoggingOut}
           rightIcon={<Feather name="log-out" size={16} color={palette.bgBase} />}
@@ -256,26 +290,26 @@ export default function ProfileScreen() {
       {/* Change password modal */}
       <AppModal
         visible={isPasswordModalVisible}
-        title="Change Password"
-        description="Enter a new password for your account."
+        title={t("profile.changePasswordTitle")}
+        description={t("profile.changePasswordModalDesc")}
         onRequestClose={closePasswordModal}
         closeOnBackdropPress
         showCornerClose
       >
         <FormInput
-          label="New password"
+          label={t("profile.newPassword")}
           value={newPassword}
           onChangeText={setNewPassword}
-          placeholder="At least 6 characters"
+          placeholder={t("profile.atLeast6Chars")}
           secureTextEntry
           autoFocus
           returnKeyType="next"
         />
         <FormInput
-          label="Confirm password"
+          label={t("profile.confirmPassword")}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          placeholder="Repeat new password"
+          placeholder={t("profile.repeatNewPassword")}
           secureTextEntry
           containerClassName="mt-4"
           returnKeyType="done"
@@ -286,14 +320,14 @@ export default function ProfileScreen() {
         ) : null}
         <View className="mt-4 flex-row gap-3">
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             className="flex-1"
             onPress={closePasswordModal}
             disabled={isChangingPassword}
           />
           <Button
-            label={isChangingPassword ? "Saving..." : "Save"}
+            label={isChangingPassword ? t("common.saving") : t("common.save")}
             className="flex-1"
             onPress={() => void handleChangePassword()}
             disabled={isChangingPassword || newPassword.length === 0}
@@ -304,17 +338,17 @@ export default function ProfileScreen() {
       {/* Edit display name modal */}
       <AppModal
         visible={isEditModalVisible}
-        title="Edit Display Name"
-        description="This is the name shown across the app."
+        title={t("profile.editDisplayName")}
+        description={t("profile.editDisplayNameDesc")}
         onRequestClose={closeEditModal}
         closeOnBackdropPress
         showCornerClose
       >
         <FormInput
-          label="Display name"
+          label={t("profile.displayName")}
           value={editName}
           onChangeText={setEditName}
-          placeholder="Enter your name"
+          placeholder={t("profile.enterYourName")}
           autoFocus
           returnKeyType="done"
           onSubmitEditing={() => void handleSaveName()}
@@ -324,14 +358,14 @@ export default function ProfileScreen() {
         ) : null}
         <View className="mt-4 flex-row gap-3">
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             className="flex-1"
             onPress={closeEditModal}
             disabled={isSaving}
           />
           <Button
-            label={isSaving ? "Saving..." : "Save"}
+            label={isSaving ? t("common.saving") : t("common.save")}
             className="flex-1"
             onPress={() => void handleSaveName()}
             disabled={isSaving || editName.trim().length === 0}

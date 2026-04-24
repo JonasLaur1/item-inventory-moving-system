@@ -12,6 +12,9 @@ import { ColorPalettes } from "@/constants/theme";
 import { ThemePreferenceProvider, useThemePreference } from "@/hooks/use-theme-preference";
 import { MovingModeProvider } from "@/hooks/use-moving-mode";
 import { authService } from "@/lib/auth.service";
+import "@/lib/i18n";
+import i18n from "@/lib/i18n";
+import { loadSavedLanguage } from "@/hooks/use-language";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
 const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "location", "room", "box"]);
@@ -48,8 +51,18 @@ const themeVars = {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(MaterialCommunityIcons.font);
+  const [isI18nReady, setIsI18nReady] = useState(false);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    loadSavedLanguage().then((saved) => {
+      if (saved) {
+        void i18n.changeLanguage(saved);
+      }
+      setIsI18nReady(true);
+    });
+  }, []);
+
+  if (!fontsLoaded || !isI18nReady) {
     return null;
   }
 

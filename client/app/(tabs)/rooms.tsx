@@ -14,11 +14,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View, useWindowDimensions } from "react-native";
 
 const LOCATION_CARD_MIN_HEIGHT = 110;
 
 export default function RoomsTabScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
@@ -57,14 +59,14 @@ export default function RoomsTabScreen() {
         <RetryErrorCard
           message={errorMessage}
           isRetrying={isRefreshing}
-          retryingLabel="Refreshing..."
+          retryingLabel={t("common.refreshing")}
           onRetry={() => void refreshLocations()}
           className="mt-6"
         />
       ) : null}
 
       <View className="mt-6">
-        <SectionHeader title="Locations" />
+        <SectionHeader title={t("locations.title")} />
       </View>
 
       {isLoading && locations.length === 0 ? (
@@ -74,12 +76,12 @@ export default function RoomsTabScreen() {
       ) : locations.length === 0 ? (
         <>
           <EmptyStateCard
-            title="No locations yet"
-            description="Create your first location to start organizing your inventory."
+            title={t("locations.noLocationsYet")}
+            description={t("locations.noLocationsYetDesc")}
             containerClassName="mt-4"
           />
           <Button
-            label="Create Location"
+            label={t("locations.createLocation")}
             onPress={() => setIsAddLocationModalOpen(true)}
             className="mt-4"
           />
@@ -111,7 +113,7 @@ export default function RoomsTabScreen() {
                   {loc.name}
                 </Text>
                 <Text className="mt-0.5 text-xs text-text-tertiary">
-                  {loc.rooms} room{loc.rooms !== 1 ? "s" : ""}
+                  {loc.rooms} {loc.rooms !== 1 ? t("locations.rooms") : t("locations.room")}
                 </Text>
               </View>
             </Pressable>
@@ -123,7 +125,7 @@ export default function RoomsTabScreen() {
               style={contentStyle}
             >
               <Feather name="plus" size={20} color={themeColors.primary} />
-              <Text className="mt-2 text-xs font-medium text-text-secondary">Add Location</Text>
+              <Text className="mt-2 text-xs font-medium text-text-secondary">{t("locations.addLocation")}</Text>
             </Pressable>
           )}
         />

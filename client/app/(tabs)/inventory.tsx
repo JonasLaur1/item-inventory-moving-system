@@ -24,20 +24,21 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 type StatusFilter = "All" | InventoryBoxStatus | "Fragile";
 type EditableStatus = "packed" | "unpacked";
 
 const statusFilters: StatusFilter[] = ["All", "Packed", "Not packed", "Fragile"];
-const editableStatuses: { label: string; value: EditableStatus }[] = [
-  { label: "Packed", value: "packed" },
-  { label: "Not packed", value: "unpacked" },
+const editableStatuses: { value: EditableStatus }[] = [
+  { value: "packed" },
+  { value: "unpacked" },
 ];
 
-function formatUpdatedAt(isoDate: string | null): string {
+function formatUpdatedAt(isoDate: string | null, unknownLabel: string): string {
   if (!isoDate) {
-    return "Unknown";
+    return unknownLabel;
   }
 
   return formatRelativeTime(getMinutesAgo(isoDate, Date.now()));
@@ -57,6 +58,7 @@ function mapBoxStatus(status: "packed" | "unpacked" | "delivered" | "unpacked_at
 }
 
 export default function InventoryTabScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ create?: string | string[]; locationName?: string; roomName?: string }>();
   const { width } = useWindowDimensions();
@@ -116,6 +118,7 @@ export default function InventoryTabScreen() {
 
   const availableRoomsForBox = useMemo(() => rooms, [rooms]);
 
+  const unknownLabel = t("common.unknown");
   const boxes: InventoryBox[] = useMemo(
     () =>
       summaryBoxes.map((box) => ({
@@ -125,9 +128,9 @@ export default function InventoryTabScreen() {
         itemsCount: box.itemsCount,
         isFragile: box.isFragile,
         status: mapBoxStatus(box.status),
-        updatedAt: formatUpdatedAt(box.updatedAt),
+        updatedAt: formatUpdatedAt(box.updatedAt, unknownLabel),
       })),
-    [summaryBoxes],
+    [summaryBoxes, unknownLabel],
   );
 
   useEffect(() => {
@@ -223,6 +226,25 @@ export default function InventoryTabScreen() {
 
   const STATUS_GROUP_ORDER: InventoryBoxStatus[] = ["Delivered", "Packed", "Not packed", "Unpacked"];
 
+  const statusFilterLabels = useMemo<Record<StatusFilter, string>>(() => ({
+    All: t("common.all"),
+    Packed: t("inventory.packed"),
+    "Not packed": t("inventory.notPacked"),
+    Fragile: t("inventory.fragile"),
+    Delivered: t("inventory.delivered"),
+    Unpacked: t("inventory.unpacked"),
+  }), [t]);
+
+  const getStatusLabel = useCallback((status: InventoryBoxStatus): string => {
+    switch (status) {
+      case "Packed": return t("inventory.packed");
+      case "Not packed": return t("inventory.notPacked");
+      case "Delivered": return t("inventory.delivered");
+      case "Unpacked": return t("inventory.unpacked");
+      default: return status;
+    }
+  }, [t]);
+
   const groupedByStatus = useMemo(() => {
     if (!isLocationFiltered) return null;
 
@@ -290,12 +312,12 @@ export default function InventoryTabScreen() {
     const normalizedName = newBoxName.trim();
 
     if (!normalizedName) {
-      setCreateBoxError("Box name is required.");
+      setCreateBoxError(t("inventory.boxNameRequired"));
       return;
     }
 
     if (!newBoxRoomId) {
-      setCreateBoxError("Room is required.");
+      setCreateBoxError(t("inventory.roomRequired"));
       return;
     }
 
@@ -317,7 +339,7 @@ export default function InventoryTabScreen() {
         return;
       }
 
-      setCreateBoxError("Failed to create box.");
+      setCreateBoxError(t("inventory.failedCreateBox"));
     }
   };
 
@@ -328,19 +350,19 @@ export default function InventoryTabScreen() {
           <RetryErrorCard
             message={locationErrorMessage}
             isRetrying={isLocationsRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => void refreshLocations()}
             className="mt-6"
           />
         ) : null}
 
         <EmptyStateCard
-          title="No locations yet"
-          description="Create your first location to start organizing rooms and boxes."
+          title={t("inventory.noLocationsYet")}
+          description={t("inventory.noLocationsYetDesc")}
           containerClassName="mt-6"
         />
         <Button
-          label="Create Location"
+          label={t("inventory.createLocation")}
           onPress={() => setIsCreateLocationModalOpen(true)}
           className="mt-4"
         />
@@ -362,7 +384,7 @@ export default function InventoryTabScreen() {
         <RetryErrorCard
           message={errorMessage}
           isRetrying={isRefreshing}
-          retryingLabel="Refreshing..."
+          retryingLabel={t("common.refreshing")}
           onRetry={() => void refreshBoxes()}
           className="mt-6"
         />
@@ -372,22 +394,22 @@ export default function InventoryTabScreen() {
         <>
           <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
             <MetricCard
-              label="Total Boxes"
+              label={t("inventory.totalBoxes")}
               value={String(filteredBoxes.length)}
               style={{ width: isNarrow ? "100%" : "48.5%" }}
             />
             <MetricCard
-              label="Packed"
+              label={t("inventory.packed")}
               value={String(packedCount)}
               style={{ width: isNarrow ? "100%" : "48.5%" }}
             />
             <MetricCard
-              label="Not packed"
+              label={t("inventory.notPacked")}
               value={String(unpackedCount)}
               style={{ width: isNarrow ? "100%" : "48.5%" }}
             />
             <MetricCard
-              label="Total Items"
+              label={t("inventory.totalItems")}
               value={String(totalItemsCount)}
               style={{ width: isNarrow ? "100%" : "48.5%" }}
             />
@@ -395,8 +417,8 @@ export default function InventoryTabScreen() {
 
           <View className="mt-6 flex-row">
             <QuickActionCard
-              title="Add Box"
-              subtitle="Create new box"
+              title={t("inventory.addBox")}
+              subtitle={t("inventory.createNewBox")}
               icon="plus"
               variant="secondary"
               onPress={openCreateModal}
@@ -410,7 +432,7 @@ export default function InventoryTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search boxes and items"
+          placeholder={t("inventory.searchPlaceholder")}
           containerClassName="flex-1"
         />
         <Pressable
@@ -439,7 +461,7 @@ export default function InventoryTabScreen() {
       {isFilterOpen && !isSearchActive ? (
         <View className="mt-3 rounded-card border border-border-default bg-bg-elevated/80 p-4">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-semibold text-text-primary">Filters</Text>
+            <Text className="text-sm font-semibold text-text-primary">{t("inventory.filters")}</Text>
             <Pressable
               onPress={() => {
                 setActiveStatus("All");
@@ -447,34 +469,37 @@ export default function InventoryTabScreen() {
                 setActiveRoomFilter("All");
               }}
             >
-              <Text className="text-xs font-semibold text-text-link">Clear</Text>
+              <Text className="text-xs font-semibold text-text-link">{t("common.clear")}</Text>
             </Pressable>
           </View>
 
           <FilterGroup
-            label="Status"
+            label={t("inventory.status")}
             options={statusFilters}
             activeValue={activeStatus}
             onSelect={setActiveStatus}
+            getLabel={(option) => statusFilterLabels[option]}
             className="mt-4"
           />
 
           <FilterGroup
-            label="Location"
+            label={t("inventory.location")}
             options={locationFilters}
             activeValue={activeLocationFilter}
             onSelect={(loc) => {
               setActiveLocationFilter(loc);
               setActiveRoomFilter("All");
             }}
+            getLabel={(option) => option === "All" ? t("common.all") : option}
             className="mt-4"
           />
 
           <FilterGroup
-            label="Room"
+            label={t("inventory.room")}
             options={roomFiltersForLocation}
             activeValue={activeRoomFilter}
             onSelect={setActiveRoomFilter}
+            getLabel={(option) => option === "All" ? t("common.all") : option}
             className="mt-4"
           />
         </View>
@@ -483,7 +508,7 @@ export default function InventoryTabScreen() {
       {isSearchActive ? (
         <View className="mt-8 gap-6">
           <View>
-            <SectionHeader title="Boxes" actionLabel={`${filteredBoxes.length} found`} />
+            <SectionHeader title={t("inventory.boxesSection")} actionLabel={t("inventory.found", { count: filteredBoxes.length })} />
             {filteredBoxes.length > 0 ? (
               <View className="mt-4 gap-3">
                 {filteredBoxes.map((box) => (
@@ -498,16 +523,16 @@ export default function InventoryTabScreen() {
               </View>
             ) : (
               <View className="mt-4">
-                <EmptyStateCard title="No boxes found" containerClassName="p-5" />
+                <EmptyStateCard title={t("inventory.noBoxesFound")} containerClassName="p-5" />
               </View>
             )}
           </View>
 
           <View>
-            <SectionHeader title="Items" actionLabel={`${itemResults.length} found`} />
+            <SectionHeader title={t("inventory.itemsSection")} actionLabel={t("inventory.found", { count: itemResults.length })} />
             {isSearching ? (
               <View className="mt-4">
-                <EmptyStateCard title="Searching..." containerClassName="p-5" />
+                <EmptyStateCard title={t("inventory.searching")} containerClassName="p-5" />
               </View>
             ) : itemResults.length > 0 ? (
               <View className="mt-4 gap-3">
@@ -521,30 +546,30 @@ export default function InventoryTabScreen() {
               </View>
             ) : (
               <View className="mt-4">
-                <EmptyStateCard title="No items found" containerClassName="p-5" />
+                <EmptyStateCard title={t("inventory.noItemsFound")} containerClassName="p-5" />
               </View>
             )}
           </View>
         </View>
       ) : (
         <View className="mt-8">
-          <SectionHeader title="Boxes & Items" actionLabel={`${filteredBoxes.length} boxes`} />
+          <SectionHeader title={t("inventory.boxesAndItems")} actionLabel={t("inventory.boxesCount", { count: filteredBoxes.length })} />
           {filteredBoxes.length === 0 ? (
             <View className="mt-4">
               <EmptyStateCard
                 title={
                   isLoading || isRefreshing
-                    ? "Loading boxes..."
+                    ? t("inventory.loadingBoxes")
                     : activeFilterCount > 0
-                      ? "No boxes found"
-                      : "No boxes yet"
+                      ? t("inventory.noBoxesFound")
+                      : t("inventory.noBoxesYet")
                 }
                 description={
                   isLoading || isRefreshing
-                    ? "Fetching your inventory boxes."
+                    ? t("inventory.fetchingBoxes")
                     : activeFilterCount > 0
-                      ? "Try a different filter combination."
-                      : "Create your first box to start organizing your move."
+                      ? t("inventory.noBoxesFoundDesc")
+                      : t("inventory.noBoxesYetDesc")
                 }
                 containerClassName="p-5"
               />
@@ -554,7 +579,7 @@ export default function InventoryTabScreen() {
               {groupedByStatus.map((group) => (
                 <View key={group.status}>
                   <Text className="mb-3 text-xs font-semibold uppercase tracking-[1px] text-text-tertiary">
-                    {group.status} ({group.boxes.length})
+                    {getStatusLabel(group.status)} ({group.boxes.length})
                   </Text>
                   <View className="gap-3">
                     {group.boxes.map((box) => (
@@ -588,15 +613,15 @@ export default function InventoryTabScreen() {
 
       <AppModal
         visible={isCreateModalOpen}
-        title="Create box"
-        description="Set a name, room, and status for your new box."
+        title={t("inventory.createBox")}
+        description={t("inventory.createBoxDesc")}
         onRequestClose={closeCreateModal}
         maxWidth={420}
       >
         <FormInput
           value={newBoxName}
           onChangeText={setNewBoxName}
-          placeholder="Box name (e.g. Kitchen Box #1)"
+          placeholder={t("inventory.boxNamePlaceholder")}
           autoCapitalize="words"
           autoCorrect={false}
           editable={!isCreating}
@@ -604,14 +629,14 @@ export default function InventoryTabScreen() {
         />
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Room</Text>
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("inventory.room")}</Text>
           <ScrollView className="mt-2" style={{ maxHeight: 200 }} showsVerticalScrollIndicator>
             <View className="gap-2">
               {availableRoomsForBox.length === 0 ? (
                 <Text className="text-xs text-text-tertiary">
                   {isRoomsLoading
-                    ? "Loading rooms..."
-                    : "No rooms found in this location. Create a room first."}
+                    ? t("inventory.loadingRooms")
+                    : t("inventory.noRoomsInLocation")}
                 </Text>
               ) : (
                 availableRoomsForBox.map((room) => {
@@ -638,7 +663,7 @@ export default function InventoryTabScreen() {
         </View>
 
         <View className="mt-4">
-          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">Status</Text>
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("inventory.status")}</Text>
           <View className="mt-2 flex-row gap-2">
             {editableStatuses.map((option) => {
               const isActive = option.value === newBoxStatus;
@@ -653,7 +678,9 @@ export default function InventoryTabScreen() {
                       : "border-border-default bg-bg-input/60"
                   }`}
                 >
-                  <Text className="text-sm font-semibold text-text-primary">{option.label}</Text>
+                  <Text className="text-sm font-semibold text-text-primary">
+                    {option.value === "packed" ? t("inventory.packed") : t("inventory.notPacked")}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -666,14 +693,14 @@ export default function InventoryTabScreen() {
 
         <View className={`${createBoxError ? "mt-4" : "mt-5"} flex-row gap-3`}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             variant="secondary"
             onPress={closeCreateModal}
             disabled={isCreating}
             className="flex-1"
           />
           <Button
-            label={isCreating ? "Creating..." : "Create"}
+            label={isCreating ? t("common.creating") : t("common.create")}
             onPress={() => void handleCreateBox()}
             disabled={isCreating || availableRoomsForBox.length === 0}
             className="flex-1"

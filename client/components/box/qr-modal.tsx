@@ -5,6 +5,7 @@ import { type BluetoothDevice } from "@/hooks/use-bluetooth-printer";
 import { type QrMatrix } from "@/utils/box-qr";
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Svg, { Rect } from "react-native-svg";
 
@@ -51,6 +52,7 @@ export function QrModal({
   onRescan,
   onRegenerate,
 }: QrModalProps) {
+  const { t } = useTranslation();
   const [view, setView] = useState<"qr" | "printer">("qr");
 
   useEffect(() => {
@@ -80,11 +82,11 @@ export function QrModal({
   return (
     <AppModal
       visible={visible}
-      title={view === "printer" ? "Select Printer" : "Box QR label"}
+      title={view === "printer" ? t("modals.selectPrinterTitle") : t("modals.qrTitle")}
       description={
         view === "printer"
-          ? "Paired and nearby Bluetooth printers will appear below."
-          : "Scan this QR code to open the box directly in the app."
+          ? t("modals.selectPrinterDesc")
+          : t("modals.qrDesc")
       }
       onRequestClose={handleRequestClose}
       showCornerClose
@@ -101,7 +103,7 @@ export function QrModal({
       ) : isGeneratingQr ? (
         <View className="items-center justify-center rounded-control border border-border-default bg-bg-input/60 px-4 py-8">
           <ActivityIndicator />
-          <Text className="mt-3 text-xs text-text-tertiary">Generating QR code...</Text>
+          <Text className="mt-3 text-xs text-text-tertiary">{t("modals.generatingQr")}</Text>
         </View>
       ) : qrMatrix ? (
         <>
@@ -129,25 +131,25 @@ export function QrModal({
             <View className="flex-row items-center gap-2">
               <Feather name="printer" size={14} color={Colors.dark.textTertiary} />
               <Text className="text-xs text-text-tertiary">
-                {savedPrinterName ?? "No printer selected"}
+                {savedPrinterName ?? t("modals.noPrinterSelected")}
               </Text>
             </View>
             <Pressable onPress={handleOpenPrinterPicker} hitSlop={8}>
               <Text className="text-xs font-semibold text-primary">
-                {savedPrinterName ? "Change" : "Select"}
+                {savedPrinterName ? t("modals.changePrinter") : t("modals.selectPrinterBtn")}
               </Text>
             </Pressable>
           </View>
 
           <View className="mt-3 flex-row gap-3">
             <Button
-              label={isPrinting ? "Printing..." : "Print"}
+              label={isPrinting ? t("modals.printing") : t("modals.print")}
               onPress={onPrint}
               disabled={isPrinting || !savedPrinterName}
               className="flex-1"
             />
             <Button
-              label="Regenerate"
+              label={t("modals.regenerate")}
               variant="secondary"
               onPress={onRegenerate}
               disabled={isPrinting}
@@ -159,9 +161,9 @@ export function QrModal({
         </>
       ) : (
         <View className="rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
-          <Text className="text-sm font-semibold text-text-primary">Could not generate QR code.</Text>
-          <Text className="mt-1 text-xs text-text-tertiary">{qrErrorMessage ?? "Try generating again."}</Text>
-          <Button label="Retry" variant="secondary" onPress={onRegenerate} className="mt-4" />
+          <Text className="text-sm font-semibold text-text-primary">{t("modals.qrFailed")}</Text>
+          <Text className="mt-1 text-xs text-text-tertiary">{qrErrorMessage ?? t("modals.qrFailedFallback")}</Text>
+          <Button label={t("common.retry")} variant="secondary" onPress={onRegenerate} className="mt-4" />
         </View>
       )}
     </AppModal>
@@ -183,11 +185,13 @@ function PrinterPickerContent({
   onSelectDevice,
   onRescan,
 }: PrinterPickerContentProps) {
+  const { t } = useTranslation();
+
   if (isScanning) {
     return (
       <View className="items-center justify-center py-8">
         <ActivityIndicator />
-        <Text className="mt-3 text-xs text-text-tertiary">Scanning for printers...</Text>
+        <Text className="mt-3 text-xs text-text-tertiary">{t("modals.scanningPrinters")}</Text>
       </View>
     );
   }
@@ -196,7 +200,7 @@ function PrinterPickerContent({
     return (
       <View className="gap-4">
         <View className="rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
-          <Text className="text-sm font-semibold text-crimson">Bluetooth error</Text>
+          <Text className="text-sm font-semibold text-crimson">{t("modals.bluetoothError")}</Text>
           <Text className="mt-1 text-xs text-text-tertiary">{scanError}</Text>
         </View>
         <RescanButton onRescan={onRescan} />
@@ -208,10 +212,8 @@ function PrinterPickerContent({
     return (
       <View className="gap-4">
         <View className="rounded-control border border-border-default bg-bg-input/60 px-4 py-4">
-          <Text className="text-sm font-semibold text-text-primary">No devices found</Text>
-          <Text className="mt-1 text-xs text-text-tertiary">
-            Make sure your printer is on and in range. Pair it in Android Bluetooth settings for best results.
-          </Text>
+          <Text className="text-sm font-semibold text-text-primary">{t("modals.noDevicesFound")}</Text>
+          <Text className="mt-1 text-xs text-text-tertiary">{t("modals.noDevicesDesc")}</Text>
         </View>
         <RescanButton onRescan={onRescan} />
       </View>
@@ -244,13 +246,14 @@ function PrinterPickerContent({
 }
 
 function RescanButton({ onRescan }: { onRescan: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onRescan}
       className="flex-row items-center justify-center gap-2 py-1 active:opacity-60"
     >
       <Feather name="refresh-cw" size={13} color={Colors.dark.textTertiary} />
-      <Text className="text-xs text-text-tertiary">Scan again</Text>
+      <Text className="text-xs text-text-tertiary">{t("modals.scanAgain")}</Text>
     </Pressable>
   );
 }

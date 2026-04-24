@@ -17,6 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
 type TypeFilter = "All" | ActivityEventType;
@@ -42,19 +43,14 @@ function getWindowMinutes(filter: TimeFilter) {
   }
 }
 
-function getGroupLabel(minutesAgo: number) {
-  if (minutesAgo <= 24 * 60) {
-    return "Today";
-  }
-
-  if (minutesAgo <= 48 * 60) {
-    return "Yesterday";
-  }
-
-  return "This Week";
+function getGroupKey(minutesAgo: number): "today" | "yesterday" | "thisWeek" {
+  if (minutesAgo <= 24 * 60) return "today";
+  if (minutesAgo <= 48 * 60) return "yesterday";
+  return "thisWeek";
 }
 
 export default function ActivityTabScreen() {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isCompact = width < 400;
   const isNarrow = width < 360;
@@ -112,21 +108,33 @@ export default function ActivityTabScreen() {
       .sort((firstEvent, secondEvent) => firstEvent.minutesAgo - secondEvent.minutesAgo);
   }, [activeTime, activeType, events, search]);
 
+  const getTypeFilterLabel = useCallback((option: TypeFilter): string => {
+    const labels: Partial<Record<string, string>> = {
+      All: t("common.all"),
+      Created: t("activity.created"),
+      Updated: t("activity.updated"),
+      Deleted: t("activity.deleted"),
+      Packed: t("activity.packedFilter"),
+      Delivered: t("activity.deliveredFilter"),
+    };
+    return labels[option] ?? option;
+  }, [t]);
+
   const groupedEvents = useMemo(() => {
     const grouped = visibleEvents.reduce<Record<string, ActivityTimelineEvent[]>>((acc, event) => {
-      const label = getGroupLabel(event.minutesAgo);
-      if (!acc[label]) {
-        acc[label] = [];
+      const key = getGroupKey(event.minutesAgo);
+      if (!acc[key]) {
+        acc[key] = [];
       }
-      acc[label].push(event);
+      acc[key].push(event);
       return acc;
     }, {});
 
-    const order = ["Today", "Yesterday", "This Week"];
+    const order = ["today", "yesterday", "thisWeek"] as const;
     return order
-      .filter((label) => grouped[label] && grouped[label].length > 0)
-      .map((label) => ({ label, items: grouped[label] }));
-  }, [visibleEvents]);
+      .filter((key) => grouped[key] && grouped[key].length > 0)
+      .map((key) => ({ key, label: t(`activity.${key}`), items: grouped[key] }));
+  }, [visibleEvents, t]);
 
   const todayEventsCount = useMemo(
     () => visibleEvents.filter((event) => event.minutesAgo <= 24 * 60).length,
@@ -139,7 +147,7 @@ export default function ActivityTabScreen() {
         <RetryErrorCard
           message={errorMessage}
           isRetrying={isRefreshing}
-          retryingLabel="Refreshing..."
+          retryingLabel={t("common.refreshing")}
           onRetry={() => {
             clearError();
             void refreshActivity();
@@ -150,15 +158,15 @@ export default function ActivityTabScreen() {
 
       <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
         <MetricCard
-          label="Events"
+          label={t("activity.events")}
           value={String(visibleEvents.length)}
-          hint={`Last ${activeTime}`}
+          hint={t("activity.last", { time: activeTime })}
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
         <MetricCard
-          label="Today"
+          label={t("activity.today")}
           value={String(todayEventsCount)}
-          hint="Activity in 24h"
+          hint={t("activity.activityIn24h")}
           style={{ width: isNarrow ? "100%" : "48.5%" }}
         />
       </View>
@@ -167,7 +175,7 @@ export default function ActivityTabScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search activity, location, room, or box"
+          placeholder={t("activity.searchPlaceholder")}
           containerClassName="flex-1"
         />
         <Pressable
@@ -194,27 +202,28 @@ export default function ActivityTabScreen() {
       {isFilterOpen ? (
         <View className="mt-3 rounded-card border border-border-default bg-bg-elevated/80 p-4">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-semibold text-text-primary">Filters</Text>
+            <Text className="text-sm font-semibold text-text-primary">{t("activity.filters")}</Text>
             <Pressable
               onPress={() => {
                 setActiveType("All");
                 setActiveTime("7d");
               }}
             >
-              <Text className="text-xs font-semibold text-text-link">Clear</Text>
+              <Text className="text-xs font-semibold text-text-link">{t("common.clear")}</Text>
             </Pressable>
           </View>
 
           <FilterGroup
-            label="Type"
+            label={t("activity.type")}
             options={typeFilters}
             activeValue={activeType}
             onSelect={setActiveType}
+            getLabel={getTypeFilterLabel}
             className="mt-4"
           />
 
           <FilterGroup
-            label="Window"
+            label={t("activity.window")}
             options={timeFilters}
             activeValue={activeTime}
             onSelect={setActiveTime}
@@ -224,12 +233,12 @@ export default function ActivityTabScreen() {
       ) : null}
 
       <View className="mt-8">
-        <SectionHeader title="Timeline" actionLabel={`${visibleEvents.length} events`} />
+        <SectionHeader title={t("activity.timeline")} actionLabel={t("activity.eventsCount", { count: visibleEvents.length })} />
 
         {groupedEvents.length > 0 ? (
           <View className="mt-4 gap-3">
             {groupedEvents.map((group) => (
-              <View key={group.label} className="gap-3">
+              <View key={group.key} className="gap-3">
                 <Text className="py-1 text-xs uppercase tracking-[1.2px] text-text-tertiary">
                   {group.label}
                 </Text>
@@ -246,13 +255,13 @@ export default function ActivityTabScreen() {
             <EmptyStateCard
               title={
                 isLoading || isRefreshing
-                  ? "Loading activity..."
-                  : "No activity found"
+                  ? t("activity.loadingActivity")
+                  : t("activity.noActivityFound")
               }
               description={
                 isLoading || isRefreshing
-                  ? "Fetching your recent history."
-                  : "Try a different search query or adjust filters."
+                  ? t("activity.fetchingHistory")
+                  : t("activity.adjustFilters")
               }
             />
           </View>

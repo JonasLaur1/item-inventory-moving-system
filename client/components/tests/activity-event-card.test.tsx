@@ -8,6 +8,7 @@ jest.mock('@/hooks/use-theme-preference', () => ({
 const baseEvent: ActivityEvent = {
   id: '1',
   type: 'Created',
+  entityType: 'box',
   title: 'Box created',
   description: 'Kitchen supplies box was created',
   location: 'New Apartment',

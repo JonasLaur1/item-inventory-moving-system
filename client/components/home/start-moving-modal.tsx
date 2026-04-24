@@ -6,6 +6,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   visible: boolean;
@@ -58,6 +59,7 @@ function LocationPicker({ label, selectedId, locations, disabledId, onSelect, ic
 }
 
 export function StartMovingModal({ visible, locations, onConfirm, onClose }: Props) {
+  const { t } = useTranslation();
   const [fromId, setFromId] = useState<string | null>(null);
   const [toId, setToId] = useState<string | null>(null);
   const { resolvedTheme } = useThemePreference();
@@ -83,8 +85,8 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
   return (
     <AppModal
       visible={visible}
-      title="Start Moving"
-      description="Select the origin and destination for this move."
+      title={t("modals.startMovingTitle")}
+      description={t("modals.startMovingDesc")}
       onRequestClose={handleClose}
       showCornerClose
       closeOnBackdropPress
@@ -92,7 +94,7 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
       <ScrollView showsVerticalScrollIndicator={false} className="max-h-96">
         <View className="gap-5">
           <LocationPicker
-            label="From"
+            label={t("movingProgress.from")}
             selectedId={fromId}
             locations={locations}
             disabledId={toId}
@@ -100,7 +102,7 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
             iconColor={primaryColor}
           />
           <LocationPicker
-            label="To"
+            label={t("movingProgress.to")}
             selectedId={toId}
             locations={locations}
             disabledId={fromId}
@@ -110,8 +112,8 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
         </View>
       </ScrollView>
       <View className="mt-5 gap-2">
-        <Button label="Start Moving" variant="primary" onPress={handleConfirm} disabled={!canConfirm} />
-        <Button label="Cancel" variant="secondary" onPress={handleClose} />
+        <Button label={t("home.startMoving")} variant="primary" onPress={handleConfirm} disabled={!canConfirm} />
+        <Button label={t("common.cancel")} variant="secondary" onPress={handleClose} />
       </View>
     </AppModal>
   );

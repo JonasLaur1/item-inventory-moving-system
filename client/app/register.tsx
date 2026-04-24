@@ -16,8 +16,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 export default function Register() {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -31,7 +33,7 @@ export default function Register() {
     const trimmedEmail = email.trim();
 
     if (!trimmedUsername || !trimmedEmail || !password.trim()) {
-      setErrorMessage("Please fill in all fields");
+      setErrorMessage(t("auth.fillAllFields"));
       return;
     }
 
@@ -43,7 +45,7 @@ export default function Register() {
       router.replace("/(tabs)");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to create account";
+        error instanceof Error ? error.message : t("auth.failedCreateAccount");
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -74,17 +76,17 @@ export default function Register() {
                 </View>
 
                 <Text className="mt-5 text-4xl font-bold text-text-primary">
-                  Create Account
+                  {t("auth.createAccount")}
                 </Text>
                 <Text className="mt-2 text-center text-sm text-text-tertiary">
-                  Start your smart move today with AI-powered packing.
+                  {t("auth.registerTagline")}
                 </Text>
               </View>
 
               <View className="mt-12 gap-4">
                 <FormInput
-                  label="Username"
-                  placeholder="John Doe"
+                  label={t("auth.username")}
+                  placeholder={t("auth.usernamePlaceholder")}
                   leftIcon="user"
                   value={username}
                   onChangeText={setUsername}
@@ -94,8 +96,8 @@ export default function Register() {
                 />
 
                 <FormInput
-                  label="Email Address"
-                  placeholder="hello@example.com"
+                  label={t("auth.emailAddress")}
+                  placeholder={t("auth.emailPlaceholder")}
                   leftIcon="mail"
                   value={email}
                   onChangeText={setEmail}
@@ -106,7 +108,7 @@ export default function Register() {
                 />
 
                 <FormInput
-                  label="Password"
+                  label={t("auth.password")}
                   placeholder="........"
                   leftIcon="lock"
                   value={password}
@@ -131,8 +133,8 @@ export default function Register() {
 
                 <View className="mt-4">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-xs text-text-tertiary">Password Strength</Text>
-                    <Text className="text-xs font-semibold text-text-link">Strong</Text>
+                    <Text className="text-xs text-text-tertiary">{t("auth.passwordStrength")}</Text>
+                    <Text className="text-xs font-semibold text-text-link">{t("auth.passwordStrong")}</Text>
                   </View>
 
                   <View className="mt-2 flex-row gap-2">
@@ -150,7 +152,7 @@ export default function Register() {
                 ) : null}
 
                 <Button
-                  label={isSubmitting ? "Creating account..." : "Get Started"}
+                  label={isSubmitting ? t("auth.creatingAccount") : t("auth.getStarted")}
                   className="mt-8"
                   textClassName="font-bold"
                   onPress={onRegister}
@@ -175,11 +177,11 @@ export default function Register() {
 
                 <View className="mt-4 flex-row items-center justify-center">
                   <Text className="text-sm text-text-tertiary">
-                    Already have an account?{" "}
+                    {t("auth.alreadyHaveAccount")}{" "}
                   </Text>
                   <Pressable hitSlop={8} onPress={onLogin}>
                     <Text className="text-sm font-bold text-text-link">
-                      Log In
+                      {t("auth.logIn")}
                     </Text>
                   </Pressable>
                 </View>

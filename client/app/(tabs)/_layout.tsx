@@ -5,8 +5,10 @@ import { Feather } from "@expo/vector-icons";
 import { Tabs, usePathname } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 function TabNavigator() {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
   const insets = useSafeAreaInsets();
@@ -41,7 +43,7 @@ function TabNavigator() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tabs.home"),
           tabBarIcon: ({ color }) => <Feather name="home" size={18} color={color} />,
         }}
       />
@@ -49,7 +51,7 @@ function TabNavigator() {
       <Tabs.Screen
         name="inventory"
         options={{
-          title: "Inventory",
+          title: t("tabs.inventory"),
           tabBarIcon: ({ color }) => <Feather name="archive" size={18} color={color} />,
         }}
       />
@@ -64,7 +66,7 @@ function TabNavigator() {
           },
         }}
         options={{
-          title: "Add Item",
+          title: t("tabs.addItem"),
           tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => (
             <View
@@ -101,7 +103,7 @@ function TabNavigator() {
       <Tabs.Screen
         name="rooms"
         options={{
-          title: "Locations",
+          title: t("tabs.locations"),
           tabBarIcon: ({ color }) => <Feather name="grid" size={18} color={color} />,
         }}
       />
@@ -109,7 +111,7 @@ function TabNavigator() {
       <Tabs.Screen
         name="activity"
         options={{
-          title: "Activity",
+          title: t("tabs.activity"),
           tabBarIcon: ({ color }) => <Feather name="clock" size={18} color={color} />,
         }}
       />

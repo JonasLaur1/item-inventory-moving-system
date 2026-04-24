@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/theme";
 import type { ActivityType } from "@/lib/activity.service";
+import i18n from "@/lib/i18n";
 
 export type EventTone = {
   icon: "archive" | "repeat" | "plus-square" | "edit-3" | "trash-2" | "truck" | "clock";
@@ -9,14 +10,43 @@ export type EventTone = {
   badgeTextClassName: string;
 };
 
-export const EVENT_DISPLAY_LABEL: Partial<Record<ActivityType, string>> = {
-  Created: "Created",
-  Updated: "Updated",
-  Moved: "Moved",
-  Deleted: "Deleted",
-  Packed: "Packed",
-  Delivered: "Delivered",
+type ActivityTextSource = {
+  type: ActivityType;
+  entityType: string;
+  title: string;
+  location: string;
+  room?: string;
+  box?: string;
 };
+
+export function getTranslatedActivityText(event: ActivityTextSource): { title: string; description: string } {
+  const entity = event.entityType.charAt(0).toUpperCase() + event.entityType.slice(1);
+  const titleKey = `activity.title${entity}${event.type}`;
+  const title = i18n.exists(titleKey) ? i18n.t(titleKey) : event.title;
+
+  let description: string;
+  if (event.entityType === "item" && event.box) {
+    description = i18n.t("activity.descInBox", { box: event.box });
+  } else if (event.room) {
+    description = i18n.t("activity.descInRoom", { room: event.room });
+  } else {
+    description = i18n.t("activity.descInLocation", { location: event.location });
+  }
+
+  return { title, description };
+}
+
+export function getEventDisplayLabel(type: ActivityType): string {
+  switch (type) {
+    case "Created": return i18n.t("activity.created");
+    case "Updated": return i18n.t("activity.updated");
+    case "Moved": return i18n.t("activity.moved");
+    case "Deleted": return i18n.t("activity.deleted");
+    case "Packed": return i18n.t("activity.packedFilter");
+    case "Delivered": return i18n.t("activity.deliveredFilter");
+    default: return type;
+  }
+}
 
 export function getEventTone(type: ActivityType): EventTone {
   switch (type) {

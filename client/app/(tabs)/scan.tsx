@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -73,6 +74,7 @@ function parseScannedBoxId(payload: string): string | null {
 }
 
 export default function ScanTabScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
   const insets = useSafeAreaInsets();
@@ -98,7 +100,7 @@ export default function ScanTabScreen() {
       const boxId = parseScannedBoxId(data);
 
       if (!boxId) {
-        setScanError("Unsupported QR code. Use a BoxIt box QR label.");
+        setScanError(t("scan.unsupportedQr"));
         setTimeout(() => {
           setIsHandlingScan(false);
         }, 1200);
@@ -111,17 +113,17 @@ export default function ScanTabScreen() {
         params: { id: boxId, ...(isMovingActive ? { delivery: "1" } : {}) },
       });
     },
-    [isHandlingScan, isMovingActive, router],
+    [isHandlingScan, isMovingActive, router, t],
   );
 
   const onPressAllowCamera = useCallback(async () => {
     const response = await requestPermission();
     if (!response.granted) {
-      setScanError("Camera permission is required to scan QR codes.");
+      setScanError(t("scan.permissionRequired"));
     } else {
       setScanError(null);
     }
-  }, [requestPermission]);
+  }, [requestPermission, t]);
 
   const onPressOpenSettings = useCallback(() => {
     void Linking.openSettings();
@@ -144,19 +146,19 @@ export default function ScanTabScreen() {
       {!permission ? (
         <View className="flex-1 items-center justify-center px-6">
           <ActivityIndicator />
-          <Text className="mt-3 text-sm text-text-tertiary">Loading camera permission...</Text>
+          <Text className="mt-3 text-sm text-text-tertiary">{t("scan.loadingPermission")}</Text>
         </View>
       ) : !permission.granted ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base font-semibold text-text-primary">
-            Camera access is required
+            {t("scan.cameraRequired")}
           </Text>
           <Text className="mt-2 text-center text-sm text-text-tertiary">
-            Allow camera permission to scan and open box QR labels.
+            {t("scan.cameraRequiredDesc")}
           </Text>
           <View className="mt-5 w-full gap-3">
-            <Button label="Allow Camera" onPress={() => void onPressAllowCamera()} />
-            <Button label="Open Settings" variant="secondary" onPress={onPressOpenSettings} />
+            <Button label={t("scan.allowCamera")} onPress={() => void onPressAllowCamera()} />
+            <Button label={t("scan.openSettings")} variant="secondary" onPress={onPressOpenSettings} />
           </View>
         </View>
       ) : (

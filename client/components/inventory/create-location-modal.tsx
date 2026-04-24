@@ -2,12 +2,13 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { AppModal } from "@/components/ui/app-modal";
 import { Colors } from "@/constants/theme";
-import { ROOM_SUGGESTIONS } from "@/constants/room-suggestions";
+import { ROOM_SUGGESTION_KEYS } from "@/constants/room-suggestions";
 import { locationService } from "@/lib/location.service";
 import { roomService } from "@/lib/room.service";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const { height: windowHeight } = useWindowDimensions();
 
@@ -45,7 +47,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
   const handleStep1Submit = useCallback(async () => {
     const trimmed = locationName.trim();
     if (!trimmed) {
-      setError("Location name is required.");
+      setError(t("modals.locationNameRequired"));
       return;
     }
 
@@ -59,11 +61,11 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
       setLocationId(id);
       setStep(2);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create location.");
+      setError(err instanceof Error ? err.message : t("modals.failedCreateLocation"));
     } finally {
       setIsSubmitting(false);
     }
-  }, [locationAddress, locationName]);
+  }, [locationAddress, locationName, t]);
 
   const toggleSuggestion = useCallback((suggestion: string) => {
     setPendingRooms((prev) => {
@@ -104,11 +106,11 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
         onCreated?.(id);
         onClose();
       } catch {
-        setError("Location created but some rooms could not be saved. You can add rooms from the location page.");
+        setError(t("modals.locationCreatedRoomsError"));
         setIsSubmitting(false);
       }
     },
-    [onClose, onCreated],
+    [onClose, onCreated, t],
   );
 
   const handleRequestClose = useCallback(() => {
@@ -129,11 +131,11 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
   return (
     <AppModal
       visible={visible}
-      title={step === 1 ? "New Location" : "Add Rooms"}
+      title={step === 1 ? t("modals.createLocationStep1") : t("modals.createLocationStep2")}
       description={
         step === 1
-          ? "Give your location a name (e.g. New Apartment, Storage Unit)."
-          : `Which rooms does "${locationName.trim()}" have?`
+          ? t("modals.createLocationStep1Desc")
+          : t("modals.createLocationStep2Desc", { name: locationName.trim() })
       }
       onRequestClose={handleRequestClose}
       maxWidth={420}
@@ -143,7 +145,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
           <FormInput
             value={locationName}
             onChangeText={setLocationName}
-            placeholder="Location name (e.g. Home)"
+            placeholder={t("modals.locationNamePlaceholder")}
             autoCapitalize="words"
             autoCorrect={false}
             editable={!isSubmitting}
@@ -154,7 +156,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
             <FormInput
               value={locationAddress}
               onChangeText={setLocationAddress}
-              placeholder="Address (optional)"
+              placeholder={t("locationDetail.addressPlaceholder")}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!isSubmitting}
@@ -166,14 +168,14 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
 
           <View className={`${error ? "mt-4" : "mt-5"} flex-row gap-3`}>
             <Button
-              label="Cancel"
+              label={t("common.cancel")}
               variant="secondary"
               onPress={onClose}
               disabled={isSubmitting}
               className="flex-1"
             />
             <Button
-              label={isSubmitting ? "Creating..." : "Next"}
+              label={isSubmitting ? t("common.creating") : t("common.next")}
               onPress={() => void handleStep1Submit()}
               disabled={isSubmitting}
               className="flex-1"
@@ -188,14 +190,15 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
             keyboardShouldPersistTaps="handled"
           >
             <View className="flex-row flex-wrap gap-2">
-              {ROOM_SUGGESTIONS.map((suggestion) => {
+              {ROOM_SUGGESTION_KEYS.map((key) => {
+                const label = t(`roomSuggestions.${key}`);
                 const isSelected = pendingRooms.some(
-                  (r) => r.toLowerCase() === suggestion.toLowerCase(),
+                  (r) => r.toLowerCase() === label.toLowerCase(),
                 );
                 return (
                   <Pressable
-                    key={suggestion}
-                    onPress={() => toggleSuggestion(suggestion)}
+                    key={key}
+                    onPress={() => toggleSuggestion(label)}
                     disabled={isSubmitting}
                     className={`rounded-control border px-3 py-2 ${
                       isSelected
@@ -203,7 +206,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
                         : "border-border-default bg-bg-input/60"
                     }`}
                   >
-                    <Text className="text-sm font-semibold text-text-primary">{suggestion}</Text>
+                    <Text className="text-sm font-semibold text-text-primary">{label}</Text>
                   </Pressable>
                 );
               })}
@@ -214,7 +217,7 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
                 <FormInput
                   value={customRoomInput}
                   onChangeText={setCustomRoomInput}
-                  placeholder="Custom room name"
+                  placeholder={t("modals.customRoomName")}
                   autoCapitalize="words"
                   autoCorrect={false}
                   editable={!isSubmitting}
@@ -255,14 +258,14 @@ export function CreateLocationModal({ visible, onClose, onCreated }: Props) {
 
           <View className={`${error ? "mt-4" : "mt-5"} flex-row gap-3`}>
             <Button
-              label={isSubmitting ? "Saving..." : "Skip"}
+              label={isSubmitting ? t("common.saving") : t("common.skip")}
               variant="secondary"
               onPress={() => void finishCreation(locationId, [])}
               disabled={isSubmitting}
               className="flex-1"
             />
             <Button
-              label={isSubmitting ? "Saving..." : "Confirm"}
+              label={isSubmitting ? t("common.saving") : t("common.confirm")}
               onPress={() => void finishCreation(locationId, pendingRooms)}
               disabled={isSubmitting}
               className="flex-1"

@@ -10,6 +10,7 @@ import { type LocationSummary } from "@/lib/location.service";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
@@ -28,6 +29,7 @@ type DeliveryRingProps = {
 };
 
 function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRingProps) {
+  const { t } = useTranslation();
   const dashOffset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, progress)) / 100);
   return (
     <View className="items-center">
@@ -49,7 +51,9 @@ function DeliveryRing({ delivered, total, progress, primary, track }: DeliveryRi
         </Svg>
         <View className="absolute inset-0 items-center justify-center">
           <Text className="text-4xl font-bold text-text-primary">{Math.round(progress)}%</Text>
-          <Text className="mt-1 text-sm text-text-tertiary">{delivered} / {total} delivered</Text>
+          <Text className="mt-1 text-sm text-text-tertiary">
+            {t("movingProgress.deliveredCount", { delivered, total })}
+          </Text>
         </View>
       </View>
     </View>
@@ -74,6 +78,7 @@ type LocationProgressCardProps = {
 };
 
 function LocationProgressCard({ location, isFrom, isTo }: LocationProgressCardProps) {
+  const { t } = useTranslation();
   const delivered = location.deliveredBoxes - location.unpackedAtDestinationBoxes;
   const unpacked = location.unpackedAtDestinationBoxes;
   const deliveryProgress =
@@ -94,7 +99,9 @@ function LocationProgressCard({ location, isFrom, isTo }: LocationProgressCardPr
         </View>
         {isFrom || isTo ? (
           <View className="rounded-control bg-primary/15 px-2.5 py-0.5">
-            <Text className="text-xs font-semibold text-primary">{isFrom ? "From" : "To"}</Text>
+            <Text className="text-xs font-semibold text-primary">
+              {isFrom ? t("movingProgress.from") : t("movingProgress.to")}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -105,16 +112,17 @@ function LocationProgressCard({ location, isFrom, isTo }: LocationProgressCardPr
         />
       </View>
       <View className="mt-4 flex-row">
-        <StatItem label="Total" value={location.boxes} />
-        <StatItem label="Packed" value={location.packedBoxes} />
-        <StatItem label="Delivered" value={delivered} />
-        <StatItem label="Unpacked" value={unpacked} />
+        <StatItem label={t("movingProgress.total")} value={location.boxes} />
+        <StatItem label={t("movingProgress.packed")} value={location.packedBoxes} />
+        <StatItem label={t("movingProgress.delivered")} value={delivered} />
+        <StatItem label={t("movingProgress.unpacked")} value={unpacked} />
       </View>
     </View>
   );
 }
 
 export default function MovingProgressScreen() {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const themeColors = Colors[resolvedTheme];
   const { fromLocationId, toLocationId } = useMovingMode();
@@ -154,7 +162,7 @@ export default function MovingProgressScreen() {
           >
             <Feather name="chevron-left" size={20} color={themeColors.textPrimary} />
           </Pressable>
-          <Text className="flex-1 text-2xl font-bold text-text-primary">Moving Progress</Text>
+          <Text className="flex-1 text-2xl font-bold text-text-primary">{t("movingProgress.title")}</Text>
         </View>
 
         {isLoading ? (
@@ -165,7 +173,7 @@ export default function MovingProgressScreen() {
           <RetryErrorCard
             message={errorMessage}
             isRetrying={isRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => {
               clearError();
               void refreshLocations();
@@ -174,8 +182,8 @@ export default function MovingProgressScreen() {
           />
         ) : locations.length === 0 ? (
           <EmptyStateCard
-            title="No locations yet"
-            description="Add at least two locations to track moving progress."
+            title={t("movingProgress.noLocationsYet")}
+            description={t("movingProgress.noLocationsYetDesc")}
             containerClassName="mt-8"
           />
         ) : (
@@ -197,35 +205,35 @@ export default function MovingProgressScreen() {
                   <Feather name="camera" size={18} color={themeColors.primary} />
                 </View>
                 <View>
-                  <Text className="text-base font-bold text-text-primary">Scan Box</Text>
-                  <Text className="text-xs text-text-tertiary">Scan QR Code</Text>
+                  <Text className="text-base font-bold text-text-primary">{t("movingProgress.scanBox")}</Text>
+                  <Text className="text-xs text-text-tertiary">{t("movingProgress.scanQr")}</Text>
                 </View>
                 <Feather name="chevron-right" size={18} color={themeColors.textTertiary} style={{ marginLeft: "auto" }} />
               </Pressable>
             </View>
 
             <View className="mt-8">
-              <SectionHeader title="Overview" />
+              <SectionHeader title={t("movingProgress.overview")} />
               <View className="mt-4 flex-row flex-wrap gap-3">
                 <MetricCard
-                  label="Total Boxes"
+                  label={t("movingProgress.totalBoxes")}
                   value={String(stats.total)}
                   style={{ width: "48.5%" }}
                 />
                 <MetricCard
-                  label="Packed"
+                  label={t("movingProgress.packed")}
                   value={String(stats.packed)}
                   variant="success"
                   style={{ width: "48.5%" }}
                 />
                 <MetricCard
-                  label="Delivered"
+                  label={t("movingProgress.delivered")}
                   value={String(stats.delivered)}
                   valueClassName="text-2xl font-bold text-primary"
                   style={{ width: "48.5%" }}
                 />
                 <MetricCard
-                  label="Unpacked"
+                  label={t("movingProgress.unpacked")}
                   value={String(stats.unpacked)}
                   valueClassName="text-2xl font-bold text-primary"
                   style={{ width: "48.5%" }}
@@ -234,7 +242,7 @@ export default function MovingProgressScreen() {
             </View>
 
             <View className="mt-8">
-              <SectionHeader title="By Location" />
+              <SectionHeader title={t("movingProgress.byLocation")} />
               <View className="mt-4 gap-3">
                 {moveLocations.map((loc) => (
                   <LocationProgressCard

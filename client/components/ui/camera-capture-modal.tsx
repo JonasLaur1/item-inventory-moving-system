@@ -3,6 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Linking,
@@ -57,6 +58,7 @@ async function callRecognizeItem(
 }
 
 export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -83,10 +85,10 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
       const result = await callRecognizeItem(base64);
       setRecognition({ status: "done", name: result.name, notes: result.notes });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Recognition failed.";
+      const message = err instanceof Error ? err.message : t("camera.recognitionFailed");
       setRecognition({ status: "error", message });
     }
-  }, []);
+  }, [t]);
 
   const handleCapture = useCallback(async () => {
     if (isCapturing || !cameraRef.current) return;
@@ -109,12 +111,12 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
       if (photo.base64) {
         void runRecognition(photo.base64);
       } else {
-        setRecognition({ status: "error", message: "Could not process image." });
+        setRecognition({ status: "error", message: t("camera.couldNotProcess") });
       }
     } finally {
       setIsCapturing(false);
     }
-  }, [isCapturing, runRecognition]);
+  }, [isCapturing, runRecognition, t]);
 
   const handleRetake = useCallback(() => {
     setCapturedUri(null);
@@ -164,28 +166,28 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
             ) : !permission.granted ? (
               <View className="flex-1 items-center justify-center gap-4 px-8">
                 <Text className="text-center text-base font-semibold text-white">
-                  Camera access required
+                  {t("camera.accessRequired")}
                 </Text>
                 <Text className="text-center text-sm text-white/60">
-                  Allow camera access to take photos for AI item recognition.
+                  {t("camera.accessRequiredDesc")}
                 </Text>
                 {permission.canAskAgain ? (
                   <Pressable
                     onPress={() => void requestPermission()}
                     className="rounded-control bg-white px-6 py-3"
                   >
-                    <Text className="font-semibold text-black">Allow Camera</Text>
+                    <Text className="font-semibold text-black">{t("camera.allowCamera")}</Text>
                   </Pressable>
                 ) : (
                   <Pressable
                     onPress={() => void Linking.openSettings()}
                     className="rounded-control bg-white px-6 py-3"
                   >
-                    <Text className="font-semibold text-black">Open Settings</Text>
+                    <Text className="font-semibold text-black">{t("camera.openSettings")}</Text>
                   </Pressable>
                 )}
                 <Pressable onPress={onClose} hitSlop={10}>
-                  <Text className="text-sm text-white/50">Cancel</Text>
+                  <Text className="text-sm text-white/50">{t("common.cancel")}</Text>
                 </Pressable>
               </View>
             ) : (
@@ -209,7 +211,7 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                     style={{ bottom: bottomPad }}
                   >
                     <Text className="mb-5 text-sm text-white/70">
-                      Take a photo to identify the item
+                      {t("camera.takePhotoHint")}
                     </Text>
                     <Pressable
                       onPress={() => void handleCapture()}
@@ -251,7 +253,7 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                   className="flex-row items-center gap-2 rounded-full border border-white/40 bg-black/45 px-4 py-2.5"
                 >
                   <Feather name="rotate-ccw" size={16} color="#fff" />
-                  <Text className="text-sm font-semibold text-white">Retake</Text>
+                  <Text className="text-sm font-semibold text-white">{t("camera.retake")}</Text>
                 </Pressable>
               </View>
 
@@ -262,7 +264,7 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                 {recognition.status === "idle" || recognition.status === "recognizing" ? (
                   <View className="flex-row items-center gap-3">
                     <ActivityIndicator color="#fff" size="small" />
-                    <Text className="text-sm text-white/80">Identifying item...</Text>
+                    <Text className="text-sm text-white/80">{t("camera.identifying")}</Text>
                   </View>
                 ) : recognition.status === "done" ? (
                   <View className="gap-3">
@@ -274,7 +276,7 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                         style={{ marginTop: 2 }}
                       />
                       <View className="flex-1">
-                        <Text className="text-xs text-white/60">AI identified</Text>
+                        <Text className="text-xs text-white/60">{t("camera.aiIdentified")}</Text>
                         <Text className="text-base font-bold text-white">
                           {recognition.name}
                         </Text>
@@ -290,13 +292,13 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                         onPress={handleRetake}
                         className="flex-1 items-center rounded-control border border-white/30 py-2.5"
                       >
-                        <Text className="text-sm font-semibold text-white/80">Retake</Text>
+                        <Text className="text-sm font-semibold text-white/80">{t("camera.retake")}</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => handleConfirm(true)}
                         className="flex-1 items-center rounded-control bg-white py-2.5"
                       >
-                        <Text className="text-sm font-semibold text-black">Use Photo</Text>
+                        <Text className="text-sm font-semibold text-black">{t("camera.usePhoto")}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -313,14 +315,14 @@ export function CameraCaptureModal({ visible, onClose, onConfirm }: Props) {
                         onPress={handleRetryRecognition}
                         className="flex-1 items-center rounded-control border border-white/30 py-2.5"
                       >
-                        <Text className="text-sm font-semibold text-white/80">Try Again</Text>
+                        <Text className="text-sm font-semibold text-white/80">{t("camera.tryAgain")}</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => handleConfirm(false)}
                         className="flex-1 items-center rounded-control bg-white py-2.5"
                       >
                         <Text className="text-sm font-semibold text-black">
-                          Use Without AI
+                          {t("camera.useWithoutAi")}
                         </Text>
                       </Pressable>
                     </View>

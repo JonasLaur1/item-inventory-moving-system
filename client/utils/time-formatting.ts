@@ -1,3 +1,5 @@
+import i18n from "@/lib/i18n";
+
 export function getMinutesAgo(occurredAt: string, nowMs: number): number {
   const timestamp = new Date(occurredAt).getTime();
 
@@ -10,20 +12,20 @@ export function getMinutesAgo(occurredAt: string, nowMs: number): number {
 
 export function formatRelativeTime(minutesAgo: number): string {
   if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
-    return "Unknown";
+    return i18n.t("common.unknown");
   }
 
   if (minutesAgo < 1) {
-    return "Just now";
+    return i18n.t("common.justNow");
   }
 
   if (minutesAgo < 60) {
-    return `${minutesAgo}m ago`;
+    return i18n.t("time.minutesAgo", { count: minutesAgo });
   }
 
   if (minutesAgo < 24 * 60) {
-    return `${Math.floor(minutesAgo / 60)}h ago`;
+    return i18n.t("time.hoursAgo", { count: Math.floor(minutesAgo / 60) });
   }
 
-  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
+  return i18n.t("time.daysAgo", { count: Math.floor(minutesAgo / (24 * 60)) });
 }

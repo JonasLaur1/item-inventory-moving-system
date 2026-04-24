@@ -2,7 +2,7 @@ import { CollaboratorPill } from "@/components/ui/collaborator-pill";
 import { MetaPill } from "@/components/ui/meta-pill";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import type { ActivityType } from "@/lib/activity.service";
-import { EVENT_DISPLAY_LABEL, getEventTone } from "@/utils/activity-tone";
+import { getEventDisplayLabel, getEventTone, getTranslatedActivityText } from "@/utils/activity-tone";
 import { Feather } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
@@ -11,6 +11,7 @@ export type ActivityEventType = ActivityType;
 export type ActivityEvent = {
   id: string;
   type: ActivityEventType;
+  entityType: string;
   title: string;
   description: string;
   location: string;
@@ -31,6 +32,7 @@ export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) 
   const tone = getEventTone(event.type);
   const isCollaborator = !event.isOwnEvent;
   const iconColor = resolvedTheme === "dark" ? tone.iconColor : tone.iconColor;
+  const { title, description } = getTranslatedActivityText(event);
 
   return (
     <View
@@ -44,14 +46,14 @@ export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) 
           </View>
 
           <View className="ml-3 flex-1">
-            <Text className="text-sm font-semibold text-text-primary">{event.title}</Text>
-            <Text className="mt-1 text-xs leading-5 text-text-tertiary">{event.description}</Text>
+            <Text className="text-sm font-semibold text-text-primary">{title}</Text>
+            <Text className="mt-1 text-xs leading-5 text-text-tertiary">{description}</Text>
           </View>
         </View>
 
         <View className={`rounded-full px-2.5 py-1 ${tone.badgeBgClassName}`}>
           <Text className={`text-[10px] font-semibold uppercase tracking-[0.7px] ${tone.badgeTextClassName}`}>
-            {EVENT_DISPLAY_LABEL[event.type] ?? event.type}
+            {getEventDisplayLabel(event.type)}
           </Text>
         </View>
       </View>
