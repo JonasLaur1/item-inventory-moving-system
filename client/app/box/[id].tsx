@@ -175,11 +175,17 @@ export default function BoxDetailsScreen() {
   const handleUnpackItem = useCallback(async (itemId: string) => {
     if (!box) return;
 
-    await itemService.markItemUnpacked(itemId);
-
     const allWillBeUnpacked = box.items.length > 0 && box.items.every(
       (item) => item.id === itemId || item.unpackedAt !== null,
     );
+
+    setBox((prev) => {
+      if (!prev) return prev;
+      const now = new Date().toISOString();
+      return { ...prev, items: prev.items.map((item) => item.id === itemId ? { ...item, unpackedAt: now } : item) };
+    });
+
+    await itemService.markItemUnpacked(itemId);
 
     if (allWillBeUnpacked) {
       await boxService.markBoxUnpackedAtDestination(boxId);

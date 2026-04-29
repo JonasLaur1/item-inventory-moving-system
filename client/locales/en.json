@@ -284,8 +284,8 @@
     "deleteItemDesc": "Delete \"{{name}}\" permanently.",
     "deleteItemFallback": "Delete this item permanently.",
     "deleteBox": "Delete box?",
-    "deleteBoxDesc": "Delete \"{{name}}\" permanently. Deletion is blocked if the box still has items.",
-    "deleteBoxFallback": "Delete this box permanently.",
+    "deleteBoxDesc": "Delete \"{{name}}\" permanently. All items inside will also be deleted.",
+    "deleteBoxFallback": "Delete this box permanently. All items inside will also be deleted.",
     "items": "Items"
   },
   "roomDetail": {
@@ -320,9 +320,8 @@
     "addressPlaceholder": "Address (optional)",
     "failedUpdateAddress": "Failed to update address.",
     "deleteLocation": "Delete location?",
-    "deleteLocationDesc": "Delete \"{{name}}\" permanently. If this location still has rooms, deletion will be blocked.",
-    "deleteLocationFallback": "Delete this location permanently.",
-    "removeRoomsFirst": "Remove all rooms before deleting this location.",
+    "deleteLocationDesc": "Delete \"{{name}}\" permanently. All rooms, boxes, and items inside will also be deleted.",
+    "deleteLocationFallback": "Delete this location permanently. All rooms, boxes, and items inside will also be deleted.",
     "rooms": "Rooms",
     "addRoom": "Add Room",
     "packedBoxes": "Packed boxes",

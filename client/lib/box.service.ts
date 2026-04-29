@@ -89,7 +89,6 @@ export type UpdateBoxInput = {
   status: BoxStatus;
 };
 
-const BOX_HAS_ITEMS_MESSAGE = "Box has items. Empty it before deleting.";
 
 async function getCurrentUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
@@ -633,15 +632,12 @@ async function deleteBox(boxId: string): Promise<void> {
     throw new Error("Box not found.");
   }
 
-  const { count, error: countError } = await supabase
+  const { error: deleteItemsError } = await supabase
     .from("items")
-    .select("id", { count: "exact", head: true })
+    .delete()
     .eq("box_id", normalizedBoxId);
 
-  if (countError) throw countError;
-  if ((count ?? 0) > 0) {
-    throw new Error(BOX_HAS_ITEMS_MESSAGE);
-  }
+  if (deleteItemsError) throw deleteItemsError;
 
   const roomContextMap = await getRoomContextMap(
     userId,
@@ -677,10 +673,6 @@ async function deleteBox(boxId: string): Promise<void> {
     .maybeSingle();
 
   if (error) {
-    if (isForeignKeyViolation(error)) {
-      throw new Error(BOX_HAS_ITEMS_MESSAGE);
-    }
-
     throw error;
   }
 

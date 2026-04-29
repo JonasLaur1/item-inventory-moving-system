@@ -147,7 +147,6 @@ export default function LocationDetailsScreen() {
     setEditedLocationName(location.name);
   }, [isEditingName, location]);
 
-  const hasRooms = rooms.length > 0;
 
   const openNameEditor = useCallback(() => {
     if (!location) return;
@@ -472,8 +471,8 @@ export default function LocationDetailsScreen() {
                           <Pressable
                             onPress={openDeleteLocationModal}
                             hitSlop={8}
-                            className={`h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10 ${hasRooms ? "opacity-40" : ""}`}
-                            disabled={isDeletingLocation || hasRooms}
+                            className="h-10 w-10 items-center justify-center rounded-full border border-crimson/40 bg-crimson/10"
+                            disabled={isDeletingLocation}
                           >
                             <Feather name="trash-2" size={18} color={themeColors.crimson} />
                           </Pressable>
@@ -484,10 +483,6 @@ export default function LocationDetailsScreen() {
                 </View>
               </View>
             </View>
-
-            {hasRooms ? (
-              <Text className="mt-2 text-xs text-text-tertiary">{t("locationDetail.removeRoomsFirst")}</Text>
-            ) : null}
 
             <View className="mt-6 flex-row flex-wrap justify-between gap-y-3">
               <MetricCard

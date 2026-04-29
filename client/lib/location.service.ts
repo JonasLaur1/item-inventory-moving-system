@@ -505,6 +505,49 @@ async function deleteLocation(locationId: string): Promise<void> {
     throw new Error("Location not found.");
   }
 
+  const { data: roomRows, error: roomsError } = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("location_id", normalizedLocationId);
+
+  if (roomsError) throw roomsError;
+
+  if (roomRows && roomRows.length > 0) {
+    const roomIds = roomRows.map((r) => r.id);
+
+    const { data: boxRows, error: boxesError } = await supabase
+      .from("boxes")
+      .select("id")
+      .in("room_id", roomIds);
+
+    if (boxesError) throw boxesError;
+
+    if (boxRows && boxRows.length > 0) {
+      const boxIds = boxRows.map((b) => b.id);
+
+      const { error: deleteItemsError } = await supabase
+        .from("items")
+        .delete()
+        .in("box_id", boxIds);
+
+      if (deleteItemsError) throw deleteItemsError;
+
+      const { error: deleteBoxesError } = await supabase
+        .from("boxes")
+        .delete()
+        .in("id", boxIds);
+
+      if (deleteBoxesError) throw deleteBoxesError;
+    }
+
+    const { error: deleteRoomsError } = await supabase
+      .from("rooms")
+      .delete()
+      .in("id", roomIds);
+
+    if (deleteRoomsError) throw deleteRoomsError;
+  }
+
   await activityService.writeActivitySafely({
     type: "Deleted",
     entityType: "location",
@@ -523,13 +566,7 @@ async function deleteLocation(locationId: string): Promise<void> {
     .select("id")
     .maybeSingle();
 
-  if (error) {
-    if (isForeignKeyViolation(error)) {
-      throw new Error("Location has rooms. Remove or move its rooms before deleting it.");
-    }
-
-    throw error;
-  }
+  if (error) throw error;
 
   if (!data) {
     throw new Error("Location not found.");
