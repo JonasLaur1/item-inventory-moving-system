@@ -170,6 +170,41 @@ const TEXT_MAX_CHARS_PER_LINE = 30; // 720px / (6px/char × 4) = 30 chars per li
 const TEXT_LINE_GAP_PX = 4;  // blank rows between wrapped lines
 const FRAGILE_SCALE = 5;      // render each font pixel as 5×5 physical pixels for FRAGILE banner
 const FRAGILE_GAP_PX = 12;   // gap between QR code and FRAGILE banner
+const FRAGILE_ICON_GAP_PX = 8; // gap between wine glass icon and FRAGILE text
+
+// Outlined wine glass with diagonal crack (32 columns × 26 rows).
+// Bit 31 = leftmost column (col 0), bit 0 = rightmost (col 31). Image is horizontally mirrored on print.
+// prettier-ignore
+const FRAGILE_ICON_WIDTH = 32;
+// prettier-ignore
+const FRAGILE_ICON_ROWS: number[] = [
+  0x0FFFFFF0,  //  0: rim solid (cols 4-27)
+  0x0FFFFFF0,  //  1: rim solid
+  0x0C000030,  //  2: bowl outline cols 4-5, 26-27
+  0x06000060,  //  3: bowl cols 5-6, 25-26
+  0x030000C0,  //  4: bowl cols 6-7, 24-25
+  0x01802180,  //  5: bowl cols 7-8, 23-24 + crack col 18
+  0x00C04300,  //  6: bowl cols 8-9, 22-23 + crack col 17
+  0x00608600,  //  7: bowl cols 9-10, 21-22 + crack col 16
+  0x00310C00,  //  8: bowl cols 10-11, 20-21 + crack col 15
+  0x00181800,  //  9: bowl cols 11-12, 19-20
+  0x000C3000,  // 10: bowl cols 12-13, 18-19
+  0x00066000,  // 11: bowl cols 13-14, 17-18
+  0x0007E000,  // 12: bowl bottom solid cols 13-18
+  0x00018000,  // 13: stem cols 15-16
+  0x00018000,  // 14: stem
+  0x00018000,  // 15: stem
+  0x00018000,  // 16: stem
+  0x00018000,  // 17: stem
+  0x00018000,  // 18: stem
+  0x00018000,  // 19: stem
+  0x00018000,  // 20: stem
+  0x001FF800,  // 21: base top cols 11-20
+  0x00FFFF00,  // 22: base cols 8-23
+  0x07FFFFE0,  // 23: base cols 5-26
+  0x0FFFFFF0,  // 24: base solid cols 4-27
+  0x0FFFFFF0,  // 25: base solid
+];
 
 function getCharCols(charCode: number): Uint8Array {
   const idx = charCode < 32 || charCode > 126 ? 63 - 32 : charCode - 32; // '?' fallback
@@ -243,6 +278,34 @@ function renderTextLine(text: string, scale = TEXT_SCALE): Uint8Array[] {
   return lines;
 }
 
+/** Render the wine glass icon bitmap centered on the label. */
+function renderFragileIcon(scale = FRAGILE_SCALE): Uint8Array[] {
+  const iconWidthPx = FRAGILE_ICON_WIDTH * scale;
+  const leftPadPx = Math.max(0, Math.floor((BYTES_PER_LINE * 8 - iconWidthPx) / 2));
+  const totalRows = FRAGILE_ICON_ROWS.length * scale;
+
+  const lines: Uint8Array[] = Array.from({ length: totalRows }, () => new Uint8Array(BYTES_PER_LINE));
+
+  for (let ri = 0; ri < FRAGILE_ICON_ROWS.length; ri++) {
+    const rowBits = FRAGILE_ICON_ROWS[ri];
+    for (let col = 0; col < FRAGILE_ICON_WIDTH; col++) {
+      if (!((rowBits >> (FRAGILE_ICON_WIDTH - 1 - col)) & 1)) continue;
+      for (let rs = 0; rs < scale; rs++) {
+        const rasterRow = ri * scale + rs;
+        for (let cs = 0; cs < scale; cs++) {
+          const pixX = leftPadPx + col * scale + cs;
+          if (pixX >= 0 && pixX < BYTES_PER_LINE * 8) {
+            const mirX = BYTES_PER_LINE * 8 - 1 - pixX;
+            lines[rasterRow][Math.floor(mirX / 8)] |= 1 << (7 - (mirX % 8));
+          }
+        }
+      }
+    }
+  }
+
+  return lines;
+}
+
 /**
  * Build a complete Brother QL raster print payload for a QR code.
  * Protocol reference: Brother P-touch Raster Command Reference (QL series).
@@ -254,7 +317,9 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix, routeLabel?: string, fragil
   const leftPadPx = Math.floor(((BYTES_PER_LINE * 8) - qrAreaPixels) / 2);
   const qrHeightPx = modulePixels * totalModules;
 
-  const routeWrapped = routeLabel ? wrapText(normalizeForFont(routeLabel), TEXT_MAX_CHARS_PER_LINE) : [];
+  const routeWrapped = routeLabel
+    ? routeLabel.split("\n").flatMap((seg) => wrapText(normalizeForFont(seg), TEXT_MAX_CHARS_PER_LINE))
+    : [];
   const routeRasterGroups = routeWrapped.map((line) => renderTextLine(line));
   const textSectionPx = routeRasterGroups.length > 0
     ? routeRasterGroups.reduce((sum, g) => sum + g.length, 0)
@@ -262,8 +327,11 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix, routeLabel?: string, fragil
       + TEXT_TO_QR_GAP_PX
     : 0;
 
+  const fragileIconLines = fragile ? renderFragileIcon() : [];
   const fragileLines = fragile ? renderTextLine("** FRAGILE **", FRAGILE_SCALE) : [];
-  const fragileSectionPx = fragileLines.length > 0 ? FRAGILE_GAP_PX + fragileLines.length : 0;
+  const fragileSectionPx = fragileLines.length > 0
+    ? FRAGILE_GAP_PX + fragileIconLines.length + FRAGILE_ICON_GAP_PX + fragileLines.length
+    : 0;
 
   const buildRasterLine = (pixRow: number): Uint8Array => {
     const modRow = Math.floor(pixRow / modulePixels) - QUIET_ZONE_MODULES;
@@ -318,10 +386,14 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix, routeLabel?: string, fragil
 
   // DK-22251 (black + red two-color): must use `w` (0x77) with two separate plane commands
   // per line — single-plane `g` (0x67) commands cause "wrong roll type" on the QL-820NWB.
-  const redPlane = new Uint8Array(BYTES_PER_LINE); // red plane always zero (black-only label)
+  const emptyPlane = new Uint8Array(BYTES_PER_LINE);
   const pushLine = (data: Uint8Array): void => {
-    parts.push(new Uint8Array([0x77, 0x01, BYTES_PER_LINE, ...data]));     // black plane
-    parts.push(new Uint8Array([0x77, 0x02, BYTES_PER_LINE, ...redPlane])); // red plane (empty)
+    parts.push(new Uint8Array([0x77, 0x01, BYTES_PER_LINE, ...data]));       // black plane
+    parts.push(new Uint8Array([0x77, 0x02, BYTES_PER_LINE, ...emptyPlane])); // red plane (empty)
+  };
+  const pushRedLine = (data: Uint8Array): void => {
+    parts.push(new Uint8Array([0x77, 0x01, BYTES_PER_LINE, ...emptyPlane])); // black plane (empty)
+    parts.push(new Uint8Array([0x77, 0x02, BYTES_PER_LINE, ...data]));       // red plane
   };
 
   // 8. Raster lines: top margin + optional route label + gap + QR code + optional FRAGILE banner + bottom margin
@@ -335,7 +407,9 @@ function buildBrotherRasterBytes(qrMatrix: QrMatrix, routeLabel?: string, fragil
   for (let i = 0; i < (routeRasterGroups.length > 0 ? TEXT_TO_QR_GAP_PX : 0); i++) pushLine(blankLine);
   for (let row = 0; row < qrHeightPx; row++) pushLine(buildRasterLine(row));
   for (let i = 0; i < (fragileLines.length > 0 ? FRAGILE_GAP_PX : 0); i++) pushLine(blankLine);
-  for (const line of fragileLines) pushLine(line);
+  for (const line of fragileIconLines) pushRedLine(line);
+  for (let i = 0; i < (fragileLines.length > 0 ? FRAGILE_ICON_GAP_PX : 0); i++) pushLine(blankLine);
+  for (const line of fragileLines) pushRedLine(line);
   for (let i = 0; i < BOTTOM_MARGIN_PX; i++) pushLine(blankLine);
 
   // 9. Print with feeding

@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { AntDesign, Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { Button } from "@/components/button";
@@ -83,6 +83,7 @@ export default function App() {
 
               <View className="mt-12 gap-4">
                 <FormInput
+                  testID="email-input"
                   label={t("auth.emailAddress")}
                   placeholder={t("auth.emailPlaceholder")}
                   leftIcon="mail"
@@ -102,7 +103,8 @@ export default function App() {
                     </Pressable>
                   </View>
                   <FormInput
-                    placeholder="........"
+                    testID="password-input"
+                    placeholder="password\"
                     leftIcon="lock"
                     value={password}
                     onChangeText={setPassword}
@@ -141,25 +143,6 @@ export default function App() {
                 }
               />
 
-              <View className="mt-8 flex-row items-center">
-                <View className="h-px flex-1 bg-text-tertiary/20" />
-                <Text className="mx-4 text-sm text-text-tertiary">{t("auth.orContinueWith")}</Text>
-                <View className="h-px flex-1 bg-text-tertiary/20" />
-              </View>
-
-              <View className="mt-8">
-                <Button
-                  label={t("auth.google")}
-                  variant="secondary"
-                  leftIcon={
-                    <AntDesign
-                      name="google"
-                      size={16}
-                      color={Colors.dark.textPrimary}
-                    />
-                  }
-                />
-              </View>
 
               <View className="mt-auto pt-10 flex-row items-center justify-center">
                 <Text className="text-sm text-text-tertiary">

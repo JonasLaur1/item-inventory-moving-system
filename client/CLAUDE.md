@@ -37,9 +37,9 @@ Claude **must ask before**:
 - Adding a new `lib/` service file for a domain that doesn't yet exist.
 
 ### Testing & verification
-- **No test framework is currently configured.** Do not run `npm test` — it will fail.
+- **Jest is configured** (`jest-expo`, `react-test-renderer`). Run `yarn test` or `yarn test:watch`. Coverage via `yarn test:coverage`.
 - Always run `npx tsc` after modifying TypeScript files to check for type errors.
-- Do not introduce a test framework without asking.
+- Tests live in `components/tests/`, `hooks/tests/`, `lib/__tests__/`, `utils/__tests__/`.
 
 ### Communication style
 - Be direct and implementation-focused.

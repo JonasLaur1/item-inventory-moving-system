@@ -1,0 +1,47 @@
+appId: com.jonaslaur.boxit
+---
+# TC-03: User registration
+# Verifies that a new user can create an account and reach the Home screen.
+# Uses a timestamp-based email to avoid duplicate account errors across runs.
+# Set BOXIT_REG_EMAIL to a fresh address before each run, e.g.:
+#   BOXIT_REG_EMAIL=test_$(date +%s)@boxit.lt
+
+- launchApp:
+    clearState: true
+
+- assertVisible: "BoxIt"
+
+# Navigate to registration screen
+- tapOn: "Sign Up"
+
+- assertVisible: "Create Account"
+- assertVisible: "Start your smart move today with AI-powered packing."
+
+# Fill username
+- tapOn:
+    text: "Username"
+- inputText: "TestUser"
+
+# Fill email
+- tapOn:
+    text: "El. pašto adresas"
+- inputText: ${BOXIT_REG_EMAIL}
+
+# Fill password (must be ≥6 chars)
+- tapOn:
+    text: "Slaptažodis"
+- inputText: "securepass123"
+
+
+# Password strength indicator should show Strong
+- assertVisible: "Password Strength"
+
+- tapOn: "Get Started"
+
+# After successful registration user lands on Home
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 10000
+
+- assertVisible: "Home"
