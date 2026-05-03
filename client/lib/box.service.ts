@@ -1,5 +1,6 @@
 import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
+import { getCurrentUserId, normalizeFragility, resolveUniqueName } from "@/lib/utils/service-utils";
 
 type BoxStatus = "packed" | "unpacked" | "delivered" | "unpacked_at_destination";
 
@@ -90,18 +91,6 @@ export type UpdateBoxInput = {
 };
 
 
-async function getCurrentUserId(): Promise<string> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-
-  const userId = data.user?.id;
-  if (!userId) {
-    throw new Error("No authenticated user found.");
-  }
-
-  return userId;
-}
-
 function normalizeStatus(status: string | null): BoxStatus {
   switch (status?.toLowerCase()) {
     case "packed":
@@ -127,20 +116,6 @@ function normalizeInputStatus(status: string): BoxStatus {
 }
 
 
-function normalizeFragility(value: string | null): boolean {
-  if (!value) {
-    return false;
-  }
-
-  const normalized = value.toLowerCase();
-
-  if (normalized === "none" || normalized === "normal" || normalized === "not_fragile") {
-    return false;
-  }
-
-  return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
-}
-
 function normalizeRoomContextRow(row: RoomContextRow): RoomContext {
   const location = Array.isArray(row.location) ? row.location[0] : row.location;
 
@@ -150,27 +125,6 @@ function normalizeRoomContextRow(row: RoomContextRow): RoomContext {
     parentLocationId: location?.id ?? row.location_id,
     parentLocationName: location?.name ?? "Unknown location",
   };
-}
-
-function resolveUniqueName(baseName: string, existingNames: string[]): string {
-  const lower = baseName.toLowerCase();
-
-  if (!existingNames.some((n) => n.toLowerCase() === lower)) {
-    return baseName;
-  }
-
-  const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^${escaped} #(\\d+)$`, "i");
-  let maxN = 1;
-
-  for (const name of existingNames) {
-    const match = name.match(pattern);
-    if (match) {
-      maxN = Math.max(maxN, parseInt(match[1], 10));
-    }
-  }
-
-  return `${baseName} #${maxN + 1}`;
 }
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -711,12 +665,9 @@ async function markBoxDelivered(boxId: string, destinationLocationId?: string | 
         originRoomContext?.roomName ?? null,
         userId,
       );
-      console.log("[markBoxDelivered] destinationRoom resolved:", destinationRoom);
-    } catch (err) {
-      console.error("[markBoxDelivered] Failed to resolve destination room:", err);
+    } catch {
+      // destination room resolution is best-effort; proceed without it
     }
-  } else {
-    console.log("[markBoxDelivered] No destinationLocationId provided, toLocationId was:", destinationLocationId);
   }
 
   const updatePayload: { status: string; room_id?: string } = { status: "delivered" };
@@ -724,14 +675,10 @@ async function markBoxDelivered(boxId: string, destinationLocationId?: string | 
     updatePayload.room_id = destinationRoom.roomId;
   }
 
-  console.log("[markBoxDelivered] Updating box with payload:", updatePayload);
-
   const { error } = await supabase
     .from("boxes")
     .update(updatePayload)
     .eq("id", normalizedBoxId);
-
-  console.log("[markBoxDelivered] Update result error:", error);
 
   if (error) throw error;
 
