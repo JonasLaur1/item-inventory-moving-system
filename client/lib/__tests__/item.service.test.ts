@@ -23,7 +23,7 @@ const mockStorageFrom = supabase.storage.from as jest.Mock;
 
 function makeMockChain(result: Record<string, unknown> = { data: null, error: null }) {
   const self: any = {};
-  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'order', 'limit', 'ilike']) {
+  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'order', 'limit', 'ilike', 'not', 'is']) {
     self[m] = jest.fn().mockReturnValue(self);
   }
   self.maybeSingle = jest.fn().mockResolvedValue(result);
@@ -387,5 +387,254 @@ describe('itemService.removeItemPhoto', () => {
     mockFrom.mockReturnValue(updateChain);
 
     await expect(itemService.removeItemPhoto(ITEM_ID)).rejects.toThrow('update failed');
+  });
+});
+
+describe('itemService.updateItem – blank itemId', () => {
+  it('throws when itemId is blank', async () => {
+    await expect(
+      itemService.updateItem('   ', { name: 'Plates', quantity: 1, boxId: BOX_ID }),
+    ).rejects.toThrow('Item id is required.');
+  });
+});
+
+describe('itemService.updateItem – update returns no data', () => {
+  it('throws when update query returns no row', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Updated', notes: null, quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(
+      itemService.updateItem(ITEM_ID, { name: 'Updated', quantity: 4, boxId: BOX_ID }),
+    ).rejects.toThrow('Item not found.');
+  });
+});
+
+describe('itemService.updateItem – no changes branch', () => {
+  it('returns early without logging activity when nothing changed and isFragile is false', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await expect(
+      itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).not.toHaveBeenCalled();
+  });
+
+  it('calls markBoxFragileIfNeeded when no changes but isFragile is true', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+    const boxUpdateChain = makeMockChain({ error: null });
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: true, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { ...fakeBoxContext, fragility: 'normal' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }))
+      .mockReturnValueOnce(boxUpdateChain);
+
+    await expect(
+      itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID, isFragile: true }),
+    ).resolves.toBeUndefined();
+
+    expect(boxUpdateChain.update).toHaveBeenCalledWith({ fragility: 'fragile' });
+    expect(activitySvc.writeActivitySafely).not.toHaveBeenCalled();
+  });
+});
+
+describe('itemService.updateItem – isFragile with changes', () => {
+  it('calls markBoxFragileIfNeeded when changes exist and isFragile is true', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { ...fakeBoxContext, fragility: 'fragile' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await expect(
+      itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID, isFragile: true }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Updated' }),
+    );
+  });
+});
+
+describe('itemService.updateItem – change detail descriptions', () => {
+  it('includes "marked as fragile" when fragility changes to true', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { ...fakeBoxContext, fragility: 'fragile' }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID, isFragile: true });
+
+    const call = activitySvc.writeActivitySafely.mock.calls[0][0];
+    expect(call.description).toContain('marked as fragile');
+  });
+
+  it('includes "notes cleared" when notes removed', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: 'old notes', quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID, notes: null });
+
+    const call = activitySvc.writeActivitySafely.mock.calls[0][0];
+    expect(call.description).toContain('notes cleared');
+  });
+
+  it('includes "notes updated" when notes added', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', notes: null, quantity: 4, is_fragile: false, box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null }));
+
+    await itemService.updateItem(ITEM_ID, { name: 'Plates', quantity: 4, boxId: BOX_ID, notes: 'new notes' });
+
+    const call = activitySvc.writeActivitySafely.mock.calls[0][0];
+    expect(call.description).toContain('notes updated');
+  });
+});
+
+describe('itemService.searchItems', () => {
+  it('returns empty array for blank query', async () => {
+    const result = await itemService.searchItems('   ');
+    expect(result).toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('returns mapped search results with nested objects', async () => {
+    const row = {
+      id: ITEM_ID,
+      name: 'Plates',
+      quantity: 4,
+      is_fragile: false,
+      box_id: BOX_ID,
+      boxes: { name: 'Box #1', rooms: { name: 'Kitchen', locations: { name: 'My Home' } } },
+    };
+    mockFrom.mockReturnValue(makeMockChain({ data: [row], error: null }));
+
+    const result = await itemService.searchItems('Plates');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: ITEM_ID,
+      name: 'Plates',
+      boxName: 'Box #1',
+      roomName: 'Kitchen',
+      locationName: 'My Home',
+    });
+  });
+
+  it('returns mapped results with array-wrapped nested relations', async () => {
+    const row = {
+      id: ITEM_ID,
+      name: 'Cup',
+      quantity: 1,
+      is_fragile: null,
+      box_id: BOX_ID,
+      boxes: [{ name: 'Box #1', rooms: [{ name: 'Kitchen', locations: [{ name: 'My Home' }] }] }],
+    };
+    mockFrom.mockReturnValue(makeMockChain({ data: [row], error: null }));
+
+    const result = await itemService.searchItems('Cup');
+
+    expect(result[0].boxName).toBe('Box #1');
+    expect(result[0].roomName).toBe('Kitchen');
+    expect(result[0].locationName).toBe('My Home');
+  });
+
+  it('throws when query returns an error', async () => {
+    mockFrom.mockReturnValue(makeMockChain({ data: null, error: new Error('search failed') }));
+
+    await expect(itemService.searchItems('Plates')).rejects.toThrow('search failed');
+  });
+});
+
+describe('itemService.markItemUnpacked', () => {
+  it('throws when itemId is blank', async () => {
+    await expect(itemService.markItemUnpacked('   ')).rejects.toThrow('Item id is required.');
+  });
+
+  it('throws when item is not found', async () => {
+    mockFrom.mockReturnValue(makeMockChain({ data: null, error: null }));
+
+    await expect(itemService.markItemUnpacked(ITEM_ID)).rejects.toThrow('Item not found.');
+  });
+
+  it('marks item unpacked and logs activity when box_id is set', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', box_id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }));
+
+    await expect(itemService.markItemUnpacked(ITEM_ID)).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Updated', title: 'Item unpacked' }),
+    );
+  });
+
+  it('marks item unpacked without activity when box_id is null', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID, name: 'Plates', box_id: null }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ error: null }));
+
+    await expect(itemService.markItemUnpacked(ITEM_ID)).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).not.toHaveBeenCalled();
+  });
+});
+
+describe('itemService.deleteItem – no data after delete', () => {
+  it('throws when delete query returns no row', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeItem, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: fakeBoxContext, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+
+    await expect(itemService.deleteItem(ITEM_ID)).rejects.toThrow('Item not found.');
+  });
+});
+
+describe('itemService – box with null room in context (getNormalizedRoomLocation / getRoomNameByRoomId)', () => {
+  it('handles box with null room and null room_id in activity context', async () => {
+    const nullRoomBox = { id: BOX_ID, name: 'Box', room_id: null, fragility: null, room: null };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeItem, error: null })) // itemBeforeDelete
+      .mockReturnValueOnce(makeMockChain({ data: nullRoomBox, error: null })) // assertUserOwnsBox
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null })); // delete
+
+    await expect(itemService.deleteItem(ITEM_ID)).resolves.toBeUndefined();
+  });
+
+  it('calls DB to resolve room name when box room join is null but room_id is set', async () => {
+    const nullRoomJoinBox = { id: BOX_ID, name: 'Box', room_id: ROOM_ID, fragility: null, room: null };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeItem, error: null })) // itemBeforeDelete
+      .mockReturnValueOnce(makeMockChain({ data: nullRoomJoinBox, error: null })) // assertUserOwnsBox
+      .mockReturnValueOnce(makeMockChain({ data: { name: 'Kitchen' }, error: null })) // getRoomNameByRoomId
+      .mockReturnValueOnce(makeMockChain({ data: { id: ITEM_ID }, error: null })); // delete
+
+    await expect(itemService.deleteItem(ITEM_ID)).resolves.toBeUndefined();
   });
 });

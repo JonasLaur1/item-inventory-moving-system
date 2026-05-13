@@ -512,6 +512,7 @@ export default function LocationDetailsScreen() {
                 <CardGrid
                   items={rooms}
                   compact={isCompact}
+                  itemMinHeight={110}
                   className="mt-4"
                   keyExtractor={(room) => room.id}
                   renderItem={(room, contentStyle) => (

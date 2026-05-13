@@ -1,6 +1,5 @@
 import { Colors } from "@/constants/theme";
 import { Feather } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
@@ -58,7 +57,6 @@ export default function App() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
-      <StatusBar style="light" />
       <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -104,7 +102,7 @@ export default function App() {
                   </View>
                   <FormInput
                     testID="password-input"
-                    placeholder="password\"
+                    placeholder="••••••••"
                     leftIcon="lock"
                     value={password}
                     onChangeText={setPassword}

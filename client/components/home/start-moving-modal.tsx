@@ -82,6 +82,16 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
     setToId(null);
   };
 
+  const handleFromSelect = (id: string) => {
+    setFromId(id);
+    if (id === toId) setToId(null);
+  };
+
+  const handleToSelect = (id: string) => {
+    setToId(id);
+    if (id === fromId) setFromId(null);
+  };
+
   return (
     <AppModal
       visible={visible}
@@ -97,16 +107,16 @@ export function StartMovingModal({ visible, locations, onConfirm, onClose }: Pro
             label={t("movingProgress.from")}
             selectedId={fromId}
             locations={locations}
-            disabledId={toId}
-            onSelect={setFromId}
+            disabledId={null}
+            onSelect={handleFromSelect}
             iconColor={primaryColor}
           />
           <LocationPicker
             label={t("movingProgress.to")}
             selectedId={toId}
             locations={locations}
-            disabledId={fromId}
-            onSelect={setToId}
+            disabledId={null}
+            onSelect={handleToSelect}
             iconColor={primaryColor}
           />
         </View>

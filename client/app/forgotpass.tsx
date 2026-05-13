@@ -2,7 +2,6 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { Colors } from "@/constants/theme";
 import { Feather } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import {
   KeyboardAvoidingView,
@@ -56,7 +55,6 @@ export default function ForgotPass() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
-      <StatusBar style="light" />
       <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}

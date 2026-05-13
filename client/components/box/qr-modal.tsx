@@ -31,6 +31,8 @@ type QrModalProps = {
   onSelectDevice: (device: BluetoothDevice) => void;
   onRescan: () => void;
   onRegenerate: () => void;
+  onDownloadPdf: () => void;
+  isDownloadingPdf: boolean;
 };
 
 export function QrModal({
@@ -51,6 +53,8 @@ export function QrModal({
   onSelectDevice,
   onRescan,
   onRegenerate,
+  onDownloadPdf,
+  isDownloadingPdf,
 }: QrModalProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"qr" | "printer">("qr");
@@ -149,10 +153,10 @@ export function QrModal({
               className="flex-1"
             />
             <Button
-              label={t("modals.regenerate")}
+              label={isDownloadingPdf ? t("modals.downloadingPdf") : t("modals.downloadPdf")}
               variant="secondary"
-              onPress={onRegenerate}
-              disabled={isPrinting}
+              onPress={onDownloadPdf}
+              disabled={isPrinting || isDownloadingPdf}
               className="flex-1"
             />
           </View>

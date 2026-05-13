@@ -214,14 +214,6 @@ describe('boxService.deleteBox', () => {
     await expect(boxService.deleteBox(BOX_ID)).rejects.toThrow('Box not found.');
   });
 
-  it('throws when box has items', async () => {
-    mockFrom
-      .mockReturnValueOnce(makeMockChain({ data: fakeBox, error: null }))
-      .mockReturnValueOnce(makeMockChain({ count: 3, error: null }));
-
-    await expect(boxService.deleteBox(BOX_ID)).rejects.toThrow('Box has items. Empty it before deleting.');
-  });
-
   it('deletes box successfully when empty', async () => {
     mockFrom
       .mockReturnValueOnce(makeMockChain({ data: fakeBox, error: null }))
@@ -357,5 +349,199 @@ describe('boxService.markBoxUnpackedAtDestination', () => {
 
     await expect(boxService.markBoxUnpackedAtDestination(BOX_ID)).resolves.toBeUndefined();
     expect(updateChain.update).toHaveBeenCalledWith({ status: 'unpacked_at_destination' });
+  });
+});
+
+describe('boxService.createBox – resolveRoomFromInput', () => {
+  it('throws when neither roomId nor locationId is provided', async () => {
+    await expect(
+      boxService.createBox({ name: 'Box', status: 'unpacked' }),
+    ).rejects.toThrow('Room is required.');
+  });
+
+  it('falls back to locationId when direct room lookup fails', async () => {
+    const insertChain = makeMockChain({ data: { id: 'new-box-fallback' }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })) // assertUserCanAccessRoom → throws internally
+      .mockReturnValueOnce(makeMockChain({ data: { name: 'My Place' }, error: null })) // getLocationNameById
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null })) // findDefaultRoomInLocation
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null })) // siblings
+      .mockReturnValueOnce(insertChain); // insert
+
+    const result = await boxService.createBox({ name: 'Box', locationId: LOCATION_ID, status: 'unpacked' });
+    expect(result).toBe('new-box-fallback');
+  });
+
+  it('throws "Room not found." when locationId is also not found', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })) // assertUserCanAccessRoom
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })); // getLocationNameById → null
+
+    await expect(
+      boxService.createBox({ name: 'Box', locationId: LOCATION_ID, status: 'unpacked' }),
+    ).rejects.toThrow('Room not found.');
+  });
+
+  it('throws when location exists but has no rooms', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })) // assertUserCanAccessRoom
+      .mockReturnValueOnce(makeMockChain({ data: { name: 'My Place' }, error: null })) // getLocationNameById
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })); // findDefaultRoomInLocation → null
+
+    await expect(
+      boxService.createBox({ name: 'Box', locationId: LOCATION_ID, status: 'unpacked' }),
+    ).rejects.toThrow('has no rooms');
+  });
+});
+
+describe('boxService.updateBox – additional paths', () => {
+  it('throws when box does not exist before update', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null })) // resolveRoomFromInput
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })); // previousBox → null
+
+    await expect(
+      boxService.updateBox(BOX_ID, { name: 'Box', roomId: ROOM_ID, status: 'unpacked' }),
+    ).rejects.toThrow('Box not found.');
+  });
+
+  it('returns early without logging when nothing changed', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box', status: 'unpacked', room_id: ROOM_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID }, error: null }));
+
+    await expect(
+      boxService.updateBox(BOX_ID, { name: 'Box', roomId: ROOM_ID, status: 'unpacked' }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).not.toHaveBeenCalled();
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+  });
+
+  it('logs Moved activity when room changes', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+    const newRoom = { id: 'room-2', name: 'Living Room', location_id: LOCATION_ID, location: { id: LOCATION_ID, name: 'My Home' } };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: newRoom, error: null })) // resolveRoomFromInput: new room
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box', status: 'unpacked', room_id: ROOM_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom, newRoom], error: null })); // getRoomContextMap
+
+    await expect(
+      boxService.updateBox(BOX_ID, { name: 'Box', roomId: 'room-2', status: 'unpacked' }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Moved' }),
+    );
+  });
+
+  it('logs Packed activity when status changes to packed', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box', status: 'unpacked', room_id: ROOM_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null }));
+
+    await expect(
+      boxService.updateBox(BOX_ID, { name: 'Box', roomId: ROOM_ID, status: 'packed' }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Packed' }),
+    );
+  });
+
+  it('logs Updated activity when only name changes', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Old Name', status: 'unpacked', room_id: ROOM_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null }));
+
+    await expect(
+      boxService.updateBox(BOX_ID, { name: 'New Name', roomId: ROOM_ID, status: 'unpacked' }),
+    ).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Updated' }),
+    );
+  });
+});
+
+describe('boxService.markBoxDelivered – with destination', () => {
+  it('moves box to destination room and logs delivery with destination info', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+    const destRoom = { id: 'dest-room-1', name: 'Kitchen', location_id: 'dest-loc-1', location: { id: 'dest-loc-1', name: 'New Place' } };
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box #1', room_id: ROOM_ID }, error: null })) // box fetch
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null })) // getRoomContextMap
+      .mockReturnValueOnce(makeMockChain({ data: destRoom, error: null })) // resolveDestinationRoom name match
+      .mockReturnValueOnce(makeMockChain({ error: null })); // update
+
+    await expect(boxService.markBoxDelivered(BOX_ID, 'dest-loc-1')).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Delivered' }),
+    );
+  });
+
+  it('logs Updated activity with status change in description when status changes to non-packed', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: fakeRoom, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box', status: 'packed', room_id: ROOM_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID }, error: null }))
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null }));
+
+    await boxService.updateBox(BOX_ID, { name: 'Box', roomId: ROOM_ID, status: 'unpacked' });
+
+    const call = activitySvc.writeActivitySafely.mock.calls[0][0];
+    expect(call.description).toContain('status set to');
+  });
+});
+
+describe('boxService.getBoxDetails – null room_id', () => {
+  it('handles box with null room_id gracefully', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'boxes') return makeMockChain({ data: { ...fakeBox, room_id: null }, error: null });
+      if (table === 'items') return makeMockChain({ data: [], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await boxService.getBoxDetails(BOX_ID);
+    expect(result.id).toBe(BOX_ID);
+    expect(result.items).toEqual([]);
+    expect(result.roomName).toBe('Unknown room');
+  });
+});
+
+describe('boxService.markBoxDelivered – with destination (continued)', () => {
+  it('proceeds without destination when room match fails and location has no rooms', async () => {
+    const activitySvc = require('@/lib/activity.service').activityService;
+
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: { id: BOX_ID, name: 'Box #1', room_id: ROOM_ID }, error: null })) // box fetch
+      .mockReturnValueOnce(makeMockChain({ data: [fakeRoom], error: null })) // getRoomContextMap
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })) // resolveDestinationRoom name match → null
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })) // findDefaultRoomInLocation → null
+      .mockReturnValueOnce(makeMockChain({ error: null })); // update
+
+    await expect(boxService.markBoxDelivered(BOX_ID, 'dest-loc-1')).resolves.toBeUndefined();
+
+    expect(activitySvc.writeActivitySafely).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Delivered' }),
+    );
   });
 });

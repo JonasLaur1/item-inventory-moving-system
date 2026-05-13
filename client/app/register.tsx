@@ -3,7 +3,6 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { authService } from "@/lib/auth.service";
 import { Feather } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -26,7 +25,6 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const strengthSegments = [1, 2, 3, 0];
 
   const onRegister = async (): Promise<void> => {
     const trimmedUsername = username.trim();
@@ -58,7 +56,6 @@ export default function Register() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
-      <StatusBar style="light" />
       <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -130,22 +127,6 @@ export default function Register() {
                     </Pressable>
                   }
                 />
-
-                <View className="mt-4">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-xs text-text-tertiary">{t("auth.passwordStrength")}</Text>
-                    <Text className="text-xs font-semibold text-text-link">{t("auth.passwordStrong")}</Text>
-                  </View>
-
-                  <View className="mt-2 flex-row gap-2">
-                    {strengthSegments.map((active, index) => (
-                      <View
-                        key={index}
-                        className={`h-1 flex-1 rounded-full ${active ? "bg-primary" : "bg-text-tertiary/30"}`}
-                      />
-                    ))}
-                  </View>
-                </View>
 
                 {errorMessage ? (
                   <Text className="text-sm text-red-400">{errorMessage}</Text>

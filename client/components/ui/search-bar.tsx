@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/theme";
+import { ColorPalettes } from "@/constants/theme";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -19,7 +19,7 @@ export function SearchBar({
 }: SearchBarProps) {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
-  const palette = Colors[resolvedTheme];
+  const palette = ColorPalettes[resolvedTheme];
 
   return (
     <View
@@ -27,7 +27,8 @@ export function SearchBar({
     >
       <Feather name="search" size={16} color={palette.textSecondary} />
       <TextInput
-        className={`ml-3 flex-1 text-sm text-text-primary ${inputClassName}`}
+        className={`ml-3 flex-1 text-sm ${inputClassName}`}
+        style={{ color: palette.textPrimary }}
         placeholder={placeholder ?? t("common.search")}
         placeholderTextColor={placeholderTextColor ?? palette.textSecondary}
         selectionColor={selectionColor ?? palette.primary}

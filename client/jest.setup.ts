@@ -5,3 +5,7 @@ jest.mock("expo-secure-store", () => ({
   setItemAsync: jest.fn().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
+
+// Initialize i18n so useTranslation() and i18n.t() resolve to actual strings.
+// Resources are provided inline so init is synchronous.
+import "@/lib/i18n";

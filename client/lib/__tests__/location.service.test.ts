@@ -19,7 +19,7 @@ const mockFrom = supabase.from as jest.Mock;
 
 function makeMockChain(result: Record<string, unknown> = { data: null, error: null }) {
   const self: any = {};
-  for (const m of ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'in', 'order', 'limit', 'ilike']) {
+  for (const m of ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'in', 'order', 'limit', 'ilike', 'is', 'not']) {
     self[m] = jest.fn().mockReturnValue(self);
   }
   self.maybeSingle = jest.fn().mockResolvedValue(result);
@@ -45,7 +45,7 @@ const fakeLocation = {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.resetAllMocks();
   mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
 });
 
@@ -193,22 +193,26 @@ describe('locationService.deleteLocation', () => {
     await expect(locationService.deleteLocation(LOCATION_ID)).rejects.toThrow('Location not found.');
   });
 
-  it('deletes location successfully', async () => {
+  it('deletes location successfully when it has no rooms', async () => {
     mockFrom
       .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
-      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID }, error: null }));
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))  // fetch rooms: empty
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID }, error: null }));  // delete location
 
     await expect(locationService.deleteLocation(LOCATION_ID)).resolves.toBeUndefined();
   });
 
-  it('throws friendly error on foreign key violation', async () => {
+  it('cascade-deletes rooms, boxes, and items before deleting the location', async () => {
     mockFrom
       .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
-      .mockReturnValueOnce(makeMockChain({ data: null, error: { code: '23503', message: 'fk violation' } }));
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: 'room-1' }], error: null }))  // fetch rooms
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: 'box-1' }], error: null }))  // fetch boxes
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }))  // delete items
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }))  // delete boxes
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null }))  // delete rooms
+      .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID }, error: null }));  // delete location
 
-    await expect(locationService.deleteLocation(LOCATION_ID)).rejects.toThrow(
-      'Location has rooms. Remove or move its rooms before deleting it.',
-    );
+    await expect(locationService.deleteLocation(LOCATION_ID)).resolves.toBeUndefined();
   });
 });
 
@@ -353,7 +357,8 @@ describe('locationService.deleteLocation – error paths', () => {
   it('throws when delete returns no data', async () => {
     mockFrom
       .mockReturnValueOnce(makeMockChain({ data: { id: LOCATION_ID, name: 'My Home' }, error: null }))
-      .mockReturnValueOnce(makeMockChain({ data: null, error: null }));
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null }))   // fetch rooms: empty
+      .mockReturnValueOnce(makeMockChain({ data: null, error: null })); // delete location returns no row
 
     await expect(locationService.deleteLocation(LOCATION_ID)).rejects.toThrow('Location not found.');
   });
@@ -390,5 +395,127 @@ describe('locationService.updateLocationName', () => {
 
     await expect(locationService.updateLocationName(LOCATION_ID, 'New Name')).resolves.toBeUndefined();
     expect(updateChain.update).toHaveBeenCalledWith(expect.objectContaining({ name: 'New Name' }));
+  });
+});
+
+describe('locationService.updateLocation – blank name after trim', () => {
+  it('throws when updated name trims to empty string', async () => {
+    const fetchChain = makeMockChain({
+      data: { id: LOCATION_ID, name: 'Old Name', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce(fetchChain);
+
+    await expect(
+      locationService.updateLocation(LOCATION_ID, { name: '   ' }),
+    ).rejects.toThrow('Location name is required.');
+  });
+});
+
+describe('locationService.updateLocation – coverImageUrl', () => {
+  it('includes cover_image_url in update when coverImageUrl is provided', async () => {
+    const fetchChain = makeMockChain({
+      data: { id: LOCATION_ID, name: 'My Home', kind: 'other', sort_order: 0, cover_image_url: null, address: null },
+      error: null,
+    });
+    const updateChain = makeMockChain({ data: { id: LOCATION_ID }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(fetchChain)
+      .mockReturnValueOnce(updateChain);
+
+    await expect(
+      locationService.updateLocation(LOCATION_ID, { coverImageUrl: 'https://example.com/img.jpg' }),
+    ).resolves.toBeUndefined();
+
+    expect(updateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ cover_image_url: 'https://example.com/img.jpg' }),
+    );
+  });
+});
+
+describe('locationService.getLocationDetails – fragility normalisation', () => {
+  it('normalises null fragility to false', async () => {
+    const roomRow = { id: 'room-1', location_id: LOCATION_ID, name: 'Kitchen', cover_image_url: null, sort_order: 0, created_at: null, updated_at: null };
+    const boxRow = { id: 'box-1', room_id: 'room-1', status: 'unpacked', updated_at: null, fragility: null, name: 'Box A' };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'locations') return makeMockChain({ data: fakeLocation, error: null });
+      if (table === 'rooms') return makeMockChain({ data: [roomRow], error: null });
+      if (table === 'boxes') return makeMockChain({ data: [boxRow], error: null });
+      if (table === 'items') return makeMockChain({ data: [], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await locationService.getLocationDetails(LOCATION_ID);
+    expect(result.boxList[0].isFragile).toBe(false);
+  });
+
+  it('normalises "normal" fragility to false', async () => {
+    const roomRow = { id: 'room-1', location_id: LOCATION_ID, name: 'Kitchen', cover_image_url: null, sort_order: 0, created_at: null, updated_at: null };
+    const boxRow = { id: 'box-1', room_id: 'room-1', status: 'unpacked', updated_at: null, fragility: 'normal', name: 'Box B' };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'locations') return makeMockChain({ data: fakeLocation, error: null });
+      if (table === 'rooms') return makeMockChain({ data: [roomRow], error: null });
+      if (table === 'boxes') return makeMockChain({ data: [boxRow], error: null });
+      if (table === 'items') return makeMockChain({ data: [], error: null });
+      return makeMockChain({ data: [], error: null });
+    });
+
+    const result = await locationService.getLocationDetails(LOCATION_ID);
+    expect(result.boxList[0].isFragile).toBe(false);
+  });
+});
+
+describe('locationService.createLocation – numbered siblings', () => {
+  it('increments beyond the highest numbered sibling', async () => {
+    const siblingChain = makeMockChain({ data: [{ name: 'New Place' }, { name: 'New Place #2' }], error: null });
+    const insertChain = makeMockChain({ data: { id: 'new-loc-3' }, error: null });
+
+    mockFrom
+      .mockReturnValueOnce(siblingChain)
+      .mockReturnValueOnce(insertChain);
+
+    await locationService.createLocation('New Place');
+
+    const insertArgs = insertChain.insert.mock.calls[0][0];
+    expect(insertArgs.name).toBe('New Place #3');
+  });
+});
+
+describe('locationService.countUncheckedItems', () => {
+  it('returns 0 when no rooms exist in the given locations', async () => {
+    mockFrom.mockReturnValueOnce(makeMockChain({ data: [], error: null }));
+
+    const result = await locationService.countUncheckedItems('from-loc', 'to-loc');
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 when no delivered/unpacked boxes exist in rooms', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: 'room-1' }], error: null })) // rooms
+      .mockReturnValueOnce(makeMockChain({ data: [], error: null })); // boxes
+
+    const result = await locationService.countUncheckedItems('from-loc', 'to-loc');
+    expect(result).toBe(0);
+  });
+
+  it('returns the count of unpacked items', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: 'room-1' }], error: null })) // rooms
+      .mockReturnValueOnce(makeMockChain({ data: [{ id: 'box-1' }], error: null })) // boxes
+      .mockReturnValueOnce(makeMockChain({ count: 7, error: null })); // items count
+
+    const result = await locationService.countUncheckedItems('from-loc', 'to-loc');
+    expect(result).toBe(7);
+  });
+
+  it('throws when rooms query returns an error', async () => {
+    mockFrom.mockReturnValueOnce(makeMockChain({ data: null, error: new Error('rooms error') }));
+
+    await expect(
+      locationService.countUncheckedItems('from-loc', 'to-loc'),
+    ).rejects.toThrow('rooms error');
   });
 });

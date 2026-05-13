@@ -21,10 +21,12 @@ import { useMovingMode } from "@/hooks/use-moving-mode";
 import { boxService, type BoxDetails, type BoxSummary } from "@/lib/box.service";
 import { itemService } from "@/lib/item.service";
 import { roomService, type RoomSummary } from "@/lib/room.service";
+import { generateQrDataUrl } from "@/utils/box-qr";
 import { formatUpdatedAt, mapItemToRow } from "@/utils/box-detail-utils";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Print from "expo-print";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
@@ -77,6 +79,8 @@ export default function BoxDetailsScreen() {
   const [isUnpackModalOpen, setIsUnpackModalOpen] = useState(false);
   const [isMarkingUnpacked, setIsMarkingUnpacked] = useState(false);
   const [unpackError, setUnpackError] = useState<string | null>(null);
+
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const loadBox = useCallback(
     async (refresh: boolean) => {
@@ -428,6 +432,26 @@ export default function BoxDetailsScreen() {
         onSelectDevice={(device) => void btPrinter.selectPrinter(device)}
         onRescan={() => void btPrinter.rescan()}
         onRegenerate={qr.retryGenerateQr}
+        isDownloadingPdf={isDownloadingPdf}
+        onDownloadPdf={() => {
+          if (!box || !qr.qrAppLinkUrl || isDownloadingPdf) return;
+          setIsDownloadingPdf(true);
+          void generateQrDataUrl(qr.qrAppLinkUrl, 640)
+            .then((svgDataUrl) => {
+              const boxIndex = availableBoxes.findIndex((b) => b.id === box.id);
+              const boxNumber = boxIndex >= 0 ? boxIndex + 1 : null;
+              const routeLabel = boxNumber != null
+                ? `#${boxNumber} ${box.name} (${box.roomName})`
+                : `${box.name} (${box.roomName})`;
+              const fragileSection = box.isFragile
+                ? `<div class="fragile"><span class="fragile-icon">🍷</span><span class="fragile-text">** FRAGILE **</span></div>`
+                : "";
+              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>*{margin:0;padding:0;box-sizing:border-box}body{display:flex;flex-direction:column;align-items:center;font-family:-apple-system,Helvetica,sans-serif;background:#fff;padding:40px 40px 32px}.label{font-size:18px;font-weight:700;color:#0f0f0f;text-align:center;margin-bottom:24px;line-height:1.4}.qr{width:280px;height:280px}.fragile{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:24px}.fragile-icon{font-size:48px}.fragile-text{font-size:20px;font-weight:700;color:#c00;letter-spacing:2px}</style></head><body><p class="label">${routeLabel}</p><img class="qr" src="${svgDataUrl}"/>${fragileSection}</body></html>`;
+              return Print.printAsync({ html });
+            })
+            .catch(() => undefined)
+            .finally(() => setIsDownloadingPdf(false));
+        }}
       />
 
       <ItemFormModal
