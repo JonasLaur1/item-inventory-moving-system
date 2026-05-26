@@ -1,0 +1,451 @@
+import { Button } from "@/components/button";
+import { FormInput } from "@/components/form-input";
+import { CameraCaptureModal, type CaptureResult } from "@/components/ui/camera-capture-modal";
+import { ColorPalettes } from "@/constants/theme";
+import { useInventoryFilter } from "@/contexts/inventory-filter-context";
+import { useBoxes } from "@/hooks/use-boxes";
+import { useThemePreference } from "@/hooks/use-theme-preference";
+import { itemService } from "@/lib/item.service";
+import { type BoxSummary } from "@/lib/box.service";
+import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+type RoomGroup = { roomName: string; boxes: BoxSummary[] };
+type LocationGroup = { locationName: string; rooms: RoomGroup[] };
+
+function groupBoxes(boxes: BoxSummary[]): LocationGroup[] {
+  const locationMap = new Map<string, Map<string, BoxSummary[]>>();
+
+  for (const box of boxes) {
+    if (!locationMap.has(box.parentLocationId)) {
+      locationMap.set(box.parentLocationId, new Map());
+    }
+    const roomMap = locationMap.get(box.parentLocationId)!;
+    if (!roomMap.has(box.roomId)) {
+      roomMap.set(box.roomId, []);
+    }
+    roomMap.get(box.roomId)!.push(box);
+  }
+
+  return Array.from(locationMap.entries()).map(([, roomMap]) => {
+    const firstBox = Array.from(roomMap.values())[0][0];
+    return {
+      locationName: firstBox.parentLocationName,
+      rooms: Array.from(roomMap.entries()).map(([, roomBoxes]) => ({
+        roomName: roomBoxes[0].roomName,
+        boxes: roomBoxes,
+      })),
+    };
+  });
+}
+
+function parseQuantity(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isInteger(parsed) || parsed < 1) return null;
+  return parsed;
+}
+
+export default function AddItemScreen() {
+  const { t } = useTranslation();
+  const { resolvedTheme } = useThemePreference();
+  const palette = ColorPalettes[resolvedTheme];
+
+  const { locationFilter, roomFilter, previousRoute } = useInventoryFilter();
+  const hasLocationContext = locationFilter !== "All";
+  const hasRoomContext = roomFilter !== "All";
+
+  const { boxes, isLoading: isBoxesLoading } = useBoxes();
+  const [showAllBoxes, setShowAllBoxes] = useState(false);
+
+  const groupedBoxes = useMemo(() => {
+    const allGrouped = groupBoxes(boxes);
+    if (showAllBoxes || !hasLocationContext) return allGrouped;
+
+    return allGrouped
+      .filter((loc) => loc.locationName === locationFilter)
+      .map((loc) => ({
+        ...loc,
+        rooms: hasRoomContext
+          ? loc.rooms.filter((r) => `${locationFilter} / ${r.roomName}` === roomFilter)
+          : loc.rooms,
+      }));
+  }, [boxes, showAllBoxes, hasLocationContext, hasRoomContext, locationFilter, roomFilter]);
+
+  const noBoxesInFilter =
+    !showAllBoxes &&
+    hasLocationContext &&
+    boxes.length > 0 &&
+    groupedBoxes.every((loc) => loc.rooms.length === 0);
+
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [isFragile, setIsFragile] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [selectedBoxId, setSelectedBoxId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
+  const [isAiSuggested, setIsAiSuggested] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setQuantity("1");
+    setIsFragile(false);
+    setNotes("");
+    setSelectedBoxId("");
+    setError(null);
+    setIsSubmitting(false);
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+    setIsAiSuggested(false);
+    setShowAllBoxes(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetForm();
+      };
+    }, [resetForm]),
+  );
+
+  const handleCaptureResult = useCallback(
+    (result: CaptureResult) => {
+      setIsCameraOpen(false);
+      setCapturedPhotoUri(result.uri);
+      setCapturedPhotoBase64(result.base64);
+      if (result.suggestedName) {
+        setName(result.suggestedName);
+        setIsAiSuggested(true);
+        if (!notes.trim() && result.suggestedNotes) {
+          setNotes(result.suggestedNotes);
+        }
+      }
+    },
+    [notes],
+  );
+
+  const handleRemovePhoto = useCallback(() => {
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+    setIsAiSuggested(false);
+  }, []);
+
+  const handleNameChange = useCallback((text: string) => {
+    setName(text);
+    setIsAiSuggested(false);
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      setError(t("addItem.itemNameRequired"));
+      return;
+    }
+
+    const parsedQuantity = parseQuantity(quantity);
+    if (!parsedQuantity) {
+      setError(t("addItem.quantityInvalid"));
+      return;
+    }
+
+    if (!selectedBoxId) {
+      setError(t("addItem.boxRequired"));
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const itemId = await itemService.createItem({
+        name: normalizedName,
+        quantity: parsedQuantity,
+        isFragile,
+        notes: notes.trim() || null,
+        boxId: selectedBoxId,
+      });
+
+      if (capturedPhotoBase64) {
+        try {
+          await itemService.uploadItemPhoto(itemId, capturedPhotoBase64);
+        } catch (photoErr) {
+          console.warn("Photo upload failed:", photoErr);
+        }
+      }
+
+      router.replace("/(tabs)/inventory");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("addItem.failedCreateItem");
+      setError(message);
+      setIsSubmitting(false);
+    }
+  }, [name, quantity, isFragile, notes, selectedBoxId, capturedPhotoBase64, t]);
+
+  return (
+    <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-bg-base">
+      <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
+        <Text className="text-2xl font-bold text-text-primary">{t("addItem.title")}</Text>
+        <Pressable
+          onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
+          className="h-10 w-10 items-center justify-center rounded-card border border-border-strong bg-bg-input"
+        >
+          <Feather name="x" size={18} color={palette.textPrimary} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {capturedPhotoUri ? (
+          <View className="flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3">
+            <Image
+              source={{ uri: capturedPhotoUri }}
+              style={{ width: 56, height: 56, borderRadius: 8 }}
+              contentFit="cover"
+            />
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.photoAttached")}</Text>
+              {isAiSuggested ? (
+                <Text className="mt-0.5 text-xs text-primary">{t("addItem.aiSuggestionApplied")}</Text>
+              ) : (
+                <Text className="mt-0.5 text-xs text-text-tertiary">
+                  {t("addItem.willBeSaved")}
+                </Text>
+              )}
+            </View>
+            <Pressable
+              onPress={handleRemovePhoto}
+              disabled={isSubmitting}
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full border border-border-default bg-bg-input"
+            >
+              <Feather name="x" size={14} color={palette.textTertiary} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setIsCameraOpen(true)}
+            disabled={isSubmitting}
+            className="flex-row items-center gap-3 rounded-card border border-border-default bg-bg-elevated/70 p-3"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+              <Feather name="camera" size={16} color={palette.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.takePhoto")}</Text>
+              <Text className="mt-0.5 text-xs text-text-tertiary">
+                {t("addItem.aiWillIdentify")}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={palette.textTertiary} />
+          </Pressable>
+        )}
+
+        <View className="mt-4">
+          <FormInput
+            value={name}
+            onChangeText={handleNameChange}
+            placeholder={t("addItem.itemName")}
+            autoCapitalize="sentences"
+            autoCorrect={false}
+            editable={!isSubmitting}
+            maxLength={120}
+          />
+          {isAiSuggested ? (
+            <Text className="mt-1 text-xs text-primary">{t("addItem.aiSuggested")}</Text>
+          ) : null}
+        </View>
+
+        <View className="mt-4">
+          <FormInput
+            value={quantity}
+            onChangeText={setQuantity}
+            placeholder={t("addItem.quantity")}
+            keyboardType="number-pad"
+            editable={!isSubmitting}
+            maxLength={4}
+          />
+        </View>
+
+        <View className="mt-4">
+          <FormInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder={t("addItem.notesOptional")}
+            autoCapitalize="sentences"
+            editable={!isSubmitting}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            style={{ minHeight: 84, paddingTop: 12 }}
+            maxLength={300}
+          />
+        </View>
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.fragility")}</Text>
+          <View className="mt-2 flex-row gap-2">
+            <Pressable
+              onPress={() => setIsFragile(false)}
+              disabled={isSubmitting}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                !isFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.notFragile")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setIsFragile(true)}
+              disabled={isSubmitting}
+              className={`flex-1 items-center rounded-control border py-2.5 ${
+                isFragile
+                  ? "border-primary bg-primary/15"
+                  : "border-border-default bg-bg-input/60"
+              }`}
+            >
+              <Text className="text-sm font-semibold text-text-primary">{t("addItem.fragile")}</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="mt-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-xs uppercase tracking-[1px] text-text-tertiary">{t("addItem.box")}</Text>
+            {hasLocationContext && !showAllBoxes && (
+              <View className="flex-row items-center gap-2">
+                <View className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-2.5 py-1">
+                  <Feather name="tag" size={10} color={palette.textTertiary} />
+                  <Text className="text-xs text-text-secondary">
+                    {hasRoomContext ? roomFilter.split(" / ")[1] : locationFilter}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowAllBoxes(true)}
+                  className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1"
+                >
+                  <Text className="text-xs font-semibold text-primary">{t("addItem.showMore")}</Text>
+                  <Feather name="chevron-down" size={11} color={palette.primary} />
+                </Pressable>
+              </View>
+            )}
+            {showAllBoxes && hasLocationContext && (
+              <Pressable
+                onPress={() => setShowAllBoxes(false)}
+                className="flex-row items-center gap-1 rounded-full border border-border-default bg-bg-input px-3 py-1"
+              >
+                <Text className="text-xs font-semibold text-text-secondary">{t("addItem.showLess")}</Text>
+                <Feather name="chevron-up" size={11} color={palette.textSecondary} />
+              </Pressable>
+            )}
+          </View>
+          <View className="gap-4">
+            {isBoxesLoading ? (
+              <Text className="text-xs text-text-tertiary">{t("addItem.loadingBoxes")}</Text>
+            ) : boxes.length === 0 ? (
+              <Text className="text-xs text-text-tertiary">
+                {t("addItem.noBoxesCreate")}
+              </Text>
+            ) : noBoxesInFilter ? (
+              <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <Feather name="alert-circle" size={15} color={palette.textSecondary} />
+                  <Text className="text-sm font-semibold text-text-secondary">
+                    {hasRoomContext ? t("addItem.noBoxesInRoom") : t("addItem.noBoxesInLocation")}
+                  </Text>
+                </View>
+                <Text className="text-xs text-text-tertiary mb-3">
+                  {t("addItem.createBoxFirst")}
+                </Text>
+                <Pressable
+                  onPress={() => setShowAllBoxes(true)}
+                  className="flex-row items-center gap-1 self-start rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5"
+                >
+                  <Text className="text-xs font-semibold text-primary">{t("addItem.showAllBoxes")}</Text>
+                  <Feather name="chevron-down" size={11} color={palette.primary} />
+                </Pressable>
+              </View>
+            ) : (
+              groupedBoxes.map((location) => (
+                <View key={location.locationName}>
+                  <Text className="mb-2 text-sm font-bold text-text-primary">
+                    {location.locationName}
+                  </Text>
+                  {location.rooms.map((room) => (
+                    <View key={room.roomName} className="mb-3">
+                      <Text className="mb-1.5 text-xs uppercase tracking-[1px] text-text-tertiary">
+                        {room.roomName}
+                      </Text>
+                      <View className="gap-2">
+                        {room.boxes.map((box) => {
+                          const isActive = box.id === selectedBoxId;
+                          return (
+                            <Pressable
+                              key={box.id}
+                              onPress={() => setSelectedBoxId(box.id)}
+                              disabled={isSubmitting}
+                              className={`rounded-control border px-3 py-2.5 ${
+                                isActive
+                                  ? "border-primary bg-primary/15"
+                                  : "border-border-default bg-bg-input/60"
+                              }`}
+                            >
+                              <Text className="text-sm font-semibold text-text-primary">
+                                {box.name}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
+        {error ? (
+          <Text className="mt-3 text-xs text-crimson">{error}</Text>
+        ) : null}
+
+        <View className={`${error ? "mt-4" : "mt-6"} flex-row gap-3`}>
+          <Button
+            label={t("common.cancel")}
+            variant="secondary"
+            onPress={() => router.replace(previousRoute as Parameters<typeof router.replace>[0])}
+            disabled={isSubmitting}
+            className="flex-1"
+          />
+          <Button
+            label={isSubmitting ? t("common.creating") : t("common.create")}
+            onPress={() => void handleSubmit()}
+            disabled={isSubmitting || boxes.length === 0 || noBoxesInFilter}
+            className="flex-1"
+          />
+        </View>
+      </ScrollView>
+
+      <CameraCaptureModal
+        visible={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onConfirm={handleCaptureResult}
+      />
+    </SafeAreaView>
+  );
+}

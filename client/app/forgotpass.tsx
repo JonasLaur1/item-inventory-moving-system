@@ -2,7 +2,6 @@ import { Button } from "@/components/button";
 import { FormInput } from "@/components/form-input";
 import { Colors } from "@/constants/theme";
 import { Feather } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import {
   KeyboardAvoidingView,
@@ -16,8 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "@/lib/auth.service";
 import { useState } from "react";
 import * as Linking from "expo-linking";
+import { useTranslation } from "react-i18next";
 
 export default function ForgotPass() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export default function ForgotPass() {
     const trimmedEmail = email.trim();
 
     if (!trimmedEmail) {
-      setErrorMessage("Please provide your email address");
+      setErrorMessage(t("auth.provideEmail"));
       return;
     }
 
@@ -42,10 +43,10 @@ export default function ForgotPass() {
 
     try {
       await authService.remindPassword(trimmedEmail, redirectTo);
-      setSuccessMessage("Reset link sent. Check your email inbox.");
+      setSuccessMessage(t("auth.resetLinkSent"));
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to send reset link";
+        error instanceof Error ? error.message : t("auth.failedSendReset");
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -54,7 +55,6 @@ export default function ForgotPass() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg-base">
-      <StatusBar style="light" />
       <View className="flex-1 bg-bg-base">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -88,18 +88,18 @@ export default function ForgotPass() {
                 </View>
 
                 <Text className="mt-12 text-center text-3xl font-bold text-text-primary">
-                  Forgot Password?
+                  {t("auth.forgotPasswordTitle")}
                 </Text>
 
                 <Text className="mt-3 px-4 text-center text-sm leading-5 text-text-tertiary">
-                  Enter your email address to receive a password reset link
+                  {t("auth.forgotPasswordDesc")}
                 </Text>
               </View>
 
               <View className="mt-12">
                 <FormInput
-                  label="Email Address"
-                  placeholder="name@example.com"
+                  label={t("auth.emailAddress")}
+                  placeholder={t("auth.forgotEmailPlaceholder")}
                   leftIcon="mail"
                   value={email}
                   onChangeText={setEmail}
@@ -110,7 +110,7 @@ export default function ForgotPass() {
                 />
 
                 <Button
-                  label={isSubmitting ? "Sending..." : "Send Reset Link"}
+                  label={isSubmitting ? t("auth.sending") : t("auth.sendResetLink")}
                   className="mt-6 shadow-card"
                   textClassName="font-bold"
                   onPress={onSendResetLink}
@@ -147,7 +147,7 @@ export default function ForgotPass() {
                     color={Colors.dark.primary}
                   />
                   <Text className="text-sm font-medium text-text-link">
-                    Return to Login
+                    {t("auth.returnToLogin")}
                   </Text>
                 </Pressable>
               </View>

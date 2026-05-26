@@ -1,15 +1,20 @@
 import { ColorPalettes } from "@/constants/theme";
+import { InventoryFilterProvider, useInventoryFilter } from "@/contexts/inventory-filter-context";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
-export default function TabLayout() {
+function TabNavigator() {
+  const { t } = useTranslation();
   const { resolvedTheme } = useThemePreference();
   const palette = ColorPalettes[resolvedTheme];
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 10);
+  const pathname = usePathname();
+  const { setPreviousRoute } = useInventoryFilter();
 
   return (
     <Tabs
@@ -38,7 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tabs.home"),
           tabBarIcon: ({ color }) => <Feather name="home" size={18} color={color} />,
         }}
       />
@@ -46,15 +51,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="inventory"
         options={{
-          title: "Inventory",
+          title: t("tabs.inventory"),
           tabBarIcon: ({ color }) => <Feather name="archive" size={18} color={color} />,
         }}
       />
 
       <Tabs.Screen
-        name="scan"
+        name="add-item"
+        listeners={{
+          tabPress: () => {
+            if (pathname !== "/add-item") {
+              setPreviousRoute(pathname);
+            }
+          },
+        }}
         options={{
-          title: "Scan",
+          title: t("tabs.addItem"),
           tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => (
             <View
@@ -75,16 +87,23 @@ export default function TabLayout() {
                 elevation: 8,
               }}
             >
-              <Feather name="camera" size={20} color={palette.textPrimary} />
+              <Feather name="plus" size={20} color={palette.textPrimary} />
             </View>
           ),
         }}
       />
 
       <Tabs.Screen
+        name="scan"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
         name="rooms"
         options={{
-          title: "Rooms",
+          title: t("tabs.locations"),
           tabBarIcon: ({ color }) => <Feather name="grid" size={18} color={color} />,
         }}
       />
@@ -92,10 +111,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="activity"
         options={{
-          title: "Activity",
+          title: t("tabs.activity"),
           tabBarIcon: ({ color }) => <Feather name="clock" size={18} color={color} />,
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <InventoryFilterProvider>
+      <TabNavigator />
+    </InventoryFilterProvider>
   );
 }

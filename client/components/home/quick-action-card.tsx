@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/theme";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import { Feather } from "@expo/vector-icons";
 import { type PressableProps } from "react-native";
 
@@ -20,6 +21,8 @@ export function QuickActionCard({
   variant = "primary",
   ...props
 }: QuickActionCardProps) {
+  const { resolvedTheme } = useThemePreference();
+  const palette = Colors[resolvedTheme];
   const isPrimary = variant === "primary";
 
   return (
@@ -28,7 +31,7 @@ export function QuickActionCard({
         <Feather
           name={icon}
           size={20}
-          color={isPrimary ? Colors.dark.textPrimary : Colors.dark.primary}
+          color={isPrimary ? palette.textPrimary : palette.primary}
         />
       }
       title={title}
@@ -40,7 +43,7 @@ export function QuickActionCard({
       }
       iconContainerClassName={isPrimary ? "bg-white/15" : "bg-primary/20"}
       titleClassName="text-text-primary"
-      subtitleClassName={isPrimary ? "text-text-primary" : "text-text-tertiary"}
+      subtitleClassName={isPrimary ? "text-white/80" : "text-text-tertiary"}
       {...props}
     />
   );

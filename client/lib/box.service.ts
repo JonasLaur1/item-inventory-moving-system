@@ -1,23 +1,24 @@
 import { activityService } from "@/lib/activity.service";
 import { supabase } from "@/lib/supabase";
+import { getCurrentUserId, normalizeFragility, resolveUniqueName } from "@/lib/utils/service-utils";
 
-type BoxStatus = "packed" | "unpacked";
+type BoxStatus = "packed" | "unpacked" | "delivered" | "unpacked_at_destination";
 
 type BoxRow = {
   id: string;
   name: string;
   status: string | null;
-  location_id: string | null;
+  room_id: string | null;
   updated_at: string | null;
   fragility: string | null;
-  item_count: Array<{ count: number | null }> | null;
+  item_count: number;
 };
 
 type BoxDetailsRow = {
   id: string;
   name: string;
   status: string | null;
-  location_id: string | null;
+  room_id: string | null;
   updated_at: string | null;
   fragility: string | null;
 };
@@ -27,19 +28,35 @@ type ItemRow = {
   name: string | null;
   notes: string | null;
   quantity: number | null;
+  is_fragile: boolean | null;
+  photo_url: string | null;
+  unpacked_at: string | null;
 };
 
-type LocationRow = {
+type RoomContextRow = {
   id: string;
   name: string;
+  location_id: string;
+  location: { id: string; name: string } | Array<{ id: string; name: string }> | null;
+};
+
+type RoomContext = {
+  roomId: string;
+  roomName: string;
+  parentLocationId: string;
+  parentLocationName: string;
 };
 
 export type BoxSummary = {
   id: string;
   name: string;
   status: BoxStatus;
+  roomId: string;
+  roomName: string;
   locationId: string;
   locationName: string;
+  parentLocationId: string;
+  parentLocationName: string;
   updatedAt: string | null;
   itemsCount: number;
   isFragile: boolean;
@@ -50,6 +67,9 @@ export type BoxDetailsItem = {
   name: string;
   notes: string | null;
   quantity: number;
+  isFragile: boolean;
+  photoUrl: string | null;
+  unpackedAt: string | null;
 };
 
 export type BoxDetails = BoxSummary & {
@@ -58,83 +78,53 @@ export type BoxDetails = BoxSummary & {
 
 export type CreateBoxInput = {
   name: string;
-  locationId: string;
+  roomId?: string;
+  locationId?: string;
   status: BoxStatus;
 };
 
 export type UpdateBoxInput = {
   name: string;
-  locationId: string;
+  roomId?: string;
+  locationId?: string;
   status: BoxStatus;
 };
 
-const BOX_HAS_ITEMS_MESSAGE = "Box has items. Empty it before deleting.";
-
-async function getCurrentUserId(): Promise<string> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-
-  const userId = data.user?.id;
-  if (!userId) {
-    throw new Error("No authenticated user found.");
-  }
-
-  return userId;
-}
 
 function normalizeStatus(status: string | null): BoxStatus {
-  return status?.toLowerCase() === "packed" ? "packed" : "unpacked";
+  switch (status?.toLowerCase()) {
+    case "packed":
+      return "packed";
+    case "delivered":
+      return "delivered";
+    case "unpacked_at_destination":
+      return "unpacked_at_destination";
+    default:
+      return "unpacked";
+  }
 }
 
 function normalizeInputStatus(status: string): BoxStatus {
-  const normalizedStatus = status.trim().toLowerCase();
+  const normalizedStatus = status.trim().toLowerCase() as BoxStatus;
+  const valid: BoxStatus[] = ["packed", "unpacked", "delivered", "unpacked_at_destination"];
 
-  if (normalizedStatus !== "packed" && normalizedStatus !== "unpacked") {
-    throw new Error("Box status must be Packed or Unpacked.");
+  if (!valid.includes(normalizedStatus)) {
+    throw new Error("Invalid box status.");
   }
 
   return normalizedStatus;
 }
 
-function getNestedCount(value: Array<{ count: number | null }> | null): number {
-  if (!Array.isArray(value) || value.length === 0) {
-    return 0;
-  }
 
-  return value.reduce((total, entry) => {
-    const count = entry?.count;
-    return total + (typeof count === "number" ? count : 0);
-  }, 0);
-}
+function normalizeRoomContextRow(row: RoomContextRow): RoomContext {
+  const location = Array.isArray(row.location) ? row.location[0] : row.location;
 
-function normalizeFragility(value: string | null): boolean {
-  if (!value) {
-    return false;
-  }
-
-  const normalized = value.toLowerCase();
-
-  if (normalized === "none" || normalized === "normal" || normalized === "not_fragile") {
-    return false;
-  }
-
-  return normalized.includes("fragile") || normalized === "medium" || normalized === "high";
-}
-
-async function assertUserOwnsLocation(locationId: string, userId: string): Promise<string> {
-  const { data, error } = await supabase
-    .from("locations")
-    .select("id,name")
-    .eq("id", locationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error("Room not found.");
-  }
-
-  return data.name;
+  return {
+    roomId: row.id,
+    roomName: row.name,
+    parentLocationId: location?.id ?? row.location_id,
+    parentLocationName: location?.name ?? "Unknown location",
+  };
 }
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -146,36 +136,138 @@ function isForeignKeyViolation(error: unknown): boolean {
   return possibleCode === "23503";
 }
 
-async function getLocationNameMap(userId: string, locationIds: string[]): Promise<Map<string, string>> {
-  if (locationIds.length === 0) {
-    return new Map<string, string>();
+async function getRoomContextMap(userId: string, roomIds: string[]): Promise<Map<string, RoomContext>> {
+  if (roomIds.length === 0) {
+    return new Map<string, RoomContext>();
   }
 
   const { data, error } = await supabase
-    .from("locations")
-    .select("id,name")
-    .eq("user_id", userId)
-    .in("id", locationIds);
+    .from("rooms")
+    .select("id,name,location_id,location:locations(id,name)")
+    .in("id", roomIds);
 
   if (error) throw error;
 
-  const map = new Map<string, string>();
-  (data ?? []).forEach((location: LocationRow) => {
-    map.set(location.id, location.name);
+  const map = new Map<string, RoomContext>();
+  (data ?? []).forEach((room: RoomContextRow) => {
+    const context = normalizeRoomContextRow(room);
+    map.set(context.roomId, context);
   });
 
   return map;
 }
 
-function mapBoxSummary(row: BoxRow, locationNameMap: Map<string, string>): BoxSummary {
+async function assertUserCanAccessRoom(roomId: string): Promise<RoomContext> {
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id,name,location_id,location:locations(id,name)")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data) {
+    return normalizeRoomContextRow(data as RoomContextRow);
+  }
+
+  throw new Error("Room not found.");
+}
+
+async function getLocationNameById(locationId: string, userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id,name")
+    .eq("id", locationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.name ?? null;
+}
+
+async function resolveDestinationRoom(
+  destinationLocationId: string,
+  originRoomName: string | null,
+  userId: string,
+): Promise<RoomContext | null> {
+  if (originRoomName) {
+    const { data: matchedRoom, error } = await supabase
+      .from("rooms")
+      .select("id,name,location_id,location:locations(id,name)")
+      .eq("location_id", destinationLocationId)
+      .ilike("name", originRoomName)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && matchedRoom) {
+      return normalizeRoomContextRow(matchedRoom as RoomContextRow);
+    }
+  }
+
+  return findDefaultRoomInLocation(destinationLocationId, userId);
+}
+
+async function findDefaultRoomInLocation(locationId: string, userId: string): Promise<RoomContext | null> {
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id,name,location_id,location:locations(id,name)")
+    .eq("location_id", locationId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return normalizeRoomContextRow(data as RoomContextRow);
+}
+
+async function resolveRoomFromInput(
+  userId: string,
+  input: Pick<CreateBoxInput, "roomId" | "locationId">,
+): Promise<RoomContext> {
+  const directRoomId = input.roomId?.trim();
+  const legacyLocationOrRoomId = input.locationId?.trim();
+  const candidateId = directRoomId || legacyLocationOrRoomId;
+
+  if (!candidateId) {
+    throw new Error("Room is required.");
+  }
+
+  try {
+    return await assertUserCanAccessRoom(candidateId);
+  } catch {
+    const locationName = await getLocationNameById(candidateId, userId);
+    if (!locationName) {
+      throw new Error("Room not found.");
+    }
+
+    const defaultRoom = await findDefaultRoomInLocation(candidateId, userId);
+    if (!defaultRoom) {
+      throw new Error(`Location "${locationName}" has no rooms. Create a room first.`);
+    }
+
+    return defaultRoom;
+  }
+}
+
+function mapBoxSummary(row: BoxRow, roomContextMap: Map<string, RoomContext>): BoxSummary {
+  const roomContext = row.room_id ? roomContextMap.get(row.room_id) : undefined;
+
+  const roomId = roomContext?.roomId ?? row.room_id ?? "";
+  const roomName = roomContext?.roomName ?? "Unknown room";
+
   return {
     id: row.id,
     name: row.name,
     status: normalizeStatus(row.status),
-    locationId: row.location_id ?? "",
-    locationName: row.location_id ? (locationNameMap.get(row.location_id) ?? "Unknown room") : "Unknown room",
+    roomId,
+    roomName,
+    locationId: roomId,
+    locationName: roomName,
+    parentLocationId: roomContext?.parentLocationId ?? "",
+    parentLocationName: roomContext?.parentLocationName ?? "Unknown location",
     updatedAt: row.updated_at,
-    itemsCount: getNestedCount(row.item_count),
+    itemsCount: row.item_count,
     isFragile: normalizeFragility(row.fragility),
   };
 }
@@ -183,23 +275,45 @@ function mapBoxSummary(row: BoxRow, locationNameMap: Map<string, string>): BoxSu
 async function listBoxes(): Promise<BoxSummary[]> {
   const userId = await getCurrentUserId();
 
-  const { data: boxes, error: boxesError } = await supabase
+  const { data: rawBoxes, error: boxesError } = await supabase
     .from("boxes")
-    .select("id,name,status,location_id,updated_at,fragility,item_count:items(count)")
-    .eq("user_id", userId)
+    .select("id,name,status,room_id,updated_at,fragility")
     .order("created_at", { ascending: true });
 
   if (boxesError) throw boxesError;
-  if (!boxes || boxes.length === 0) {
+  if (!rawBoxes || rawBoxes.length === 0) {
     return [];
   }
 
-  const locationIds = Array.from(
-    new Set(boxes.map((box: BoxRow) => box.location_id).filter((locationId): locationId is string => Boolean(locationId))),
-  );
-  const locationNameMap = await getLocationNameMap(userId, locationIds);
+  const allBoxIds = rawBoxes.map((box) => box.id);
+  const itemCountByBoxId = new Map<string, number>();
 
-  return boxes.map((box: BoxRow) => mapBoxSummary(box, locationNameMap));
+  if (allBoxIds.length > 0) {
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("items")
+      .select("box_id,quantity")
+      .in("box_id", allBoxIds);
+
+    if (itemsError) throw itemsError;
+
+    (itemRows ?? []).forEach((item: { box_id: string | null; quantity: number | null }) => {
+      if (!item.box_id) return;
+      const prev = itemCountByBoxId.get(item.box_id) ?? 0;
+      itemCountByBoxId.set(item.box_id, prev + (typeof item.quantity === "number" ? item.quantity : 0));
+    });
+  }
+
+  const boxes: BoxRow[] = rawBoxes.map((box) => ({
+    ...box,
+    item_count: itemCountByBoxId.get(box.id) ?? 0,
+  }));
+
+  const roomIds = Array.from(
+    new Set(boxes.map((box) => box.room_id).filter((roomId): roomId is string => Boolean(roomId))),
+  );
+  const roomContextMap = await getRoomContextMap(userId, roomIds);
+
+  return boxes.map((box) => mapBoxSummary(box, roomContextMap));
 }
 
 async function getBoxDetails(boxId: string): Promise<BoxDetails> {
@@ -212,9 +326,8 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
 
   const { data: box, error: boxError } = await supabase
     .from("boxes")
-    .select("id,name,status,location_id,updated_at,fragility")
+    .select("id,name,status,room_id,updated_at,fragility")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (boxError) throw boxError;
@@ -222,12 +335,11 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     throw new Error("Box not found.");
   }
 
-  const [locationNameMap, itemsResult] = await Promise.all([
-    getLocationNameMap(userId, box.location_id ? [box.location_id] : []),
+  const [roomContextMap, itemsResult] = await Promise.all([
+    getRoomContextMap(userId, box.room_id ? [box.room_id] : []),
     supabase
       .from("items")
-      .select("id,name,notes,quantity")
-      .eq("user_id", userId)
+      .select("id,name,notes,quantity,is_fragile,photo_url,unpacked_at")
       .eq("box_id", normalizedBoxId)
       .order("created_at", { ascending: true }),
   ]);
@@ -239,43 +351,56 @@ async function getBoxDetails(boxId: string): Promise<BoxDetails> {
     name: item.name?.trim() || "Unnamed item",
     notes: item.notes,
     quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
+    isFragile: item.is_fragile === true,
+    photoUrl: item.photo_url ?? null,
+    unpackedAt: item.unpacked_at ?? null,
   }));
 
-  const itemCount = items.length;
   const row = {
     ...(box as BoxDetailsRow),
-    item_count: [{ count: itemCount }],
+    item_count: items.reduce((total, i) => total + i.quantity, 0),
   };
 
   return {
-    ...mapBoxSummary(row, locationNameMap),
+    ...mapBoxSummary(row, roomContextMap),
     items,
   };
 }
 
 async function createBox(input: CreateBoxInput): Promise<string> {
   const name = input.name.trim();
-  const locationId = input.locationId.trim();
   const status = normalizeInputStatus(input.status);
 
   if (!name) {
     throw new Error("Box name is required.");
   }
 
-  if (!locationId) {
-    throw new Error("Room is required.");
-  }
-
   const userId = await getCurrentUserId();
+  const roomContext = await resolveRoomFromInput(userId, input);
 
-  const locationName = await assertUserOwnsLocation(locationId, userId);
+  const { data: siblingData } = await supabase
+    .from("boxes")
+    .select("name")
+    .eq("room_id", roomContext.roomId)
+    .ilike("name", `${name}%`);
+
+  const siblingNames = (siblingData ?? [])
+    .map((row: { name: string }) => row.name)
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      const base = name.toLowerCase();
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return lower === base || new RegExp(`^${escaped} #\\d+$`, "i").test(n);
+    });
+
+  const resolvedName = resolveUniqueName(name, siblingNames);
 
   const { data, error } = await supabase
     .from("boxes")
     .insert({
       user_id: userId,
-      location_id: locationId,
-      name,
+      room_id: roomContext.roomId,
+      name: resolvedName,
       status,
     })
     .select("id")
@@ -291,14 +416,17 @@ async function createBox(input: CreateBoxInput): Promise<string> {
     entityType: "box",
     entityId: data.id,
     title: "Box created",
-    description: `Created box "${name}" in "${locationName}".`,
-    roomName: locationName,
-    boxName: name,
+    description: `Created box "${resolvedName}" in room "${roomContext.roomName}".`,
+    locationName: roomContext.parentLocationName,
+    roomName: roomContext.roomName,
+    boxName: resolvedName,
     next: {
-      name,
+      name: resolvedName,
       status,
-      locationId,
-      locationName,
+      roomId: roomContext.roomId,
+      roomName: roomContext.roomName,
+      locationId: roomContext.parentLocationId,
+      locationName: roomContext.parentLocationName,
     },
   });
 
@@ -308,7 +436,6 @@ async function createBox(input: CreateBoxInput): Promise<string> {
 async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
   const normalizedBoxId = boxId.trim();
   const name = input.name.trim();
-  const locationId = input.locationId.trim();
   const status = normalizeInputStatus(input.status);
 
   if (!normalizedBoxId) {
@@ -319,17 +446,13 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
     throw new Error("Box name is required.");
   }
 
-  if (!locationId) {
-    throw new Error("Room is required.");
-  }
-
   const userId = await getCurrentUserId();
+  const nextRoom = await resolveRoomFromInput(userId, input);
 
   const { data: previousBox, error: previousBoxError } = await supabase
     .from("boxes")
-    .select("id,name,status,location_id")
+    .select("id,name,status,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (previousBoxError) throw previousBoxError;
@@ -337,17 +460,14 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
     throw new Error("Box not found.");
   }
 
-  const nextLocationNameFromOwnership = await assertUserOwnsLocation(locationId, userId);
-
   const { data, error } = await supabase
     .from("boxes")
     .update({
       name,
-      location_id: locationId,
+      room_id: nextRoom.roomId,
       status,
     })
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -357,40 +477,44 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
   }
 
   const previousStatus = normalizeStatus(previousBox.status);
+  const previousRoomId = previousBox.room_id ?? "";
   const hasNameChanged = previousBox.name !== name;
-  const hasLocationChanged = previousBox.location_id !== locationId;
+  const hasRoomChanged = previousRoomId !== nextRoom.roomId;
   const hasStatusChanged = previousStatus !== status;
-  const hasAnyChange = hasNameChanged || hasLocationChanged || hasStatusChanged;
+  const hasAnyChange = hasNameChanged || hasRoomChanged || hasStatusChanged;
 
   if (!hasAnyChange) {
     return;
   }
 
-  const locationIds = Array.from(
-    new Set([previousBox.location_id, locationId].filter((value): value is string => Boolean(value))),
+  const previousRoomContextMap = await getRoomContextMap(
+    userId,
+    previousRoomId ? [previousRoomId, nextRoom.roomId] : [nextRoom.roomId],
   );
-  const locationNameMap = await getLocationNameMap(userId, locationIds);
-  const previousLocationName = previousBox.location_id
-    ? (locationNameMap.get(previousBox.location_id) ?? "Unknown room")
-    : "Unknown room";
-  const nextLocationName = locationNameMap.get(locationId) ?? nextLocationNameFromOwnership;
+  const previousRoom = previousRoomId ? previousRoomContextMap.get(previousRoomId) : undefined;
+  const previousRoomName = previousRoom?.roomName ?? "Unknown room";
 
-  if (hasLocationChanged) {
+  if (hasRoomChanged) {
     await activityService.writeActivitySafely({
       type: "Moved",
       entityType: "box",
       entityId: normalizedBoxId,
       title: "Box moved",
-      description: `Moved box "${name}" from "${previousLocationName}" to "${nextLocationName}".`,
-      roomName: nextLocationName,
+      description: `Moved box "${name}" from room "${previousRoomName}" to room "${nextRoom.roomName}".`,
+      locationName: nextRoom.parentLocationName,
+      roomName: nextRoom.roomName,
       boxName: name,
       previous: {
-        locationId: previousBox.location_id,
-        locationName: previousLocationName,
+        roomId: previousRoomId || null,
+        roomName: previousRoomName,
+        locationId: previousRoom?.parentLocationId ?? null,
+        locationName: previousRoom?.parentLocationName ?? null,
       },
       next: {
-        locationId,
-        locationName: nextLocationName,
+        roomId: nextRoom.roomId,
+        roomName: nextRoom.roomName,
+        locationId: nextRoom.parentLocationId,
+        locationName: nextRoom.parentLocationName,
       },
     });
     return;
@@ -403,7 +527,8 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       entityId: normalizedBoxId,
       title: "Box packed",
       description: `Marked box "${name}" as packed.`,
-      roomName: nextLocationName,
+      locationName: nextRoom.parentLocationName,
+      roomName: nextRoom.roomName,
       boxName: name,
       previous: { status: previousStatus },
       next: { status },
@@ -428,7 +553,8 @@ async function updateBox(boxId: string, input: UpdateBoxInput): Promise<void> {
       changeDetails.length > 0
         ? `Updated box "${name}": ${changeDetails.join(", ")}.`
         : `Updated box "${name}".`,
-    roomName: nextLocationName,
+    locationName: nextRoom.parentLocationName,
+    roomName: nextRoom.roomName,
     boxName: name,
     previous: {
       name: previousBox.name,
@@ -451,9 +577,8 @@ async function deleteBox(boxId: string): Promise<void> {
 
   const { data: boxBeforeDelete, error: boxBeforeDeleteError } = await supabase
     .from("boxes")
-    .select("id,name,status,location_id")
+    .select("id,name,status,room_id")
     .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (boxBeforeDeleteError) throw boxBeforeDeleteError;
@@ -461,44 +586,19 @@ async function deleteBox(boxId: string): Promise<void> {
     throw new Error("Box not found.");
   }
 
-  const { count, error: countError } = await supabase
+  const { error: deleteItemsError } = await supabase
     .from("items")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
+    .delete()
     .eq("box_id", normalizedBoxId);
 
-  if (countError) throw countError;
-  if ((count ?? 0) > 0) {
-    throw new Error(BOX_HAS_ITEMS_MESSAGE);
-  }
+  if (deleteItemsError) throw deleteItemsError;
 
-  const { data, error } = await supabase
-    .from("boxes")
-    .delete()
-    .eq("id", normalizedBoxId)
-    .eq("user_id", userId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    if (isForeignKeyViolation(error)) {
-      throw new Error(BOX_HAS_ITEMS_MESSAGE);
-    }
-
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Box not found.");
-  }
-
-  const locationNameMap = await getLocationNameMap(
+  const roomContextMap = await getRoomContextMap(
     userId,
-    boxBeforeDelete.location_id ? [boxBeforeDelete.location_id] : [],
+    boxBeforeDelete.room_id ? [boxBeforeDelete.room_id] : [],
   );
-  const locationName = boxBeforeDelete.location_id
-    ? (locationNameMap.get(boxBeforeDelete.location_id) ?? "Unknown room")
-    : "Unknown room";
+  const roomContext = boxBeforeDelete.room_id ? roomContextMap.get(boxBeforeDelete.room_id) : undefined;
+  const roomName = roomContext?.roomName ?? "Unknown room";
 
   await activityService.writeActivitySafely({
     type: "Deleted",
@@ -506,14 +606,138 @@ async function deleteBox(boxId: string): Promise<void> {
     entityId: boxBeforeDelete.id,
     title: "Box deleted",
     description: `Deleted box "${boxBeforeDelete.name}".`,
-    roomName: locationName,
+    locationName: roomContext?.parentLocationName ?? null,
+    roomName,
     boxName: boxBeforeDelete.name,
     previous: {
       name: boxBeforeDelete.name,
       status: normalizeStatus(boxBeforeDelete.status),
-      locationId: boxBeforeDelete.location_id,
-      locationName,
+      roomId: boxBeforeDelete.room_id,
+      roomName,
+      locationId: roomContext?.parentLocationId ?? null,
+      locationName: roomContext?.parentLocationName ?? null,
     },
+  });
+
+  const { data, error } = await supabase
+    .from("boxes")
+    .delete()
+    .eq("id", normalizedBoxId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Box not found.");
+  }
+}
+
+async function markBoxDelivered(boxId: string, destinationLocationId?: string | null): Promise<void> {
+  const normalizedBoxId = boxId.trim();
+  if (!normalizedBoxId) {
+    throw new Error("Box id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: box, error: fetchError } = await supabase
+    .from("boxes")
+    .select("id,name,room_id")
+    .eq("id", normalizedBoxId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  const originRoomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
+  const originRoomContext = box.room_id ? originRoomContextMap.get(box.room_id) : undefined;
+
+  let destinationRoom: RoomContext | null = null;
+  if (destinationLocationId) {
+    try {
+      destinationRoom = await resolveDestinationRoom(
+        destinationLocationId,
+        originRoomContext?.roomName ?? null,
+        userId,
+      );
+    } catch {
+      // destination room resolution is best-effort; proceed without it
+    }
+  }
+
+  const updatePayload: { status: string; room_id?: string } = { status: "delivered" };
+  if (destinationRoom) {
+    updatePayload.room_id = destinationRoom.roomId;
+  }
+
+  const { error } = await supabase
+    .from("boxes")
+    .update(updatePayload)
+    .eq("id", normalizedBoxId);
+
+  if (error) throw error;
+
+  const activityRoomContext = destinationRoom ?? originRoomContext;
+
+  await activityService.writeActivitySafely({
+    type: "Delivered",
+    entityType: "box",
+    entityId: normalizedBoxId,
+    title: "Box delivered",
+    description: destinationRoom
+      ? `Marked box "${box.name}" as delivered to "${destinationRoom.parentLocationName}" (${destinationRoom.roomName}).`
+      : `Marked box "${box.name}" as delivered.`,
+    locationName: activityRoomContext?.parentLocationName ?? null,
+    roomName: activityRoomContext?.roomName ?? null,
+    boxName: box.name,
+    next: { status: "delivered" },
+  });
+}
+
+async function markBoxUnpackedAtDestination(boxId: string): Promise<void> {
+  const normalizedBoxId = boxId.trim();
+  if (!normalizedBoxId) {
+    throw new Error("Box id is required.");
+  }
+
+  const userId = await getCurrentUserId();
+
+  const { data: box, error: fetchError } = await supabase
+    .from("boxes")
+    .select("id,name,room_id")
+    .eq("id", normalizedBoxId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  const { error } = await supabase
+    .from("boxes")
+    .update({ status: "unpacked_at_destination" })
+    .eq("id", normalizedBoxId);
+
+  if (error) throw error;
+
+  const roomContextMap = await getRoomContextMap(userId, box.room_id ? [box.room_id] : []);
+  const roomContext = box.room_id ? roomContextMap.get(box.room_id) : undefined;
+
+  await activityService.writeActivitySafely({
+    type: "Updated",
+    entityType: "box",
+    entityId: normalizedBoxId,
+    title: "Box unpacked at destination",
+    description: `Marked box "${box.name}" as unpacked at destination.`,
+    locationName: roomContext?.parentLocationName ?? null,
+    roomName: roomContext?.roomName ?? null,
+    boxName: box.name,
+    next: { status: "unpacked_at_destination" },
   });
 }
 
@@ -523,4 +747,6 @@ export const boxService = {
   createBox,
   updateBox,
   deleteBox,
+  markBoxDelivered,
+  markBoxUnpackedAtDestination,
 };

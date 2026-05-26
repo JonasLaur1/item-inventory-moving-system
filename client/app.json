@@ -23,6 +23,15 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -53,7 +62,8 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "package": "com.jonaslaur.boxit"
     },
     "web": {
       "output": "static",
@@ -84,6 +94,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "51d792bd-5a90-463a-8038-9ff589c269f8"
+      }
     }
   }
 }

@@ -1,87 +1,34 @@
-import { Colors } from "@/constants/theme";
-import { RoomCard, type RoomCardProps } from "@/components/home/room-card";
 import { ItemRow, type InventoryItemRowData } from "@/components/inventory/item-row";
-import { QuickActionCard } from "@/components/home/quick-action-card";
-import { SectionHeader } from "@/components/home/section-header";
-import { CardGrid } from "@/components/ui/card-grid";
+import { ActiveMoveCard } from "@/components/home/active-move-card";
+import { MoveSummaryModal } from "@/components/home/move-summary-modal";
+import { StartMovingModal } from "@/components/home/start-moving-modal";
+import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { RetryErrorCard } from "@/components/ui/retry-error-card";
 import { TabScreenLayout } from "@/components/ui/tab-screen-layout";
+import { Button } from "@/components/button";
 import { useActivityHistory } from "@/hooks/use-activity-history";
 import { useLocations } from "@/hooks/use-locations";
-import { getLocationIcon } from "@/utils/location-icon";
-import { Feather } from "@expo/vector-icons";
+import { useMovingMode } from "@/hooks/use-moving-mode";
+import { locationService } from "@/lib/location.service";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Text, View, useWindowDimensions } from "react-native";
-import Svg, { Circle } from "react-native-svg";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RefreshControl, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { getMinutesAgo, formatRelativeTime } from "@/utils/time-formatting";
+import { getEventTone, getTranslatedActivityText } from "@/utils/activity-tone";
 
-type Room = {
-  id: string;
-  name: string;
-  packed: number;
-  total: number;
-  icon: RoomCardProps["icon"];
-};
-
-function getMinutesAgo(occurredAt: string, nowMs: number): number {
-  const timestamp = new Date(occurredAt).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, Math.floor((nowMs - timestamp) / (60 * 1000)));
-}
-
-function formatRelativeTime(minutesAgo: number): string {
-  if (!Number.isFinite(minutesAgo) || minutesAgo < 0) {
-    return "Unknown";
-  }
-
-  if (minutesAgo < 1) {
-    return "Just now";
-  }
-
-  if (minutesAgo < 60) {
-    return `${minutesAgo}m ago`;
-  }
-
-  if (minutesAgo < 24 * 60) {
-    return `${Math.floor(minutesAgo / 60)}h ago`;
-  }
-
-  return `${Math.floor(minutesAgo / (24 * 60))}d ago`;
-}
-
-function getActivityIcon(type: string): keyof typeof Feather.glyphMap {
-  switch (type) {
-    case "Created":
-      return "plus-square";
-    case "Updated":
-      return "edit-3";
-    case "Moved":
-      return "repeat";
-    case "Deleted":
-      return "trash-2";
-    case "Packed":
-      return "archive";
-    default:
-      return "clock";
-  }
-}
 
 export default function HomeTabScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isCompact = width < 400;
-  const [showAllRooms, setShowAllRooms] = useState(false);
+  const [isStartMovingModalOpen, setIsStartMovingModalOpen] = useState(false);
+  const { isMovingActive, fromLocationId, toLocationId, fromLocationName, toLocationName, startMoving, stopMoving } = useMovingMode();
   const {
     locations,
-    isLoading,
+    isLoading: isLocationsLoading,
     isRefreshing,
-    errorMessage,
     refreshLocations,
   } = useLocations();
   const {
@@ -92,6 +39,9 @@ export default function HomeTabScreen() {
     refreshActivity,
     clearError: clearActivityError,
   } = useActivityHistory(4);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [isFetchingSummary, setIsFetchingSummary] = useState(false);
+  const [summaryUncheckedItems, setSummaryUncheckedItems] = useState(0);
   const hasFocusedOnceRef = useRef(false);
 
   useFocusEffect(
@@ -105,51 +55,62 @@ export default function HomeTabScreen() {
     }, [refreshActivity, refreshLocations]),
   );
 
-  const rooms: Room[] = useMemo(
-    () =>
-      locations.map((location) => ({
-        id: location.id,
-        name: location.name,
-        packed: location.packedBoxes,
-        total: location.boxes,
-        icon: getLocationIcon(location.name),
-      })),
-    [locations],
+  const hasMultipleLocations = locations.length >= 2;
+
+  useEffect(() => {
+    if (!isLocationsLoading && isMovingActive) {
+      const fromExists = locations.some((l) => l.id === fromLocationId);
+      const toExists = locations.some((l) => l.id === toLocationId);
+      if (!fromExists || !toExists) {
+        void stopMoving();
+      }
+    }
+  }, [isLocationsLoading, isMovingActive, locations, fromLocationId, toLocationId, stopMoving]);
+
+  const moveLocations = useMemo(
+    () => locations.filter((l) => l.id === fromLocationId || l.id === toLocationId),
+    [locations, fromLocationId, toLocationId],
   );
 
-  const totalBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.total, 0),
-    [rooms],
-  );
-  const packedBoxes = useMemo(
-    () => rooms.reduce((total, room) => total + room.packed, 0),
-    [rooms],
-  );
-  const percentage = totalBoxes > 0 ? Math.round((packedBoxes / totalBoxes) * 100) : 0;
-  const boxesLeft = totalBoxes - packedBoxes;
+  const moveSummaryBoxStats = useMemo(() => ({
+    totalBoxes: moveLocations.reduce((s, l) => s + l.boxes, 0),
+    deliveredBoxes: moveLocations.reduce((s, l) => s + l.deliveredBoxes, 0),
+    unpackedBoxes: moveLocations.reduce((s, l) => s + l.unpackedAtDestinationBoxes, 0),
+    totalItems: moveLocations.reduce((s, l) => s + l.items, 0),
+  }), [moveLocations]);
 
-  const progress = useMemo(() => {
-    const radius = 88;
-    const strokeWidth = 18;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference * (1 - percentage / 100);
+  const handleStopMovingPress = useCallback(async () => {
+    if (!fromLocationId || !toLocationId) return;
+    setIsSummaryModalOpen(true);
+    setIsFetchingSummary(true);
+    try {
+      const unchecked = await locationService.countUncheckedItems(fromLocationId, toLocationId);
+      setSummaryUncheckedItems(unchecked);
+    } catch {
+      setSummaryUncheckedItems(0);
+    } finally {
+      setIsFetchingSummary(false);
+    }
+  }, [fromLocationId, toLocationId]);
 
-    return { radius, strokeWidth, circumference, offset };
-  }, [percentage]);
+  const fromLocation = locations.find((l) => l.id === fromLocationId);
+  const toLocation = locations.find((l) => l.id === toLocationId);
 
-  const visibleRooms = showAllRooms ? rooms : rooms.slice(0, 2);
   const recentActivityRows: InventoryItemRowData[] = useMemo(
     () => {
       const nowMs = Date.now();
 
       return recentEvents.map((event) => {
         const minutesAgo = getMinutesAgo(event.occurredAt, nowMs);
+        const { title, description } = getTranslatedActivityText(event);
         return {
           id: event.id,
-          title: event.title,
-          subtitle: event.description,
-          badgeText: formatRelativeTime(minutesAgo),
-          icon: getActivityIcon(event.type),
+          title,
+          subtitle: description,
+          rightLabel: formatRelativeTime(minutesAgo),
+          icon: getEventTone(event.type).icon,
+          isCollaborator: !event.isOwnEvent,
+          actorName: event.actorName,
         };
       });
     },
@@ -157,129 +118,40 @@ export default function HomeTabScreen() {
   );
 
   return (
-    <TabScreenLayout horizontalPadding={20}>
-      <View className="mt-8 items-center">
-        <View className="relative h-[220px] w-[220px] items-center justify-center">
-          <Svg width={220} height={220} viewBox="0 0 220 220">
-            <Circle
-              cx={110}
-              cy={110}
-              r={progress.radius}
-              stroke={Colors.dark.borderDefault}
-              strokeWidth={progress.strokeWidth}
-              fill="none"
-            />
-            <Circle
-              cx={110}
-              cy={110}
-              r={progress.radius}
-              stroke={Colors.dark.primary}
-              strokeWidth={progress.strokeWidth}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray={progress.circumference}
-              strokeDashoffset={progress.offset}
-              transform="rotate(-90 110 110)"
-            />
-          </Svg>
-
-          <View className="absolute items-center">
-            <Text className="text-5xl font-black text-text-primary">{percentage}%</Text>
-            <Text className="mt-1 text-xs uppercase tracking-[2px] text-text-tertiary">
-              Packed
-            </Text>
-            <Text className="mt-3 text-base font-bold text-text-primary">
-              {boxesLeft} Boxes Left
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View className="mt-8 flex-row gap-3">
-        <QuickActionCard
-          title="Add Room"
-          subtitle="Create New Room"
-          icon="plus"
-          variant="primary"
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/rooms",
-              params: { create: "1" },
-            })
-          }
+    <TabScreenLayout
+      horizontalPadding={20}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing || isActivityRefreshing}
+          onRefresh={() => void Promise.all([refreshLocations(), refreshActivity()])}
         />
-        <QuickActionCard
-          title="Add Box"
-          subtitle="Add New Box"
-          icon="plus"
-          variant="secondary"
-          onPress={() =>
-            router.push({
-              pathname: "/(tabs)/inventory",
-              params: { create: "1" },
-            })
-          }
-        />
+      }
+    >
+      <View className="mt-8 gap-3">
+        {isMovingActive && fromLocation && toLocation ? (
+          <ActiveMoveCard
+            fromLocation={fromLocation}
+            toLocation={toLocation}
+            onPress={() => router.push("/moving-progress")}
+          />
+        ) : null}
+
+        {hasMultipleLocations ? (
+          <Button
+            label={isMovingActive ? t("home.stopMoving") : t("home.startMoving")}
+            variant={isMovingActive ? "secondary" : "primary"}
+            onPress={() => void (isMovingActive ? handleStopMovingPress() : setIsStartMovingModalOpen(true))}
+          />
+        ) : null}
       </View>
 
       <View className="mt-10">
-        {errorMessage ? (
-          <RetryErrorCard
-            message={errorMessage}
-            isRetrying={isRefreshing}
-            retryingLabel="Refreshing..."
-            onRetry={() => void refreshLocations()}
-          />
-        ) : null}
-
-        <SectionHeader
-          title="Priority Rooms"
-          actionLabel={rooms.length > 2 ? (showAllRooms ? "Show Less" : "Show All") : undefined}
-          onPressAction={
-            rooms.length > 2 ? () => setShowAllRooms((prev) => !prev) : undefined
-          }
-        />
-
-        <CardGrid
-          items={visibleRooms}
-          compact={isCompact}
-          className="mt-4"
-          keyExtractor={(room) => room.id}
-          renderItem={(room) => (
-            <RoomCard
-              name={room.name}
-              packed={room.packed}
-              total={room.total}
-              icon={room.icon}
-              onPress={() => router.push({ pathname: "/room/[id]", params: { id: room.id } })}
-            />
-          )}
-        />
-
-        {isLoading && rooms.length === 0 ? (
-          <EmptyStateCard
-            title="Loading rooms..."
-            description="Fetching your locations and box progress."
-            containerClassName="mt-4"
-          />
-        ) : null}
-
-        {!isLoading && !errorMessage && rooms.length === 0 ? (
-          <EmptyStateCard
-            title="No rooms yet"
-            description="Create a room from the Rooms tab to see progress here."
-            containerClassName="mt-4"
-          />
-        ) : null}
-      </View>
-
-      <View className="mt-4">
-        <SectionHeader title="Recent Activity" />
+        <SectionHeader title={t("home.recentActivity")} />
         {activityErrorMessage ? (
           <RetryErrorCard
             message={activityErrorMessage}
             isRetrying={isActivityRefreshing}
-            retryingLabel="Refreshing..."
+            retryingLabel={t("common.refreshing")}
             onRetry={() => {
               clearActivityError();
               void refreshActivity();
@@ -288,23 +160,50 @@ export default function HomeTabScreen() {
           />
         ) : null}
         <View className="mt-4 gap-3">
-          {recentActivityRows.length > 0 ? (
+          {isActivityLoading ? (
+            <EmptyStateCard
+              title={t("home.loadingActivity")}
+              description={t("home.fetchingActivity")}
+            />
+          ) : recentActivityRows.length > 0 ? (
             recentActivityRows.map((activity) => (
               <ItemRow key={activity.id} item={activity} />
             ))
           ) : (
             <EmptyStateCard
-              title={isActivityLoading || isActivityRefreshing ? "Loading activity..." : "No activity yet"}
-              description={
-                isActivityLoading || isActivityRefreshing
-                  ? "Fetching your latest activity."
-                  : "Your latest inventory actions will appear here."
-              }
+              title={t("home.noActivity")}
+              description={t("home.noActivityDesc")}
             />
           )}
         </View>
       </View>
+
+      <MoveSummaryModal
+        visible={isSummaryModalOpen}
+        fromLocationName={fromLocation?.name ?? fromLocationName}
+        toLocationName={toLocation?.name ?? toLocationName}
+        totalBoxes={moveSummaryBoxStats.totalBoxes}
+        deliveredBoxes={moveSummaryBoxStats.deliveredBoxes}
+        unpackedBoxes={moveSummaryBoxStats.unpackedBoxes}
+        totalItems={moveSummaryBoxStats.totalItems}
+        uncheckedItems={summaryUncheckedItems}
+        isLoadingStats={isFetchingSummary}
+        onConfirm={() => {
+          setIsSummaryModalOpen(false);
+          void stopMoving();
+        }}
+        onClose={() => setIsSummaryModalOpen(false)}
+      />
+
+      <StartMovingModal
+        visible={isStartMovingModalOpen}
+        locations={locations}
+        onConfirm={(from, fromName, to, toName) => {
+          void startMoving(from, fromName, to, toName);
+          setIsStartMovingModalOpen(false);
+        }}
+        onClose={() => setIsStartMovingModalOpen(false)}
+      />
     </TabScreenLayout>
   );
 }
-

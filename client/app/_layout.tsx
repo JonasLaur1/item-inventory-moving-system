@@ -1,4 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -8,10 +10,14 @@ import "react-native-reanimated";
 import "../global.css";
 import { ColorPalettes } from "@/constants/theme";
 import { ThemePreferenceProvider, useThemePreference } from "@/hooks/use-theme-preference";
+import { MovingModeProvider } from "@/hooks/use-moving-mode";
 import { authService } from "@/lib/auth.service";
+import "@/lib/i18n";
+import i18n from "@/lib/i18n";
+import { loadSavedLanguage } from "@/hooks/use-language";
 
 const PUBLIC_ONLY_ROUTES = new Set(["index", "register", "forgotpass"]);
-const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "room", "box"]);
+const AUTH_REQUIRED_ROUTES = new Set(["(tabs)", "location", "room", "box"]);
 
 function hexToRgbTriplet(hex: string) {
   const normalized = hex.replace("#", "");
@@ -44,9 +50,27 @@ const themeVars = {
 };
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts(MaterialCommunityIcons.font);
+  const [isI18nReady, setIsI18nReady] = useState(false);
+
+  useEffect(() => {
+    loadSavedLanguage().then((saved) => {
+      if (saved) {
+        void i18n.changeLanguage(saved);
+      }
+      setIsI18nReady(true);
+    });
+  }, []);
+
+  if (!fontsLoaded || !isI18nReady) {
+    return null;
+  }
+
   return (
     <ThemePreferenceProvider>
-      <RootLayoutContent />
+      <MovingModeProvider>
+        <RootLayoutContent />
+      </MovingModeProvider>
     </ThemePreferenceProvider>
   );
 }
@@ -124,9 +148,12 @@ function RootLayoutContent() {
           <Stack.Screen name="forgotpass" options={{ headerShown: false }} />
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+          <Stack.Screen name="location/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="box/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="location-settings/[id]" options={{ headerShown: false }} />
+<Stack.Screen name="moving-progress" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       </View>
