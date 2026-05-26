@@ -14,6 +14,16 @@ BoxIt helps you organize belongings into rooms and boxes, track packing progress
 - **Activity Log** — full history of created, updated, moved, packed, and deleted events
 - **Themes** — light and dark mode support
 
+## Screenshots
+
+| Home | Inventory | Box Details |
+|:---:|:---:|:---:|
+| ![Home](screenshots/home-moving-mode.png) | ![Inventory](screenshots/inventory.png) | ![Box Details](screenshots/box-details.png) |
+
+| Locations | Moving Progress | Activity |
+|:---:|:---:|:---:|
+| ![Locations](screenshots/locations.png) | ![Moving Progress](screenshots/moving-progress.png) | ![Activity](screenshots/activity.png) |
+
 ## Tech Stack
 
 | Layer | Technology |
