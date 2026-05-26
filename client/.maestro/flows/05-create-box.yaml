@@ -1,0 +1,62 @@
+appId: com.jonaslaur.boxit
+---
+# TC-05: Create a box inside a room
+# Prerequisites: location "Maestro Test Home" with room "Kitchen" exists
+# (run TC-04 first, or seed data manually).
+# Verifies that a new box can be created from the room detail screen.
+
+- launchApp:
+    clearState: true
+
+- assertVisible: "Sign In"
+
+- tapOn:
+    text: "El. pašto adresas"
+- inputText: "boxit.test@gmail.com"
+
+- tapOn:
+    text: "Slaptažodis"
+- inputText: "BoxitTest123!"
+
+- tapOn: "Sign In"
+
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 8000
+
+# Navigate to Locations
+- tapOn:
+    text: "Locations"
+
+- waitForAnimationToEnd
+
+# Open the test location
+- tapOn: "Maestro Test Home"
+
+- waitForAnimationToEnd
+
+# Open the Kitchen room
+- tapOn: "Kitchen"
+
+- waitForAnimationToEnd
+
+- assertVisible: "Room Details"
+
+# Tap Add Box button
+- tapOn: "Add Box"
+
+- assertVisible: "Add Box"
+
+# Enter box name
+- tapOn:
+    text: "Box name"
+- inputText: "Kitchen Box #1"
+
+
+- tapOn: "Create"
+
+- waitForAnimationToEnd
+
+# Box should now appear in the room
+- assertVisible: "Kitchen Box #1"

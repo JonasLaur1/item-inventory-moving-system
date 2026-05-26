@@ -1,6 +1,8 @@
-import { Colors } from "@/constants/theme";
+import { CollaboratorPill } from "@/components/ui/collaborator-pill";
 import { MetaPill } from "@/components/ui/meta-pill";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 import type { ActivityType } from "@/lib/activity.service";
+import { getEventDisplayLabel, getEventTone, getTranslatedActivityText } from "@/utils/activity-tone";
 import { Feather } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
@@ -9,11 +11,15 @@ export type ActivityEventType = ActivityType;
 export type ActivityEvent = {
   id: string;
   type: ActivityEventType;
+  entityType: string;
   title: string;
   description: string;
-  room: string;
+  location: string;
+  room?: string;
   box?: string;
   occurredAt: string;
+  actorName?: string | null;
+  isOwnEvent?: boolean;
 };
 
 type ActivityEventCardProps = {
@@ -22,87 +28,43 @@ type ActivityEventCardProps = {
 };
 
 export function ActivityEventCard({ event, timeLabel }: ActivityEventCardProps) {
+  const { resolvedTheme } = useThemePreference();
   const tone = getEventTone(event.type);
+  const isCollaborator = !event.isOwnEvent;
+  const iconColor = resolvedTheme === "dark" ? tone.iconColor : tone.iconColor;
+  const { title, description } = getTranslatedActivityText(event);
 
   return (
-    <View className="rounded-card border border-border-default bg-bg-elevated/70 p-4">
+    <View
+      className="rounded-card border border-border-default bg-bg-elevated/70 p-4"
+      style={isCollaborator ? { borderLeftColor: "#2D6EF0", borderLeftWidth: 3 } : undefined}
+    >
       <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-row flex-1 items-start">
+        <View className="flex-1 flex-row items-start">
           <View className={`h-10 w-10 items-center justify-center rounded-full ${tone.iconBgClassName}`}>
-            <Feather name={tone.icon} size={16} color={tone.iconColor} />
+            <Feather name={tone.icon} size={16} color={iconColor} />
           </View>
 
           <View className="ml-3 flex-1">
-            <Text className="text-sm font-semibold text-text-primary">{event.title}</Text>
-            <Text className="mt-1 text-xs leading-5 text-text-tertiary">{event.description}</Text>
+            <Text className="text-sm font-semibold text-text-primary">{title}</Text>
+            <Text className="mt-1 text-xs leading-5 text-text-tertiary">{description}</Text>
           </View>
         </View>
 
         <View className={`rounded-full px-2.5 py-1 ${tone.badgeBgClassName}`}>
           <Text className={`text-[10px] font-semibold uppercase tracking-[0.7px] ${tone.badgeTextClassName}`}>
-            {event.type}
+            {getEventDisplayLabel(event.type)}
           </Text>
         </View>
       </View>
 
-      <View className="mt-4 flex-row flex-wrap gap-2">
-        <MetaPill icon="map-pin" text={event.room} />
+      <View className="mt-3 border-t border-border-subtle pt-3 flex-row flex-wrap gap-2">
+        <MetaPill icon="map-pin" text={event.location} />
+        {event.room ? <MetaPill icon="home" text={event.room} /> : null}
         {event.box ? <MetaPill icon="archive" text={event.box} /> : null}
         <MetaPill icon="clock" text={timeLabel} />
+        {isCollaborator ? <CollaboratorPill actorName={event.actorName} /> : null}
       </View>
     </View>
   );
-}
-
-function getEventTone(type: ActivityEventType) {
-  switch (type) {
-    case "Packed":
-      return {
-        icon: "archive" as const,
-        iconBgClassName: "bg-emerald/20",
-        iconColor: Colors.dark.emerald,
-        badgeBgClassName: "bg-emerald/20",
-        badgeTextClassName: "text-emerald",
-      };
-    case "Moved":
-      return {
-        icon: "repeat" as const,
-        iconBgClassName: "bg-primary/20",
-        iconColor: Colors.dark.primary,
-        badgeBgClassName: "bg-primary/20",
-        badgeTextClassName: "text-text-link",
-      };
-    case "Created":
-      return {
-        icon: "plus-square" as const,
-        iconBgClassName: "bg-primary/15",
-        iconColor: Colors.dark.primary,
-        badgeBgClassName: "bg-primary/15",
-        badgeTextClassName: "text-text-link",
-      };
-    case "Updated":
-      return {
-        icon: "edit-3" as const,
-        iconBgClassName: "bg-bg-input",
-        iconColor: Colors.dark.textSecondary,
-        badgeBgClassName: "bg-bg-input",
-        badgeTextClassName: "text-text-secondary",
-      };
-    case "Deleted":
-      return {
-        icon: "trash-2" as const,
-        iconBgClassName: "bg-crimson/20",
-        iconColor: Colors.dark.crimson,
-        badgeBgClassName: "bg-crimson/20",
-        badgeTextClassName: "text-crimson",
-      };
-    default:
-      return {
-        icon: "clock" as const,
-        iconBgClassName: "bg-bg-input",
-        iconColor: Colors.dark.textSecondary,
-        badgeBgClassName: "bg-bg-input",
-        badgeTextClassName: "text-text-secondary",
-      };
-  }
 }

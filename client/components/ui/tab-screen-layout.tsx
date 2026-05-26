@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { type StyleProp, type ViewStyle, ScrollView, View } from "react-native";
+import { type ReactElement, type ReactNode } from "react";
+import { type RefreshControlProps, type StyleProp, type ViewStyle, ScrollView, View } from "react-native";
 
 import { AppHeader } from "@/components/app-header";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ type TabScreenLayoutProps = {
   horizontalPadding?: number;
   paddingBottom?: number;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  refreshControl?: ReactElement<RefreshControlProps>;
 };
 
 export function TabScreenLayout({
@@ -20,6 +21,7 @@ export function TabScreenLayout({
   horizontalPadding = 20,
   paddingBottom = 28,
   contentContainerStyle,
+  refreshControl,
 }: TabScreenLayoutProps) {
   const content = (
     <>
@@ -45,6 +47,7 @@ export function TabScreenLayout({
             contentContainerStyle,
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
         >
           {content}
         </ScrollView>

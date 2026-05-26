@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, Pressable, Text, View } from "react-native";
 
 type AppModalProps = {
@@ -24,6 +25,7 @@ export function AppModal({
   closeOnBackdropPress = false,
   contentClassName = "",
 }: AppModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onRequestClose}>
       <View className="flex-1 items-center justify-center bg-black/60 px-6">
@@ -40,7 +42,7 @@ export function AppModal({
               className="absolute right-3 top-3 h-8 w-8 items-center justify-center rounded-full bg-bg-input/80"
               onPress={onRequestClose}
               accessibilityRole="button"
-              accessibilityLabel="Close modal"
+              accessibilityLabel={t("common.closeModal")}
             >
               <Text className="text-base font-semibold text-text-primary">X</Text>
             </Pressable>

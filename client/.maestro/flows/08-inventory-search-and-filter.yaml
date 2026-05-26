@@ -1,0 +1,77 @@
+appId: com.jonaslaur.boxit
+---
+# TC-08: Inventory search and status filters
+# Prerequisites: at least one box exists.
+# Verifies:
+#   a) The search bar filters boxes by name
+#   b) The "Packed" status filter narrows the list
+#   c) The "Not packed" filter restores unpacked boxes
+#   d) Clearing search shows all results again
+
+- launchApp:
+    clearState: true
+
+- assertVisible: "Sign In"
+
+- tapOn:
+    text: "El. pašto adresas"
+- inputText: "boxit.test@gmail.com"
+
+- tapOn:
+    text: "Slaptažodis"
+- inputText: "BoxitTest123!"
+
+- tapOn: "Sign In"
+
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 8000
+
+- tapOn:
+    text: "Inventory"
+
+- waitForAnimationToEnd
+
+- assertVisible: "Inventory"
+
+# --- Part A: Search by box name ---
+- tapOn:
+    text: "Search boxes and items"
+- inputText: "Kitchen"
+
+- waitForAnimationToEnd
+
+# Only boxes/items matching "Kitchen" should appear
+- assertVisible: "Kitchen"
+
+# Clear search
+- eraseText
+- tapOn: "Inventory"
+
+- waitForAnimationToEnd
+
+# --- Part B: Status filter — Not packed ---
+- tapOn: "Not packed"
+
+- waitForAnimationToEnd
+
+# Packed filter should now show packed boxes
+- assertVisible: "Not packed"
+
+# Reset filter
+- tapOn: "All"
+
+- waitForAnimationToEnd
+
+# --- Part C: Fragile filter ---
+- tapOn: "Fragile"
+
+- waitForAnimationToEnd
+
+- assertVisible: "Fragile"
+
+# Reset
+- tapOn: "All"
+
+- waitForAnimationToEnd

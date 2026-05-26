@@ -6,6 +6,7 @@ type FilterGroupProps<T extends string> = {
   options: readonly T[];
   activeValue: T;
   onSelect: (value: T) => void;
+  getLabel?: (option: T) => string;
   className?: string;
 };
 
@@ -14,6 +15,7 @@ export function FilterGroup<T extends string>({
   options,
   activeValue,
   onSelect,
+  getLabel,
   className = "",
 }: FilterGroupProps<T>) {
   return (
@@ -23,7 +25,7 @@ export function FilterGroup<T extends string>({
         {options.map((option) => (
           <FilterChip
             key={option}
-            label={option}
+            label={getLabel ? getLabel(option) : option}
             isActive={activeValue === option}
             onPress={() => onSelect(option)}
           />

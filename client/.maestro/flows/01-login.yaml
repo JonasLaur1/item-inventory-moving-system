@@ -1,0 +1,34 @@
+appId: com.jonaslaur.boxit
+---
+# TC-01: Successful login
+# Verifies that a registered user can sign in with valid credentials
+# and is redirected to the Home screen.
+
+- launchApp
+
+- assertVisible: "BoxIt"
+- assertVisible: "Smart moving & inventory assistant"
+
+# Fill in email
+- tapOn:
+    text: "El. pašto adresas"
+- inputText: "boxit.test@gmail.com"
+
+# Fill in password
+- tapOn:
+    text: "Slaptažodis"
+- inputText: "BoxitTest123!"
+
+
+- tapOn: "Sign In"
+
+# After successful login the tab bar must be visible
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 8000
+
+- assertVisible: "Home"
+- assertVisible: "Inventory"
+- assertVisible: "Locations"
+- assertVisible: "Activity"
